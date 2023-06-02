@@ -1,0 +1,110 @@
+extends layout
+
+block layout-content
+  script(type="text/javascript").
+    async function getDir(dir) {
+      return new Promise((resolve, reject) => {
+        $.ajax({
+          url: `/certlist?type=${dir}`,
+          method: 'GET',
+          error: (xhr, status, err) => { 
+            console.error('Failed to get ' + dir);
+            reject(err);
+          },
+          success: (result, status, xhr) => {
+            resolve(result);
+          }
+        });
+      });
+    }
+    function buildList(target, files) {
+      if (files.length == 0)
+        target.append('<li>None</li>');
+      else
+        files.sort().forEach((file) => target.append(`<li>${file}</li>`));
+    }
+    function upload(e) {
+      e.preventDefault();
+      var data = new FormData();
+      var files = $('#fileUpload');
+      if (files[0].files.length == 0) {
+        alert('No files choosen');
+      }
+      else {
+        console.log('we have something to upload');
+        for (let i = 0; i < files[0].files.length; i++) {
+          data.append('certFile', files[0].files[i]);
+        }
+
+        var request = $.ajax({
+          url: '/upload',
+          method: 'POST',
+          processData: false,
+          contentType: false,
+          data: data,
+          error: (xhr, msg, err) => {
+            document.getElementById('uploadForm').reset();
+            $.magnificPopup.open({
+              items: {
+                src: `<div class="error-popup">${err}: ${xhr.responseText}</div>`,
+                type: 'inline'
+              }
+            });
+            //- alert(JSON.stringify(err));
+          },
+          success: async (result, status) => {
+            document.getElementById('uploadForm').reset();
+            let files = await getDir(result);
+            $(`#${result}List`).empty();
+            buildList($(`#${result}List`), files.files);
+            $.magnificPopup.open({
+              items: {
+                src: `<div class="white-popup">File uploaded</div>`,
+                type: 'inline'
+              }
+            });
+          }
+        });
+      }
+    }
+    //- window.onload = async function() {
+    $(async function() {  
+      $('#uploadButton').click(upload);
+      let files;
+      let test = $('#rootsList');
+      [ 'roots', 'intermediates', 'leaves' ].forEach(async (dir) => { 
+        files = await getDir(dir);
+        buildList($(`#${dir}List`), files.files);
+      });
+    });
+  div.View
+    h1.Banner Local Certificate Manager
+    form#uploadForm(action="/upload", method="post", encType="multipart/form-data") 
+      .Upload
+        | Upload a new certificate:
+        span.UploadInput
+          input#fileUpload(type="file", name="certFile", accept=".pem,.crt", title="Upload file")
+        div.SubmitButton
+          input#fileReset(type="reset")
+          button#uploadButton.SubmitButton(type="submit", title="submit", value="Upload!") Upload
+    .Certs 
+      .Title
+        h3 Root Certificates
+        #rootCert.CertList
+          ul#rootsList.CertTable
+    .Certs 
+      .Title 
+        h3 Itermediate Certificates 
+        .CertList
+          ul#intermediatesList.CertTable 
+    .Certs 
+      .Title 
+        h3 Leaf Certificates 
+        .CertList
+          ul#leavesList.CertTable
+    //-     h3 Making the Best
+    //-     h1 Food For Devs
+    //-   span.Details Access the WHATABYTE Team Portal
+    //- div.NavButtons
+    //-   a(href="/user")
+    //-       div.NavButton Just dive in!

@@ -1,0 +1,50 @@
+div.Certs {
+    /* height: 100%; */
+    border: 1px black solid;
+    padding-left: 5px;
+    padding-bottom: 5px;
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+
+div.CertList {
+    border: 3px;
+}
+
+ul.CertTable {
+    list-style-type: none;
+    padding-left: 5px;
+}
+
+span.UploadButton {
+    margin-left: 4px;
+}
+
+div.SubmitButton {
+    padding-top: 4px;
+    padding-bottom: 4px;
+}
+
+button#uploadButton {
+    /* padding-left: 4px; */
+    margin-left: 8px;
+}
+
+.white-popup {
+    position: relative;
+    background: #FFF;
+    padding: 20px;
+    width: auto;
+    max-width: 500px;
+    margin: 20px auto;
+}
+
+.error-popup {
+    position: relative;
+    background: #FFF;
+    padding: 20px;
+    width: auto;
+    max-width: 500px;
+    margin: 20px auto;
+    border: 5px red solid;
+}
