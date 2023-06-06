@@ -1,5 +1,6 @@
 import { PathLike, existsSync, mkdir } from 'node:fs';
-import path from 'path'
+import path from 'path';
+import http from 'http';
 import fs from 'fs';
 import { pki } from 'node-forge'; 
 import loki, { Collection } from 'lokijs'
@@ -147,10 +148,10 @@ export class WebServer {
             response.status(404).send('Unknown');
         });
 
-        
-        this._app.listen(this._port, () => {
-            console.log(`Listen on the port ${WebServer.getWebServer().port}...`);
-        });
+        http.createServer(this._app).listen(this._port, '0.0.0.0');
+        // this._app.listen(this._port, () => {
+        //     console.log(`Listen on the port ${WebServer.getWebServer().port}...`);
+        // });
         console.log('Starting');
     }
 

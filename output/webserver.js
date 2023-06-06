@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.WebServer = void 0;
 const node_fs_1 = require("node:fs");
 const path_1 = __importDefault(require("path"));
+const http_1 = __importDefault(require("http"));
 const fs_1 = __importDefault(require("fs"));
 const node_forge_1 = require("node-forge");
 const lokijs_1 = __importDefault(require("lokijs"));
@@ -36,17 +37,6 @@ class CertError extends Error {
     get status() { return this._status; }
 }
 class WebServer {
-    static createWebServer(port, dataPath) {
-        if (!WebServer.instance) {
-            WebServer.instance = new WebServer(port, dataPath);
-        }
-        return WebServer.instance;
-    }
-    static getWebServer() {
-        return WebServer.instance;
-    }
-    get port() { return this._port; }
-    get dataPath() { return this._dataPath; }
     constructor(port, dataPath) {
         this.DB_NAME = 'certs.db';
         this._app = (0, express_1.default)();
@@ -79,6 +69,17 @@ class WebServer {
         this._app.set('views', path_1.default.join(__dirname, 'web/views'));
         this._app.set('view engine', 'pug');
     }
+    static createWebServer(port, dataPath) {
+        if (!WebServer.instance) {
+            WebServer.instance = new WebServer(port, dataPath);
+        }
+        return WebServer.instance;
+    }
+    static getWebServer() {
+        return WebServer.instance;
+    }
+    get port() { return this._port; }
+    get dataPath() { return this._dataPath; }
     start() {
         return __awaiter(this, void 0, void 0, function* () {
             let { certificates, privatekeys } = yield this._dbInit();
@@ -132,9 +133,10 @@ class WebServer {
             this._app.get('/api/upload', (_request, response) => {
                 response.status(404).send('Unknown');
             });
-            this._app.listen(this._port, () => {
-                console.log(`Listen on the port ${WebServer.getWebServer().port}...`);
-            });
+            http_1.default.createServer(this._app).listen(this._port, '0.0.0.0');
+            // this._app.listen(this._port, () => {
+            //     console.log(`Listen on the port ${WebServer.getWebServer().port}...`);
+            // });
             console.log('Starting');
         });
     }
@@ -285,6 +287,6 @@ class WebServer {
         });
     }
 }
-WebServer.instance = null;
 exports.WebServer = WebServer;
+WebServer.instance = null;
 //# sourceMappingURL=webserver.js.map
