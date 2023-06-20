@@ -12,7 +12,14 @@ export class CertificateCache {
     private _location: string;   
     private _cacheTime: number;
     private _cache: Map<string, CacheEntry> = new Map();
-    constructor(location: string, cacheTime: number = 10 * 60 * 60) {
+    constructor(location: string, cacheTime: number = 10) { // * 60 * 60) {
+        let cacheCheck: () => void = (): void => {
+            this._cache.forEach((value, key, map) => {
+                if (value.lastUsed + this._cacheTime < Date.now() / 1000) {
+                    map.delete(key);
+                }
+            });
+        }
         if (!fs.existsSync(location)) {
             throw new Error('Specified location does not exist');
         }
@@ -25,25 +32,18 @@ export class CertificateCache {
         this._cacheTime = cacheTime;
 
         if (this._cacheTime > 0) {
-            setInterval((this._cacheCheck), this._cacheTime * 1000);
+            setInterval((cacheCheck), this._cacheTime * 1000);
         }
-    }
-
-    private _cacheCheck() {
-        this._cache.forEach((value, key, map) => {
-            if (value.lastUsed + this._cacheTime < Date.now() / 1000) {
-                map.delete(key);
-            }
-        });
     }
 
     async getCertificate(name: string): Promise<pki.Certificate> {
         return new Promise<pki.Certificate>(async (resolve, reject) => {
-            let entry: CacheEntry = this._cache.get(name);
+            let entry: CacheEntry = this._cache.get(name) || { lastUsed: 0, certificate: null };
 
-            if (!entry) {
+            if (!entry.certificate) {
                 try {
-                    entry.certificate = pki.certificateFromPem(await readFile(path.join(this._location, name) ,{ encoding: 'utf8' }));
+                    // entry.certificate = pki.certificateFromPem(fs.readFileSync(path.join(this._location, name + '.pem') ,{ encoding: 'utf8' }));
+                    entry.certificate = pki.certificateFromPem(await readFile(path.join(this._location, name + '.pem') ,{ encoding: 'utf8' }));
                 }
                 catch (err) {
                     reject(err);
@@ -51,8 +51,8 @@ export class CertificateCache {
 
                 entry.lastUsed = Date.now() / 1000;
                 this._cache.set(name, entry);
-                resolve(entry.certificate);
             }
+            resolve(entry.certificate);
         });
     }
 

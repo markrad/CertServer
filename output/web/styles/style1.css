@@ -7,6 +7,14 @@ div.Certs {
     margin-bottom: 5px;
 }
 
+div.Keys {
+    border: 1px black solid;
+    padding-left: 5px;
+    padding-bottom: 5px;
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+
 div.CertList {
     border: 3px;
 }
@@ -15,6 +23,18 @@ ul.CertTable {
     list-style-type: none;
     padding-left: 5px;
 }
+
+.slideForm {
+    display: none;
+    border: 1px black solid;
+    padding: 5px 5px 5px 5px;
+    margin: 5px 0px 5px 0px;
+    background-color: rgb(232, 247, 219);
+}
+
+/* form#uploadCertForm {
+    display: none;
+} */
 
 span.UploadButton {
     margin-left: 4px;
@@ -28,6 +48,95 @@ div.SubmitButton {
 button#uploadButton {
     /* padding-left: 4px; */
     margin-left: 8px;
+}
+
+span.certArrow {
+    font-family:'Courier New', Courier, monospace;
+    cursor: pointer;
+    padding-right: 10pt;
+}
+
+span.certLine {
+    font-family: 'Courier New', Courier, monospace;
+}
+
+span.certButtons {
+    text-align: right;
+    display: block;
+}
+
+span.certDeleteBtn {
+    cursor: pointer;
+}
+
+span.certDownloadBtn {
+    cursor: pointer;
+}
+
+div.certDetails {
+    display: none;
+}
+
+div.certInfo {
+    font-family: monospace;
+    margin-left: 25px;
+    margin-bottom: 10px;
+}
+
+span.certPrivateKey {
+    color: red;
+}
+
+span.keyArrow {
+    font-family:'Courier New', Courier, monospace;
+    cursor: pointer;
+    padding-right: 10pt;
+}
+
+span.keyLine {
+    font-family: 'Courier New', Courier, monospace;
+}
+
+span.keyButtons {
+    text-align: right;
+    display: block;
+}
+
+span.keyDeleteBtn {
+    cursor: pointer;
+}
+
+span.keyDownloadBtn {
+    cursor: pointer;
+}
+
+div.keyDetails {
+    display: none;
+}
+
+div.keyInfo {
+    font-family: monospace;
+    margin-left: 25px;
+    margin-bottom: 10px;
+}
+
+button.button1 {
+    background-color: rgb(34, 116, 34);
+    border: none;
+    padding: 8px 8px;
+    text-align: center;
+    display: inline-block;
+    font-size: 16px;
+    margin: 4px 4px;
+    transition-duration: 0.4s;
+    cursor: pointer;
+    color: whitesmoke;
+    border-radius: 6px;
+    width: 140pt;
+}
+
+button.button1:hover {
+    background-color: rgb(64, 167, 64);
 }
 
 .white-popup {

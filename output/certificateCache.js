@@ -18,8 +18,15 @@ const promises_1 = require("fs/promises");
 const path_1 = __importDefault(require("path"));
 const node_forge_1 = require("node-forge");
 class CertificateCache {
-    constructor(location, cacheTime = 10 * 60 * 60) {
+    constructor(location, cacheTime = 10) {
         this._cache = new Map();
+        let cacheCheck = () => {
+            this._cache.forEach((value, key, map) => {
+                if (value.lastUsed + this._cacheTime < Date.now() / 1000) {
+                    map.delete(key);
+                }
+            });
+        };
         if (!fs_1.default.existsSync(location)) {
             throw new Error('Specified location does not exist');
         }
@@ -29,31 +36,25 @@ class CertificateCache {
         this._location = location;
         this._cacheTime = cacheTime;
         if (this._cacheTime > 0) {
-            setInterval((this._cacheCheck), this._cacheTime * 1000);
+            setInterval((cacheCheck), this._cacheTime * 1000);
         }
-    }
-    _cacheCheck() {
-        this._cache.forEach((value, key, map) => {
-            if (value.lastUsed + this._cacheTime < Date.now() / 1000) {
-                map.delete(key);
-            }
-        });
     }
     getCertificate(name) {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
-                let entry = this._cache.get(name);
-                if (!entry) {
+                let entry = this._cache.get(name) || { lastUsed: 0, certificate: null };
+                if (!entry.certificate) {
                     try {
-                        entry.certificate = node_forge_1.pki.certificateFromPem(yield (0, promises_1.readFile)(path_1.default.join(this._location, name), { encoding: 'utf8' }));
+                        // entry.certificate = pki.certificateFromPem(fs.readFileSync(path.join(this._location, name + '.pem') ,{ encoding: 'utf8' }));
+                        entry.certificate = node_forge_1.pki.certificateFromPem(yield (0, promises_1.readFile)(path_1.default.join(this._location, name + '.pem'), { encoding: 'utf8' }));
                     }
                     catch (err) {
                         reject(err);
                     }
                     entry.lastUsed = Date.now() / 1000;
                     this._cache.set(name, entry);
-                    resolve(entry.certificate);
                 }
+                resolve(entry.certificate);
             }));
         });
     }
