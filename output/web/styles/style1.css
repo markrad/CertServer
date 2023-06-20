@@ -139,6 +139,33 @@ button.button1:hover {
     background-color: rgb(64, 167, 64);
 }
 
+button.button2 {
+    background-color: rgb(34, 116, 34);
+    border: none;
+    padding: 8px 8px;
+    text-align: center;
+    display: inline-block;
+    font-size: 12px;
+    margin: 4px 4px;
+    transition-duration: 0.4s;
+    cursor: pointer;
+    color: whitesmoke;
+    border-radius: 6px;
+    width: 100pt;
+}
+
+button.button2Red {
+    background-color: rgb(160, 13, 13);
+}
+
+button.button2:hover {
+    background-color: rgb(64, 167, 64);
+}
+
+button.button2Red:hover {
+    background-color: red;
+}
+
 .white-popup {
     position: relative;
     background: #FFF;

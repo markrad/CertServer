@@ -62,12 +62,19 @@ block layout-content
             nameLookup[file.id] = file.name;
           });
     }
+    //- button(type='button' class='button1' onclick='togglePane(\'#uploadCertForm\')') Upload Certificate
 
     function certClick(id) {
       let detailHTML = 
-        '<div class="certInfo">' +
+        '<div class="certInfo slideform">' +
+          '<div class="certInfoButtons">' + 
+            '<button type="button" class="button2 certBtnDownload">Download</button>' +
+            '<button type="button" class="button2 certBtnDownloadChain">Download Chain</button>' +
+            '<button type="button" class="button2 button2Red certBtnDelete">Delete</button>' +
+          '</div>' +
           '<div class="certInfoType">' +
             '<span class="certTypeLabel">Type:&nbsp;</span><span class="certTypeValue">%s</span><span class="certPrivateKey">%s</span></div>' +
+          '<div class="certInfoSerial">Serial Number: %s</div>' +  
           '<div class="certInfoSubject">Subject:&nbsp;' +
             '<span class="certInfoSubjectC">C=%s;&nbsp;</span>' +
             '<span class="certInfoSubjectST">ST=%s;&nbsp;</span>' +
@@ -119,6 +126,7 @@ block layout-content
             let content = sprintf(detailHTML, 
               result.certType,
               result.keyPresent == 'yes'? '&nbsp;with private key' : '',
+              result.serialNumber,
               result.subject.C,
               result.subject.ST,
               result.subject.L, 
@@ -137,6 +145,7 @@ block layout-content
               result.keyPresent,
             );
             details['0'].innerHTML = content;
+            if (result.certType == 'root') details.find('.' + 'certBtnDownloadChain').hide();
             let nullTest = [
               [result.subject.C, 'certInfoSubjectC'],
               [result.subject.ST, 'certInfoSubjectST'],

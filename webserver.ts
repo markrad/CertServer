@@ -59,6 +59,7 @@ type CertificateBrief = {
     validTo: Date,
     signer: string,
     keyPresent: string,
+    serialNumber: string,
 }
 
 type KeyBrief = {
@@ -196,6 +197,24 @@ export class WebServer {
                 }
             });
         }));
+        this._app.post('/uploadKey', ((req: any, res) => {
+            if (!req.files || Object.keys(req.files).length == 0) {
+                return res.status(400).send('No file selected');
+            }
+            let keyFile = req.files.keyfile;
+            let tempName = path.join(this._workPath, keyFile.name);
+            keyFile.mv(tempName, async (err: Error) => {
+                if (err) return res.status(500).send(err);
+
+                try {
+                    let keyString = await this._tryAddKey(tempName);
+                    return res.status(200).json(keyString);
+                }
+                catch (err) {
+                    return res.status(err.status ?? 500).send(err.message);
+                }
+            });
+        }));
         this._app.get("/", (_request, response) => {
             response.render('index', { title: 'Certificates Management Home'});
         });
@@ -245,6 +264,9 @@ export class WebServer {
             }
         });
         this._app.post('/api/uploadCert', async (request, response) => {
+            if (!(request.body as string).includes('\n')) {
+                return response.status(400).send('Certificate must be in standard 64 byte line length format - try --data-binary on curl');
+            }
             try {
                 writeFileSync(path.join(this._workPath, 'upload.pem'), request.body, { encoding: 'utf8' });
                 let certString = await this._tryAddCertificate(path.join(this._workPath, 'upload.pem'));
@@ -255,6 +277,9 @@ export class WebServer {
             }
         });
         this._app.post('/api/uploadKey', async (request, response) => {
+            if (!(request.body as string).includes('\n')) {
+                return response.status(400).send('Key must be in standard 64 byte line length format - try --data-binary on curl');
+            }
             try {
                 writeFileSync(path.join(this._workPath, 'upload.key'), request.body, { encoding: 'utf8' });
                 let keyString = await this._tryAddKey(path.join(this._workPath, 'upload.key'));
@@ -297,6 +322,7 @@ export class WebServer {
             subject: r.subject,
             validFrom: r.notBefore,
             validTo: r.notAfter,
+            serialNumber: r.serialNumber.match(/.{1,2}/g).join(':'),
             signer: signer,
             keyPresent: key != null? 'yes' : 'no',
             // TODO: Add reference to signer
@@ -449,12 +475,26 @@ export class WebServer {
     _isSignedBy(cert: pki.Certificate, keyn: jsbn.BigInteger, keye: jsbn.BigInteger): boolean {
         let publicKey = pki.setRsaPublicKey(keyn, keye);
         let certPublicKey: pki.rsa.PublicKey = cert.publicKey as pki.rsa.PublicKey;
-        if (publicKey.n.data.length != certPublicKey.n.data.length) return false;
 
-        for (let i = 0; i < publicKey.n.data.length; i++) {
-            if (publicKey.n.data[i] != certPublicKey.n.data[i]) {
-                return false;
-            }
+        return this._isIdenticalKey(publicKey, certPublicKey);
+        // if (publicKey.n.data.length != certPublicKey.n.data.length) return false;
+
+        // for (let i = 0; i < publicKey.n.data.length; i++) {
+        //     if (publicKey.n.data[i] != certPublicKey.n.data[i]) {
+        //         return false;
+        //     }
+        // }
+
+        // return true;
+    }
+
+    _isIdenticalKey(leftKey: pki.rsa.PublicKey, rightKey: pki.rsa.PublicKey): boolean {
+        if (leftKey.n.data.length != rightKey.n.data.length) {
+            return false;
+        }
+
+        for (let i = 0; i < leftKey.n.data.length; i++) {
+            if (leftKey.n.data[i] != rightKey.n.data[i]) return false;
         }
 
         return true;
@@ -469,7 +509,16 @@ export class WebServer {
 
         try {
             let k = pki.privateKeyFromPem(fs.readFileSync(filename, { encoding: 'utf8' }));
-            let krow: PrivateKeyRow = { e: k.e, n: k.n, pairSerial: null, name: null }
+            let krow: PrivateKeyRow = { e: k.e, n: k.n, pairSerial: null, name: null };
+            let keys = this._privateKeys.find();
+            let publicKey = pki.setRsaPublicKey(k.e, k.n);
+
+            for (let i = 0; i < keys.length; i++) {
+                if (this._isIdenticalKey(pki.setRsaPublicKey(keys[i].n, keys[i].e), publicKey)) {
+                    throw new CertError(409, `Key already present: ${keys[i].name}`);
+                }
+            }
+            
             let certs = this._certificates.find();
             let newfile = 'unknown_key_';
 
@@ -522,7 +571,7 @@ export class WebServer {
                 let havePrivateKey: boolean = false;
 
                 if (this._certificates.findOne({ serialNumber: c.serialNumber }) != null) {
-                    throw new CertError(409, `${path.basename(filename)} is a duplicate - ignored`);
+                    throw new CertError(409, `${path.basename(filename)} serial number ${c.serialNumber} is a duplicate - ignored`);
                 }
 
                 if (c.isIssuer(c)) {
