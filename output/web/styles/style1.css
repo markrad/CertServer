@@ -30,6 +30,23 @@ ul.CertTable {
     padding: 5px 5px 5px 5px;
     margin: 5px 0px 5px 0px;
     background-color: rgb(232, 247, 219);
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+}
+
+.SubjectTitle {
+    width: 140px;
+    text-align: left;
+    /* padding-right: 2em; */
+    padding-top: 10px;
+    padding-bottom: 4px;
+    display: block;
+}
+
+.SubjectValue {
+    /* display: block; */
+    width: 600px;
+    /* float: right; */
+    margin-bottom: 1em;
 }
 
 /* form#uploadCertForm {
@@ -51,13 +68,13 @@ button#uploadButton {
 }
 
 span.certArrow {
-    font-family:'Courier New', Courier, monospace;
+    font-family: 'Courier New', Courier, monospace;
     cursor: pointer;
-    padding-right: 10pt;
 }
 
 span.certLine {
     font-family: 'Courier New', Courier, monospace;
+    cursor: pointer;
 }
 
 span.certButtons {
@@ -95,6 +112,7 @@ span.keyArrow {
 
 span.keyLine {
     font-family: 'Courier New', Courier, monospace;
+    cursor: pointer;
 }
 
 span.keyButtons {
@@ -139,7 +157,7 @@ button.button1:hover {
     background-color: rgb(64, 167, 64);
 }
 
-button.button2 {
+.button2 {
     background-color: rgb(34, 116, 34);
     border: none;
     padding: 8px 8px;

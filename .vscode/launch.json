@@ -20,7 +20,9 @@
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "program": "${workspaceFolder}/output/index.js",
+            "args": [ "../../config.json" ],
+            "outputCapture": "std",
+            "program": "${workspaceFolder}/output/src/index.js",
             "outFiles": [
                 "${workspaceFolder}/**/*.js"
             ]

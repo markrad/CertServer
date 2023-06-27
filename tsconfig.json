@@ -10,7 +10,7 @@
     "noUnusedParameters": true,
     "forceConsistentCasingInFileNames": true,
     "allowJs": false,
-    "checkJs": false,
+    "checkJs": false, 
     "outDir": "./output",
     "skipLibCheck": true,
   }

@@ -25,40 +25,40 @@ block layout-content
 
     function buildKeyList(target, files) {
       let listEntryHTML = '<li class="keyLine" id="%s">' +
-        '  <span class="keyArrow" onclick="keyClick(\'%s\')">▼</span>' +
-        '  <span class="keyDeleteBtn" onclick="keyDelete(\'%s\')"><img src="images/delete.png" alt="Delete" title="Delete" width="16" height="16"/></span>' +
-        '  <span class="keyDownloadBtn" onclick="keyDownload(\'%s\')"><img src="images/onecert.png" alt="Download certificate" title="Download key" width="16" height="16"/></span>' +
-        '  <span class="keyLine">%s</span>' +
+        '  <span onclick="keyClick(\'%s\')">' +
+        '    <span class="keyArrow">></span>' +
+        '    <span class="keyLine">%s</span>' +
+        '  </span>' +
         '  <div class="keyDetails">' +
-        //- '    Details<br/>test' +
         '  </div>' +
         '</li>';
+      target.empty();
       if (files.length == 0)
         target.append('<li>None</li>');
       else
         files.sort((l, r) => l.name.localeCompare(r))
           .forEach((file) => {
-            target.append(sprintf(listEntryHTML, file.id, file.id, file.id, file.id, file.name));
+            target.append(sprintf(listEntryHTML, file.id, file.id, file.name));
             keyLookup[file.id] = file.name;
         });
     }
 
     function buildCertList(target, files) {
       let listEntryHTML = '<li class="certLine" id="%s">' +
-        '  <span class="certArrow" onclick="certClick(\'%s\')">▼</span>' +
-        '  <span class="certDeleteBtn" onclick="certDelete(\'%s\')"><img src="images/delete.png" alt="Delete" title="Delete" width="16" height="16"/></span>' +
-        '  <span class="certDownloadBtn" onclick="certDownload(\'%s\')"><img src="images/onecert.png" alt="Download certificate" title="Download certificate" width="16" height="16"/></span>' +
-        '  <span class="certLine">%s</span>' +
+        '  <span onclick="certClick(\'%s\')">' +
+        '    <span class="certArrow">˃</span>' +
+        '    <span class="certLine">%s</span>' +
+        '  </span>' +
         '  <div class="certDetails">' +
-        //- '    Details<br/>test' +
         '  </div>' +
         '</li>';
+      target.empty();
       if (files.length == 0)
         target.append('<li>None</li>');
       else
         files.sort((l, r) => l.name.localeCompare(r))
           .forEach((file) => {
-            target.append(sprintf(listEntryHTML, file.id, file.id, file.id, file.id, file.name));
+            target.append(sprintf(listEntryHTML, file.id, file.id, file.name));
             nameLookup[file.id] = file.name;
           });
     }
@@ -68,9 +68,13 @@ block layout-content
       let detailHTML = 
         '<div class="certInfo slideform">' +
           '<div class="certInfoButtons">' + 
-            '<button type="button" class="button2 certBtnDownload">Download</button>' +
+            '<button type="button" class="button2 certBtnDownload" onClick="certDownload(\'%s\')">Download</button>' +
             '<button type="button" class="button2 certBtnDownloadChain">Download Chain</button>' +
-            '<button type="button" class="button2 button2Red certBtnDelete">Delete</button>' +
+            '<button type="button" class="button2 button2Red certBtnDelete" onClick="certDelete(\'%s\', \'%s\')">Delete</button>' +
+            '<span class="certOptionalButtons">' +
+            '  <button type="button" class="button2">New Intermediate</button>' +
+            '  <button type="button" class="button2">New Leaf</button>' +
+            '</span>' +
           '</div>' +
           '<div class="certInfoType">' +
             '<span class="certTypeLabel">Type:&nbsp;</span><span class="certTypeValue">%s</span><span class="certPrivateKey">%s</span></div>' +
@@ -101,13 +105,13 @@ block layout-content
       let details = line.find('.certDetails');
       let arrow = line.find('.certArrow');
       if (details.is(':hidden') == false) {
-        details.hide();
-        details['0'].innerText = '';
-        arrow['0'].innerText = '▼';
+        details.slideUp(400, () => {
+          details['0'].innerText = '';
+          arrow['0'].innerText = '>';
+        });
       }
       else {
-        details.show();           // &#9650
-        arrow['0'].innerText = '▲';
+        arrow['0'].innerText = '˅';
         console.log(arrow['0'].innerText);
         var request = $.ajax({
           url: '/certDetails?name=' + nameLookup[id],
@@ -124,6 +128,9 @@ block layout-content
           },
           success: (result, status) => {
             let content = sprintf(detailHTML, 
+              nameLookup[id],
+              result.serialNumber,
+              result.certType,
               result.certType,
               result.keyPresent == 'yes'? '&nbsp;with private key' : '',
               result.serialNumber,
@@ -146,6 +153,7 @@ block layout-content
             );
             details['0'].innerHTML = content;
             if (result.certType == 'root') details.find('.' + 'certBtnDownloadChain').hide();
+            if (result.keyPresent == 'no' || result.certType == 'leaf') details.find('.' + 'certOptionalButtons').hide();
             let nullTest = [
               [result.subject.C, 'certInfoSubjectC'],
               [result.subject.ST, 'certInfoSubjectST'],
@@ -166,6 +174,8 @@ block layout-content
                 t.hide();
               }
             });
+            
+            details.slideDown(500);
 
             console.log('success');
           }
@@ -173,24 +183,67 @@ block layout-content
       };
     }
 
-    function certDelete(id) {
-      if (confirm(`This will delete ${nameLookup[id]}. \n\nDo you wish to continue?`)) {
-        console.log('Would delete ' + nameLookup[id]);
+    function certDelete(serialNumber, type) {
+      if (confirm(`This will delete ${serialNumber}. \n\nDo you wish to continue?`)) {
+        console.log('Would delete ' + serialNumber.split(':').join(''));
+        var request = $.ajax({
+          url: '/deleteCert?serialNumber=' + serialNumber.split(':').join(''),
+          method: 'DELETE',
+          processData: false,
+          contentType: false,
+          error: (xhr, msg, err) => {
+            $.magnificPopup.open({
+              items: {
+                src: `<div class="error-popup">${err}: ${JSON.parse(xhr.responseText).error}</div>`,
+                type: 'inline'
+              }
+            });
+          },
+          success: async (result, status) => {
+            processChanges(result.types);
+            $.magnificPopup.open({
+              items: {
+                src: `<div class="white-popup">Certificate Deleted</div>`,
+                type: 'inline'
+              }
+            });
+          }
+        });
       }
     }
 
-    function certDownload(id) {
-      console.log('Would download ' + nameLookup[id]);
+    function processChanges(types) {
+      types.split(';').forEach(async (type) => {
+        let files = await getDir(type);
+        if (type == 'key') buildKeyList($(`#${type}List`), files.files);
+        else buildCertList($(`#${type}List`), files.files);
+      });
+    }
+
+    function certDownload(name) {
+      let filename = name + '.pem';
+      let filelocation = 'certificates/' + filename;
+      const anchor = $('<a>', { href: filelocation, download: filename })[0];
+      $('body').append(anchor);
+      anchor.click();
+      $(anchor).remove();
     }
 
     function keyClick(id) {
       let detailHTML =
         '<div class="keyInfo">' +
+          '<div class="certInfoButtons">' + 
+            '<button type="button" class="button2 keyBtnDownload" onClick="keyDownload(\'%s\')">Download</button>' +
+            '<button type="button" class="button2 button2Red keyBtnDelete" onClick="keyDelete(\'%s\')">Delete</button>' +
+          '</div>' +
           '<div class="keyName">' +
             '<span class="keyNameLabel">Name:&nbsp;</span><span class="keyNameValue">%s</span>' +
           '</div>' +
           '<div class="keyPair">' +
             '<span class="keyPairLabel">Pair:&nbsp;</span><span class="keyPairValue">%s</span>' +
+          '</div>' +
+          '<div class="keyEncrypted">' +
+          '  <span class="keyEncryptedLabel">Encrypted:&nbsp;</span><span class="keyEncryptedValue">%s</span>' +
           '</div>'; 
       console.log('key click ' + id);
       let line = $('.keyLine#' + id);
@@ -199,11 +252,11 @@ block layout-content
       if (details.is(':hidden') == false) {
         details.hide();
         details['0'].innerText = '';
-        arrow['0'].innerText = '▼';
+        arrow['0'].innerText = '>';
       }
       else {
         details.show();           // &#9650
-        arrow['0'].innerText = '▲';
+        arrow['0'].innerText = '˅';
         console.log(arrow['0'].innerText);
         var request = $.ajax({
           url: '/keyDetails?name=' + keyLookup[id],
@@ -219,7 +272,7 @@ block layout-content
             });
           },
           success: (result, status) => {
-            let content = sprintf(detailHTML, result.name, result.certPair);
+            let content = sprintf(detailHTML, result.name, result.name, result.name, result.certPair, result.encrypted? 'yes' : 'no');
             details['0'].innerHTML = content;
             console.log('success');
           }
@@ -227,12 +280,41 @@ block layout-content
       };
     }
 
-    function keyDownload(id) {
-      console.log('key download ' + id);
+    function keyDownload(name) {
+      let filename = name + '.pem';
+      let filelocation = 'keys/' + filename;
+      const anchor = $('<a>', { href: filelocation, download: filename })[0];
+      $('body').append(anchor);
+      anchor.click();
+      $(anchor).remove();
     }
 
-    function keyDelete(id) {
-      console.log('key delete ' + id);
+    function keyDelete(name) {
+      if (confirm(`This will delete ${name}. \n\nDo you wish to continue?`)) {
+        var request = $.ajax({
+          url: '/deleteKey?name=' + name,
+          method: 'DELETE',
+          processData: false,
+          contentType: false,
+          error: (xhr, msg, err) => {
+            $.magnificPopup.open({
+              items: {
+                src: `<div class="error-popup">${err}: ${JSON.parse(xhr.responseText).error}</div>`,
+                type: 'inline'
+              }
+            });
+          },
+          success: async (result, status) => {
+            processChanges(result.types);
+            $.magnificPopup.open({
+              items: {
+                src: `<div class="white-popup">Key Deleted</div>`,
+                type: 'inline'
+              }
+            });
+          }
+        });
+      }
     }
 
     function togglePane(id) {
@@ -249,9 +331,9 @@ block layout-content
     }
 
     function uploadCert(e) {
-      e.preventDefault();
+      //- e.preventDefault();
       var data = new FormData();
-      var files = $('#fileUpload');
+      var files = $('#certUpload');
       if (files[0].files.length == 0) {
         alert('No files choosen');
       }
@@ -268,7 +350,7 @@ block layout-content
           contentType: false,
           data: data,
           error: (xhr, msg, err) => {
-            document.getElementById('uploadForm').reset();
+            document.getElementById('uploadCertForm').reset();
             $.magnificPopup.open({
               items: {
                 src: `<div class="error-popup">${err}: ${xhr.responseText}</div>`,
@@ -278,10 +360,8 @@ block layout-content
             //- alert(JSON.stringify(err));
           },
           success: async (result, status) => {
-            document.getElementById('uploadForm').reset();
-            let files = await getDir(result);
-            $(`#${result}List`).empty();
-            buildCertList($(`#${result}List`), files.files);
+            document.getElementById('uploadCertForm').reset();
+            processChanges(result.types);
             $.magnificPopup.open({
               items: {
                 src: `<div class="white-popup">File uploaded</div>`,
@@ -293,8 +373,22 @@ block layout-content
       }
     }
 
+    function createCACert(e) {
+      let data = new FormData();
+      console.log('generate it');
+    }
+
+    function createCACertResponse(data) {
+      console.log(data);
+    }
+
     $(async function() {
       sprintf = window.sprintf;
+      let datePicker;
+      datePicker = $('#CAValidFrom');
+      datePicker.datepicker( { minDate: -20, defaultDate: 0 } );
+      datePicker = $('#CAValidTo');
+      datePicker.datepicker( { defaultDate: +365 } );
       //- $('#uploadButton').click(upload);
       let files;
       [ ['root', buildCertList], 
@@ -305,29 +399,93 @@ block layout-content
         files = await getDir(entry[0]);
         entry[1]($(`#${entry[0]}List`), files.files);
       });
+      $('#generateCertForm').ajaxForm({
+        dataType: 'json',
+        success: createCACertResponse,
+        error: (xhr, msg, err) => {
+          let outmsg = JSON.parse(xhr.responseText);
+          $.magnificPopup.open({
+            items: {
+              src: `<div class="error-popup">${err}: ${outmsg.message}</div>`,
+              type: 'inline'
+            }
+          });
+        } 
+      });      
+      //- $('#generateCertForm').submit(() => {
+      //-   $(this).ajaxSubmit({ url: '/createCACert', type: 'post', error: (xhr, msg, err) => {
+      //-     console.log('fuck');
+      //-   } });
+      //-   return false;
+      //- });
     });
   div.View
     h1.Banner Local Certificate Manager
     button(type='button' class='button1' onclick='togglePane(\'#uploadCertForm\')') Upload Certificate
     button(type='button' class='button1' onclick='togglePane(\'#uploadKeyForm\')') Upload Key
-    button(type='button' class='button1' onclick='togglePane(\'#generateCertForm\')') Generate Certificate
-    form#uploadCertForm(action="/uploadCert", method="post", encType="multipart/form-data" class='slideForm') 
+    button(type='button' class='button1' onclick='togglePane(\'#generateCertForm\')') Generate New CA
+    //- form#uploadCertForm(action="/uploadCert", method="post", encType="multipart/form-data" class='slideForm') 
+    form#uploadCertForm(method="post", encType="multipart/form-data" class='slideForm') 
       .Upload
         | Upload a certificate:&nbsp;
         span.UploadInput
-          input#fileUpload(type="file", name="certFile", accept=".pem,.crt", title="Upload file")
+          input#certUpload(type="file", name="certFile", accept=".pem,.crt", title="Upload file")
         div.SubmitButton
           input#fileReset(type="reset")
-          button#uploadButton.SubmitButton(type="submit", title="submit", value="Upload") Upload
+          button#uploadButton.SubmitButton(type="button", onClick="uploadCert()" title="submit", value="Upload") Upload
     form#uploadKeyForm(action="/uploadKey", method="post", encType="multipart/form-data" class='slideForm')
       .Upload
         | Upload a key:&nbsp;
         span.UploadInput
-          input#fileUpload(type="file", name="keyFile", accept=".pem,.crt,.key", title="Upload file")
+          input#keyUpload(type="file", name="keyFile", accept=".pem,.crt,.key", title="Upload file")
         div.SubmitButton
           input#fileReset(type="reset")
           button#uploadButton.SubmitButton(type="submit", title="submit", value="Upload") Upload
-    div.slideForm#generateCertForm Generate a new certificate here
+    form.slideForm#generateCertForm(action="/createCACert", method="post", encType="application/x-www-form-urlencoded") This will generate a private key and self-signed root CA pair
+      .Country 
+        span.SubjectTitle
+          | Country:
+        span.SubjectValue 
+          input(type="text", name="caCountry" value=C title="country")
+      .State
+        span.SubjectTitle
+          | State:
+        span.SubjectValue 
+          input(type="text", name="caState" value=S)
+      .Location
+        span.SubjectTitle
+          | Location:
+        span.SubjectValue 
+          input(type="text", name="caLocation" value=L)
+      .Organization 
+        span.SubjectTitle
+          | Organization 
+        span.SubjectValue 
+          input(type="text", name="caOrganization" value=O)
+      .Unit 
+        span.SubjectTitle
+          | Unit: 
+        span.SubjectValue 
+          input(type="text", name="caUnit" value=OU)
+      .CommonName 
+        span.SubjectTitle
+          | Common Name: 
+        span.SubjectValue 
+          input(type="text", name="caCommonName" title="Common Name")
+      .StartDate 
+        span.SubjectTitle 
+          | Valid from:
+        span.SubjectValue 
+          input#CAValidFrom(type="text", name="caValidFrom")
+      .EndDate 
+        span.SubjectTitle 
+          | Valid to:
+        span.SubjectValue 
+          input#CAValidTo(type="text", name="caValidTo")
+      div.SubmitButton
+        input.button2#fileReset(type="reset", value="Reset" title="Reset")
+        input.button2#generateCAButton.SubmitButton(type="submit" title="submit", value="Generate")
+
     .Certs 
       .Title
         h3 Root Certificates
