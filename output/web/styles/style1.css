@@ -184,6 +184,14 @@ button.button2Red:hover {
     background-color: red;
 }
 
+.modalLabel {
+    color: green;
+    width: 100%;
+    display: block;
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+
 .white-popup {
     position: relative;
     background: #FFF;
@@ -201,4 +209,12 @@ button.button2Red:hover {
     max-width: 500px;
     margin: 20px auto;
     border: 5px red solid;
+}
+
+.intButtons {
+    padding-top: 10px;
+}
+
+.hidden {
+    display: none;
 }

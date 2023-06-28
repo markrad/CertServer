@@ -72,8 +72,8 @@ block layout-content
             '<button type="button" class="button2 certBtnDownloadChain">Download Chain</button>' +
             '<button type="button" class="button2 button2Red certBtnDelete" onClick="certDelete(\'%s\', \'%s\')">Delete</button>' +
             '<span class="certOptionalButtons">' +
-            '  <button type="button" class="button2">New Intermediate</button>' +
-            '  <button type="button" class="button2">New Leaf</button>' +
+            '  <button type="button" class="button2" onClick="newIntermediateDialog(\'%s\')">New Intermediate</button>' +
+            '  <button type="button" class="button2" onClick="newLeafDialog(\'%s\')">New Leaf</button>' +
             '</span>' +
           '</div>' +
           '<div class="certInfoType">' +
@@ -131,6 +131,8 @@ block layout-content
               nameLookup[id],
               result.serialNumber,
               result.certType,
+              nameLookup[id],
+              nameLookup[id],
               result.certType,
               result.keyPresent == 'yes'? '&nbsp;with private key' : '',
               result.serialNumber,
@@ -192,9 +194,10 @@ block layout-content
           processData: false,
           contentType: false,
           error: (xhr, msg, err) => {
+            let result = JSON.parse(xhr.responseJSON);
             $.magnificPopup.open({
               items: {
-                src: `<div class="error-popup">${err}: ${JSON.parse(xhr.responseText).error}</div>`,
+                src: `<div class="error-popup">${err}: ${result.error}</div>`,
                 type: 'inline'
               }
             });
@@ -219,6 +222,29 @@ block layout-content
         else buildCertList($(`#${type}List`), files.files);
       });
     }
+
+    function newIntermediateDialog(name) {
+      console.log(name);
+      let dialog = $('#newIntermediate');
+      dialog.dialog('option', 'title', 'Sign with ' + name);
+      $('#intermediateSigner').val(name); 
+      dialog.dialog('open');
+    }
+
+    function newLeafDialog(name) {
+      console.log(name);
+      let dialog = $('#newLeaf');
+      dialog.dialog('option', 'title', 'Sign with ' + name);
+      $('#leafSigner').val(name); 
+      dialog.dialog('open');
+    }
+
+    //- function createIntermediate(xx) {
+    //-   console.log(xx);
+    //-   let form = $('#newIntermediateForm');
+    //-   form.submit();
+    //-   //- $('newIntermedidateForm').submit();
+    //- }
 
     function certDownload(name) {
       let filename = name + '.pem';
@@ -373,13 +399,47 @@ block layout-content
       }
     }
 
-    function createCACert(e) {
-      let data = new FormData();
-      console.log('generate it');
+    //- function createCACert(e) {
+    //-   let data = new FormData();
+    //-   console.log('generate it');
+    //- }
+
+    function createCACertResponse(result) {
+      console.log(result);
+      processChanges(result.types);
+      $('#generateCAReset').click();
+      $.magnificPopup.open({
+        items: {
+          src: `<div class="white-popup">${result.message}</div>`,
+          type: 'inline'
+        }
+      });
     }
 
-    function createCACertResponse(data) {
-      console.log(data);
+    function createIntermediateCertResponse(result) {
+      console.log(result);
+      processChanges(result.types);
+      $('#generateIntermediateReset').click();
+      $.magnificPopup.open({
+        items: {
+          src: `<div class="white-popup">${result.message}</div>`,
+          type: 'inline'
+        }
+      });
+      $('#newIntermediate').dialog('close');
+    }
+
+    function createLeafCertResponse(result) {
+      console.log(result);
+      processChanges(result.types);
+      $('#generateLeafReset').click();
+      $.magnificPopup.open({
+        items: {
+          src: `<div class="white-popup">${result.message}</div>`,
+          type: 'inline'
+        }
+      });
+      $('#newLeaf').dialog('close');
     }
 
     $(async function() {
@@ -389,7 +449,14 @@ block layout-content
       datePicker.datepicker( { minDate: -20, defaultDate: 0 } );
       datePicker = $('#CAValidTo');
       datePicker.datepicker( { defaultDate: +365 } );
-      //- $('#uploadButton').click(upload);
+      datePicker = $('#IntermediateValidFrom');
+      datePicker.datepicker( { minDate: -20, defaultDate: 0 } );
+      datePicker = $('#IntermediateValidTo');
+      datePicker.datepicker( { defaultDate: +365 } );
+      datePicker = $('#LeafValidFrom');
+      datePicker.datepicker( { minDate: -20, defaultDate: 0 } );
+      datePicker = $('#LeafValidTo');
+      datePicker.datepicker( { defaultDate: +365 } );
       let files;
       [ ['root', buildCertList], 
         ['intermediate', buildCertList], 
@@ -399,6 +466,7 @@ block layout-content
         files = await getDir(entry[0]);
         entry[1]($(`#${entry[0]}List`), files.files);
       });
+
       $('#generateCertForm').ajaxForm({
         dataType: 'json',
         success: createCACertResponse,
@@ -411,14 +479,100 @@ block layout-content
             }
           });
         } 
-      });      
-      //- $('#generateCertForm').submit(() => {
-      //-   $(this).ajaxSubmit({ url: '/createCACert', type: 'post', error: (xhr, msg, err) => {
-      //-     console.log('fuck');
-      //-   } });
-      //-   return false;
-      //- });
+      });
+
+      $('#newIntermediateForm').ajaxForm({
+        dataType: 'json',
+        success: createIntermediateCertResponse,
+        error: (xhr, msg, err) => {
+          let outmsg = JSON.parse(xhr.responseText);
+          $.magnificPopup.open({
+            items: {
+              src: `<div class="error-popup">${err}: ${outmsg.message}</div>`,
+              type: 'inline'
+            }
+          });
+        } 
+      });
+
+      $('#newLeafForm').ajaxForm({
+        dataType: 'json',
+        success: createLeafCertResponse,
+        error: (xhr, msg, err) => {
+          let outmsg = JSON.parse(xhr.responseText);
+          $.magnificPopup.open({
+            items: {
+              src: `<div class="error-popup">${err}: ${outmsg.message}</div>`,
+              type: 'inline'
+            }
+          });
+        } 
+      });
+
+      let dialogInt = $('#newIntermediate').dialog({
+        autoOpen: false,
+        height: 680,
+        width: 350,
+        modal: true,
+      });
+
+      let dialogLeaf = $('#newLeaf').dialog({
+        autoOpen: false,
+        height: 680,
+        width: 350,
+        modal: true,
+      });
     });
+  div#newIntermediate(title='** Title **')
+   form#newIntermediateForm(action="/createIntermediateCert", method="post", encType="application/x-www-form-urlencoded")
+    fieldset
+      label.modalLabel(for="Password") Password (if key is encrypted):
+      input(type='password' name='intPassword' id='intPassword' value='' class='text ui-widget-content ui-corner-all')
+      label.modalLabel(for='Country') Country: 
+      input(type='text' name='intCountry' id='intermediateC' value=C class='text ui-widget-content ui-corner-all')
+      label.modalLabel(for='State' styles { float: left; }) State:
+      input(type='text' name='intState' id='intermediateST' value=ST class='text ui-widget-content ui-corner-all')
+      label.modalLabel(for='Location') Location:
+      input(type='text' name='intLocation' id='intermediateL' value=L class='text ui-widget-content ui-corner-all')
+      label.modalLabel(for='Organization') Organization:
+      input(type='text' name='intOrganization' id='intermediateO' value=O class='text ui-widget-content ui-corner-all')
+      label.modalLabel(for='Unit') Unit:
+      input(type='text' name='intUnit' id='intermediateOU' value=OU class='text ui-widget-content ui-corner-all')
+      label.modalLabel(for='Common Name') Common Name:
+      input(type='text' name='intCommonName' id='intermediateCN' value='' class='text ui-widget-content ui-corner-all')
+      label.modalLabel(for='Valid From') Valid from:
+      input#IntermediateValidFrom(type='text' name='intValidFrom')
+      label.modalLabel(for='Valid To') Valid to:
+      input#IntermediateValidTo(type='text' name='intValidTo')
+      input#intermediateSigner(type='text' name='intSigner' value='' class='hidden')
+      div.intButtons
+        input.button2#generateIntermediateReset(type="reset", value="Reset" title="Reset")
+        input.button2#generateIntermediateButton.SubmitButton(type="submit" title="submit", value="Generate")
+  div#newLeaf(title='** Title **')
+   form#newLeafForm(action="/createLeafCert", method="post", encType="application/x-www-form-urlencoded")
+    fieldset
+      label.modalLabel(for="Password") Password (if key is encrypted):
+      input(type='password' name='leafPassword' id='leafPassword' value='' class='text ui-widget-content ui-corner-all')
+      label.modalLabel(for='Country') Country: 
+      input(type='text' name='leafCountry' id='leafC' value=C class='text ui-widget-content ui-corner-all')
+      label.modalLabel(for='State' styles { float: left; }) State:
+      input(type='text' name='leafState' id='leafST' value=ST class='text ui-widget-content ui-corner-all')
+      label.modalLabel(for='Location') Location:
+      input(type='text' name='leafLocation' id='leafL' value=L class='text ui-widget-content ui-corner-all')
+      label.modalLabel(for='Organization') Organization:
+      input(type='text' name='leafOrganization' id='leafO' value=O class='text ui-widget-content ui-corner-all')
+      label.modalLabel(for='Unit') Unit:
+      input(type='text' name='leafUnit' id='leafOU' value=OU class='text ui-widget-content ui-corner-all')
+      label.modalLabel(for='Common Name') Common Name:
+      input(type='text' name='leafCommonName' id='leafCN' value='' class='text ui-widget-content ui-corner-all')
+      label.modalLabel(for='Valid From') Valid from:
+      input#LeafValidFrom(type='text' name='leafValidFrom')
+      label.modalLabel(for='Valid To') Valid to:
+      input#LeafValidTo(type='text' name='leafValidTo')
+      input#leafSigner(type='text' name='leafSigner' value='' class='hidden')
+      div.intButtons
+        input.button2#generateLeafReset(type="reset", value="Reset" title="Reset")
+        input.button2#generateLeafButton.SubmitButton(type="submit" title="submit", value="Generate")
   div.View
     h1.Banner Local Certificate Manager
     button(type='button' class='button1' onclick='togglePane(\'#uploadCertForm\')') Upload Certificate
@@ -431,16 +585,16 @@ block layout-content
         span.UploadInput
           input#certUpload(type="file", name="certFile", accept=".pem,.crt", title="Upload file")
         div.SubmitButton
-          input#fileReset(type="reset")
-          button#uploadButton.SubmitButton(type="button", onClick="uploadCert()" title="submit", value="Upload") Upload
+          input#fileCertReset(type="reset")
+          button#uploadCertButton.SubmitButton(type="button", onClick="uploadCert()" title="submit", value="Upload") Upload
     form#uploadKeyForm(action="/uploadKey", method="post", encType="multipart/form-data" class='slideForm')
       .Upload
         | Upload a key:&nbsp;
         span.UploadInput
           input#keyUpload(type="file", name="keyFile", accept=".pem,.crt,.key", title="Upload file")
         div.SubmitButton
-          input#fileReset(type="reset")
-          button#uploadButton.SubmitButton(type="submit", title="submit", value="Upload") Upload
+          input#fileKeyReset(type="reset")
+          button#uploadKeyButton.SubmitButton(type="submit", title="submit", value="Upload") Upload
     form.slideForm#generateCertForm(action="/createCACert", method="post", encType="application/x-www-form-urlencoded") This will generate a private key and self-signed root CA pair
       .Country 
         span.SubjectTitle
@@ -483,7 +637,7 @@ block layout-content
         span.SubjectValue 
           input#CAValidTo(type="text", name="caValidTo")
       div.SubmitButton
-        input.button2#fileReset(type="reset", value="Reset" title="Reset")
+        input.button2#generateCAReset(type="reset", value="Reset" title="Reset")
         input.button2#generateCAButton.SubmitButton(type="submit" title="submit", value="Generate")
 
     .Certs 

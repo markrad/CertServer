@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 // import { exists } from 'node:fs/promises';
 import path from 'path';
 import http from 'http';
+import https from 'https';
 import fs from 'fs';
 
 import { jsbn, pki, pem, util, random, md } from 'node-forge'; 
@@ -16,12 +17,18 @@ import { EventWaiter } from './utility/eventWaiter';
 import { ExtensionParent } from './Extensions/ExtensionParent';
 import { ExtensionBasicConstraints } from './Extensions/ExtensionBasicConstraints';
 import { ExtensionKeyUsage } from './Extensions/ExtensionKeyUsage';
+import { ExtensionAuthorityKeyIdentifier } from './Extensions/ExtensionAuthorityKeyIdentifier';
+import { ExtensionSubjectKeyIdentifier } from './Extensions/ExtensionSubjectKeyIdentifier';
+import { ExtensionExtKeyUsage } from './Extensions/ExtensionExtKeyUsage';
+import { ExtensionSubjectAltName, ExtensionSubjectAltNameOptions } from './Extensions/ExtensionSubjectAltName';
 
 type Config = {
     port: number,
     root: string,
+    certificate?: string,
+    key?: string,
     C: string,
-    S: string,
+    ST: string,
     L: string,
     O: string,
     OU: string
@@ -125,6 +132,8 @@ export class WebServer {
     private _certificates: Collection<CertificateRow>;
     private _privateKeys: Collection<PrivateKeyRow>;
     private _cache: CertificateCache;
+    private _certificate: string = null;
+    private _key: string = null;
     private _config: Config;
     get port() { return this._port; }
     get dataPath() { return this._dataPath; }
@@ -133,6 +142,16 @@ export class WebServer {
         this._config = config;
         this._port = config.port;
         this._dataPath = config.root;
+
+        if (config.certificate || config.key) {
+            if (!config.certificate || !config.key) {
+                throw new Error('Certificate and key must both be present of neither be present');
+            }
+
+            this._certificate = fs.readFileSync(config.certificate, { encoding: 'utf8'});
+            this._key = fs.readFileSync(config.key, { encoding: 'utf8' });
+        }
+
         this._certificatesPath = path.join(this._dataPath, 'certificates');
         this._privatekeysPath = path.join(this._dataPath, 'privatekeys');
         this._workPath = path.join(this._dataPath, 'work');
@@ -190,6 +209,8 @@ export class WebServer {
             logger.fatal('Failed to initialize the database: ' + err.message);
             process.exit(4);
         }
+        // this._app.use(Express.bodyParser.json());
+        this._app.use(Express.urlencoded({ extended: true }));
         this._app.use(serveFavicon(path.join(__dirname, "../web/icons/doc_lock.ico"), { maxAge: 2592000000 }));
         this._app.use(Express.text({ type: 'text/plain' }));
         this._app.use(Express.text({ type: 'application/x-www-form-urlencoded' }));
@@ -254,7 +275,7 @@ export class WebServer {
             response.render('index', { 
                 title: 'Certificates Management Home',
                 C: this._config.C,
-                S: this._config.S,
+                ST: this._config.ST,
                 L: this._config.L,
                 O: this._config.O,
                 OU: this._config.OU,
@@ -357,49 +378,23 @@ export class WebServer {
         this._app.post('/createCACert', async (request, response) => {
             try {
                 logger.debug(request.body);
-                let validFrom: Date;
-                let validTo: Date;
-                let subject: CertificateSubject = { CN: null }
-                request.body.split('&').forEach((element: string) => {
-                    let parts: string[] = element.split('=');
-                    switch (parts[0]) {
-                        case 'caCountry':
-                            subject.C = parts[1];
-                            break;
-                        case 'caState':
-                            subject.ST = parts[1];
-                            break;
-                        case 'caLocation':
-                            subject.L = parts[1];
-                            break;
-                        case 'caOrganization':
-                            subject.O = parts[1];
-                            break;
-                        case 'caUnit':
-                            subject.OU = parts[1];
-                            break;
-                        case 'caCommonName':
-                            subject.CN = parts[1];
-                            break;
-                        case 'caValidFrom':
-                            validFrom = new Date(parts[1]);
-                            break;
-                        case 'caValidTo':
-                            validTo = new Date(parts[1]);
-                        default:
-                            break;
-                    }
-                });
+                let validFrom: Date = request.body.caValidFrom? new Date(request.body.caValidFrom) : new Date();
+                let validTo: Date = request.body.caValidTo? new Date(request.body.caValidTo) : null;
+                let subject: CertificateSubject = {
+                    C: request.body.caCountry,
+                    ST: request.body.caState,
+                    L: request.body.caLocation,
+                    O: request.body.caOrganization,
+                    OU: request.body.caUnit,
+                    CN: request.body.caCommonName
+                };
                 let errString = '';
 
-                if (subject.CN == null) errString += 'Common name is required</br>\n';
+                if (!subject.CN) errString += 'Common name is required</br>\n';
                 if (!validTo) errString += 'Valid to is required\n';
                 if (errString) {
                     return response.status(400).json({ message: errString })
                 }
-
-                if (!validFrom)
-                    validFrom = new Date();
 
                 const { privateKey, publicKey } = pki.rsa.generateKeyPair(2048);
                 const attributes = this._getAttributes(subject);
@@ -428,14 +423,179 @@ export class WebServer {
                 fs.writeFileSync(path.join(this._workPath, 'newca-key.pem'), pki.privateKeyToPem(privateKey), { encoding: 'utf8' });
                 let certResult = await this._tryAddCertificate((path.join(this._workPath, 'newca.pem')));
                 let keyResult = await this._tryAddKey((path.join(this._workPath, 'newca-key.pem')));
-                return response.status(200).json({ message: `Certificate/Key ${certResult.name}/${keyResult.name} added`, type: [ CertTypes[CertTypes.cert], CertTypes[CertTypes.key] ] });
+                return response.status(200)
+                    .json({ message: `Certificate/Key ${certResult.name}/${keyResult.name} added`, types: [ CertTypes[CertTypes.root], CertTypes[CertTypes.key] ].join(';') });
             }
             catch (err) {
-                return response.status(500).json({ message: err })
+                return response.status(500).json({ error: err })
+            }
+        });
+        this._app.post('/createIntermediateCert', async (request, response) => {
+            try {
+                logger.debug(request.body);
+                let validFrom: Date = request.body.intValidFrom? new Date(request.body.intValidFrom) : new Date();
+                let validTo: Date = request.body.intValidTo? new Date(request.body.intValidTo) : null;
+                let subject: CertificateSubject = {
+                    C: request.body.intCountry,
+                    ST: request.body.intState,
+                    L: request.body.intLocation,
+                    O: request.body.intOrganization,
+                    OU: request.body.intUnit,
+                    CN: request.body.intCommonName
+                };
+                let errString = '';
+
+                if (!subject.CN) errString += 'Common name is required</br>\n';
+                if (!validTo) errString += 'Valid to is required\n';
+                if (errString) {
+                    return response.status(400).json({ message: errString })
+                }
+
+                const cRow = this._certificates.findOne({name: request.body.intSigner});
+                const kRow = this._privateKeys.findOne({ pairSerial: cRow.serialNumber });
+
+                if (!cRow || !kRow) {
+                    return response.status(500).json({ message: 'Unexpected database corruption - rows missing'});
+                }
+
+                const c = pki.certificateFromPem(fs.readFileSync(path.join(this._certificatesPath, cRow.name + '.pem'), { encoding: 'utf8' }));
+                let k: pki.PrivateKey;
+
+                if (c) {
+                    if (request.body.intPassword) {
+                        k = pki.decryptRsaPrivateKey(fs.readFileSync(path.join(this._privatekeysPath, kRow.name + '.pem'), { encoding: 'utf8' }), request.body.intPassword);
+                    }
+                    else {
+                        k = pki.privateKeyFromPem(fs.readFileSync(path.join(this._privatekeysPath, kRow.name + '.pem'), { encoding: 'utf8' }));
+                    }
+                }
+                const { privateKey, publicKey } = pki.rsa.generateKeyPair(2048);
+                const attributes = this._getAttributes(subject);
+                const extensions: ExtensionParent[] = [
+                    new ExtensionBasicConstraints({ cA: true }),
+                    new ExtensionKeyUsage({ keyCertSign: true, cRLSign: true }),
+                    new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, serialNumber: c.serialNumber }),
+                ]
+                // Create an empty Certificate
+                let cert = pki.createCertificate();
+        
+                // Set the Certificate attributes for the new Root CA
+                cert.publicKey = publicKey;
+                // cert.privateKey = privateKey;
+                cert.serialNumber = this._getRandomSerialNumber();
+                cert.validity.notBefore = validFrom;
+                cert.validity.notAfter = validTo;
+                cert.setSubject(attributes);
+                cert.setIssuer(c.subject.attributes);
+                cert.setExtensions(extensions.map((extension) => extension.getObject()));
+        
+                // Self-sign the Certificate
+                cert.sign(k, md.sha512.create());
+        
+                // Convert to PEM format
+                fs.writeFileSync(path.join(this._workPath, 'newint.pem'), pki.certificateToPem(cert), {encoding: 'utf8'});
+                fs.writeFileSync(path.join(this._workPath, 'newint-key.pem'), pki.privateKeyToPem(privateKey), { encoding: 'utf8' });
+                let certResult = await this._tryAddCertificate((path.join(this._workPath, 'newint.pem')));
+                let keyResult = await this._tryAddKey((path.join(this._workPath, 'newint-key.pem')));
+                let retTypes = Array.from(new Set(certResult.types.concat(keyResult.types).concat([CertTypes.intermediate]))).map((type) => CertTypes[type]);
+                return response.status(200)
+                    .json({ message: `Certificate/Key ${certResult.name}/${keyResult.name} added`, types: retTypes.join(';') });
+            }
+            catch (err) {
+                return response.status(500).json({ message: err.message })
             }
         });
 
-        http.createServer(this._app).listen(this._port, '0.0.0.0');
+        this._app.post('/createLeafCert', async (request, response) => {
+            try {
+                logger.debug(request.body);
+                let validFrom: Date = request.body.leafValidFrom? new Date(request.body.leafValidFrom) : new Date();
+                let validTo: Date = request.body.leafValidTo? new Date(request.body.leafValidTo) : null;
+                let subject: CertificateSubject = {
+                    C: request.body.leafCountry,
+                    ST: request.body.leafState,
+                    L: request.body.leafLocation,
+                    O: request.body.leafOrganization,
+                    OU: request.body.leafUnit,
+                    CN: request.body.leafCommonName
+                };
+                let errString = '';
+
+                if (!subject.CN) errString += 'Common name is required</br>\n';
+                if (!validTo) errString += 'Valid to is required\n';
+                if (errString) {
+                    return response.status(400).json({ message: errString })
+                }
+
+                const cRow = this._certificates.findOne({name: request.body.leafSigner});
+                const kRow = this._privateKeys.findOne({ pairSerial: cRow.serialNumber });
+
+                if (!cRow || !kRow) {
+                    return response.status(500).json({ message: 'Unexpected database corruption - rows missing'});
+                }
+
+                const c = pki.certificateFromPem(fs.readFileSync(path.join(this._certificatesPath, cRow.name + '.pem'), { encoding: 'utf8' }));
+                let k: pki.PrivateKey;
+
+                if (c) {
+                    if (request.body.leafPassword) {
+                        k = pki.decryptRsaPrivateKey(fs.readFileSync(path.join(this._privatekeysPath, kRow.name + '.pem'), { encoding: 'utf8' }), request.body.leafPassword);
+                    }
+                    else {
+                        k = pki.privateKeyFromPem(fs.readFileSync(path.join(this._privatekeysPath, kRow.name + '.pem'), { encoding: 'utf8' }));
+                    }
+                }
+                const { privateKey, publicKey } = pki.rsa.generateKeyPair(2048);
+                const attributes = this._getAttributes(subject);
+                let sal:ExtensionSubjectAltNameOptions = { domains: [ subject.CN ] };
+                let extensions: ExtensionParent[] = [
+                    new ExtensionBasicConstraints({ cA: false }),
+                    new ExtensionSubjectKeyIdentifier({}),
+                    new ExtensionKeyUsage({ nonRepudiation: true, digitalSignature: true, keyEncipherment: true }),
+                    new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, serialNumber: c.serialNumber }),
+                    new ExtensionExtKeyUsage({ serverAuth: true }),
+                    new ExtensionSubjectAltName(sal),
+                ];
+                // Create an empty Certificate
+                let cert = pki.createCertificate();
+        
+                // Set the Certificate attributes for the new Root CA
+                cert.publicKey = publicKey;
+                // cert.privateKey = privateKey;
+                cert.serialNumber = this._getRandomSerialNumber();
+                cert.validity.notBefore = validFrom;
+                cert.validity.notAfter = validTo;
+                cert.setSubject(attributes);
+                cert.setIssuer(c.subject.attributes);
+                cert.setExtensions(extensions.map((extension) => extension.getObject()));
+        
+                // Self-sign the Certificate
+                cert.sign(k, md.sha512.create());
+
+                // Convert to PEM format
+                fs.writeFileSync(path.join(this._workPath, 'newleaf.pem'), pki.certificateToPem(cert), {encoding: 'utf8'});
+                fs.writeFileSync(path.join(this._workPath, 'newleaf-key.pem'), pki.privateKeyToPem(privateKey), { encoding: 'utf8' });
+                let certResult = await this._tryAddCertificate((path.join(this._workPath, 'newleaf.pem')));
+                let keyResult = await this._tryAddKey((path.join(this._workPath, 'newleaf-key.pem')));
+                let retTypes = Array.from(new Set(certResult.types.concat(keyResult.types).concat([CertTypes.leaf]))).map((type) => CertTypes[type]);
+                return response.status(200)
+                    .json({ message: `Certificate/Key ${certResult.name}/${keyResult.name} added`, types: retTypes.join(';') });
+            }
+            catch (err) {
+                return response.status(500).json({ message: err.message })
+            }
+        });
+
+        if (this._certificate) {
+            const options = {
+                cert: this._certificate,
+                key: this._key,
+            };
+            https.createServer(options, this._app).listen(this._port, '0.0.0.0');
+        }
+        else {
+            http.createServer(this._app).listen(this._port, '0.0.0.0');
+        }
         // this._app.listen(this._port, () => {
         //     logger.info(`Listen on the port ${WebServer.getWebServer().port}...`);
         // });
@@ -691,8 +851,8 @@ export class WebServer {
         if (key) {
             key.pairSerial = null;
             let unknownName = this._getUnpairedKeyName();
-            key.name = unknownName;
             fs.renameSync(path.join(this._privatekeysPath, key.name + '.pem'), path.join(this._privatekeysPath, unknownName + '.pem'));
+            key.name = unknownName;
             this._privateKeys.update(key);
             certTypes.push(CertTypes.key);
         }

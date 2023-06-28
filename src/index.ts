@@ -10,7 +10,7 @@ const defaultConfig: any = {
     port: 4141,
     root:path.join(__dirname, '../data'),
     C: 'USA',
-    S: 'Washington',
+    ST: 'Washington',
     L: 'Redmond',
     O: 'Microsoft',
     OU: 'CSS'

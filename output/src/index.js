@@ -13,7 +13,7 @@ const defaultConfig = {
     port: 4141,
     root: path_1.default.join(__dirname, '../data'),
     C: 'USA',
-    S: 'Washington',
+    ST: 'Washington',
     L: 'Redmond',
     O: 'Microsoft',
     OU: 'CSS'

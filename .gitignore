@@ -134,3 +134,7 @@ out
 data/
 test*.ts
 test*.js*
+
+certs/
+
+.VSCodeCounter/
