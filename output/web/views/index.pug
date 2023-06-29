@@ -68,8 +68,10 @@ block layout-content
       let detailHTML = 
         '<div class="certInfo slideform">' +
           '<div class="certInfoButtons">' + 
-            '<button type="button" class="button2 certBtnDownload" onClick="certDownload(\'%s\')">Download</button>' +
-            '<button type="button" class="button2 certBtnDownloadChain">Download Chain</button>' +
+            //- '<button type="button" class="button2 certBtnDownload" onClick="certDownload(\'%s\')">Download</button>' +
+            //- '<button type="button" class="button2 certBtnDownloadChain">Download Chain</button>' +
+            '<a href="/certificates/%s.pem" class="button2 certBtnDownload">Download</a>' +
+            '<a href="/api/chaindownload?name=%s" class="button2 certBtnDownloadChain">Download Chain</a>' +
             '<button type="button" class="button2 button2Red certBtnDelete" onClick="certDelete(\'%s\', \'%s\')">Delete</button>' +
             '<span class="certOptionalButtons">' +
             '  <button type="button" class="button2" onClick="newIntermediateDialog(\'%s\')">New Intermediate</button>' +
@@ -128,6 +130,7 @@ block layout-content
           },
           success: (result, status) => {
             let content = sprintf(detailHTML, 
+              nameLookup[id],
               nameLookup[id],
               result.serialNumber,
               result.certType,
@@ -246,14 +249,14 @@ block layout-content
     //-   //- $('newIntermedidateForm').submit();
     //- }
 
-    function certDownload(name) {
-      let filename = name + '.pem';
-      let filelocation = 'certificates/' + filename;
-      const anchor = $('<a>', { href: filelocation, download: filename })[0];
-      $('body').append(anchor);
-      anchor.click();
-      $(anchor).remove();
-    }
+    //- function certDownload(name) {
+    //-   let filename = name + '.pem';
+    //-   let filelocation = 'certificates/' + filename;
+    //-   const anchor = $('<a>', { href: filelocation, download: filename })[0];
+    //-   $('body').append(anchor);
+    //-   anchor.click();
+    //-   $(anchor).remove();
+    //- }
 
     function keyClick(id) {
       let detailHTML =
@@ -605,7 +608,7 @@ block layout-content
         span.SubjectTitle
           | State:
         span.SubjectValue 
-          input(type="text", name="caState" value=S)
+          input(type="text", name="caState" value=ST)
       .Location
         span.SubjectTitle
           | Location:
