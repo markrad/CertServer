@@ -375,6 +375,23 @@ export class WebServer {
                 return response.status(err.status?? 500).json({ error: err.message });
             }
         });
+        this._app.get('/api/chaindownload', (request, response) => {
+            try {
+                if (!fs.existsSync(path.join(this._certificatesPath, request.query.name + '.pem'))) {
+                    response.status(404).end();
+                }
+                let filename = this._getChain(request.query.name as string);
+                response.download(filename, request.query.name + '_full_chain.pem', (err) => {
+                    if (err) {
+                        logger.error(`Failed to send chain for ${request.query.name}: ${err.message}`);
+                    }
+                    fs.unlinkSync(filename);
+                });
+            }
+            catch (err) {
+                return response.status(err.status?? 500).json({ error: err.message });
+            }
+        });
         this._app.post('/createCACert', async (request, response) => {
             try {
                 logger.debug(request.body);
@@ -505,7 +522,6 @@ export class WebServer {
                 return response.status(500).json({ message: err.message })
             }
         });
-
         this._app.post('/createLeafCert', async (request, response) => {
             try {
                 logger.debug(request.body);
@@ -553,7 +569,7 @@ export class WebServer {
                     new ExtensionSubjectKeyIdentifier({}),
                     new ExtensionKeyUsage({ nonRepudiation: true, digitalSignature: true, keyEncipherment: true }),
                     new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, serialNumber: c.serialNumber }),
-                    new ExtensionExtKeyUsage({ serverAuth: true }),
+                    new ExtensionExtKeyUsage({ serverAuth: true, clientAuth: true }),
                     new ExtensionSubjectAltName(sal),
                 ];
                 // Create an empty Certificate
@@ -596,10 +612,7 @@ export class WebServer {
         else {
             http.createServer(this._app).listen(this._port, '0.0.0.0');
         }
-        // this._app.listen(this._port, () => {
-        //     logger.info(`Listen on the port ${WebServer.getWebServer().port}...`);
-        // });
-        logger.info('Starting');
+        logger.info('Listening on ' + this._port);
     }
 
     private async _dbInit(): Promise<void> {
@@ -970,6 +983,26 @@ export class WebServer {
         this._privateKeys.remove(key);
 
         return { name: key.name, types: certTypes};
+    }
+
+    private _getChain(certName: string): string {
+        let newFile = path.join(this._workPath, 'temp_');
+        let i = 0;
+        while (fs.existsSync(newFile + i.toString())) {
+            i++;
+        }
+
+        newFile += i.toString();
+        fs.copyFileSync(path.join(this._certificatesPath, certName + '.pem'), newFile);
+
+        let c: CertificateRow = this._certificates.findOne({ name: certName });
+
+        while (c.serialNumber != c.signedBy) {
+            c = this._certificates.findOne({ serialNumber: c.signedBy});
+            fs.appendFileSync(newFile, fs.readFileSync(path.join(this._certificatesPath, c.name + '.pem')));
+        }
+
+        return newFile;
     }
 
     private _getSubject(s: pki.Certificate['issuer'] | pki.Certificate['subject']): CertificateSubject {
