@@ -331,6 +331,24 @@ class WebServer {
                     return response.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).json({ error: err.message });
                 }
             });
+            this._app.get('/api/chaindownload', (request, response) => {
+                var _a;
+                try {
+                    if (!fs_1.default.existsSync(path_1.default.join(this._certificatesPath, request.query.name + '.pem'))) {
+                        response.status(404).end();
+                    }
+                    let filename = this._getChain(request.query.name);
+                    response.download(filename, request.query.name + '_full_chain.pem', (err) => {
+                        if (err) {
+                            logger.error(`Failed to send chain for ${request.query.name}: ${err.message}`);
+                        }
+                        fs_1.default.unlinkSync(filename);
+                    });
+                }
+                catch (err) {
+                    return response.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).json({ error: err.message });
+                }
+            });
             this._app.post('/createCACert', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     logger.debug(request.body);
@@ -496,7 +514,7 @@ class WebServer {
                         new ExtensionSubjectKeyIdentifier_1.ExtensionSubjectKeyIdentifier({}),
                         new ExtensionKeyUsage_1.ExtensionKeyUsage({ nonRepudiation: true, digitalSignature: true, keyEncipherment: true }),
                         new ExtensionAuthorityKeyIdentifier_1.ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, serialNumber: c.serialNumber }),
-                        new ExtensionExtKeyUsage_1.ExtensionExtKeyUsage({ serverAuth: true }),
+                        new ExtensionExtKeyUsage_1.ExtensionExtKeyUsage({ serverAuth: true, clientAuth: true }),
                         new ExtensionSubjectAltName_1.ExtensionSubjectAltName(sal),
                     ];
                     // Create an empty Certificate
@@ -535,10 +553,7 @@ class WebServer {
             else {
                 http_1.default.createServer(this._app).listen(this._port, '0.0.0.0');
             }
-            // this._app.listen(this._port, () => {
-            //     logger.info(`Listen on the port ${WebServer.getWebServer().port}...`);
-            // });
-            logger.info('Starting');
+            logger.info('Listening on ' + this._port);
         });
     }
     _dbInit() {
@@ -866,6 +881,21 @@ class WebServer {
         }
         this._privateKeys.remove(key);
         return { name: key.name, types: certTypes };
+    }
+    _getChain(certName) {
+        let newFile = path_1.default.join(this._workPath, 'temp_');
+        let i = 0;
+        while (fs_1.default.existsSync(newFile + i.toString())) {
+            i++;
+        }
+        newFile += i.toString();
+        fs_1.default.copyFileSync(path_1.default.join(this._certificatesPath, certName + '.pem'), newFile);
+        let c = this._certificates.findOne({ name: certName });
+        while (c.serialNumber != c.signedBy) {
+            c = this._certificates.findOne({ serialNumber: c.signedBy });
+            fs_1.default.appendFileSync(newFile, fs_1.default.readFileSync(path_1.default.join(this._certificatesPath, c.name + '.pem')));
+        }
+        return newFile;
     }
     _getSubject(s) {
         let getValue = (v) => {
