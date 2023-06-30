@@ -4,7 +4,7 @@ services:
     container_name: certserver 
     privileged: true # this may not be necessary for all setups
     restart: unless-stopped
-    image: certserver:1.0.0
+    image: certserver:1.0.2
     volumes:
       - /home/markrad/source/CertServer/docker/sampledirs/config:/config
       - /home/markrad/source/CertServer/docker/sampledirs/data:/data
