@@ -4,6 +4,7 @@ import path from 'path';
 import http from 'http';
 import https from 'https';
 import fs from 'fs';
+import crypto from 'crypto';
 
 import { jsbn, pki, pem, util, random, md } from 'node-forge'; 
 import loki, { Collection, LokiFsAdapter } from 'lokijs'
@@ -55,6 +56,7 @@ type CertificateRow = {
     name: string, 
     type: CertTypes, 
     serialNumber: string, 
+    fingerprint: string,
     publicKey: any, 
     privateKey: string,
     signedBy: string;
@@ -84,6 +86,7 @@ type CertificateBrief = {
     signer: string,
     keyPresent: string,
     serialNumber: string,
+    fingerprint: string,
 }
 
 type KeyBrief = {
@@ -815,6 +818,7 @@ export class WebServer {
                     notBefore: c.validity.notBefore,
                     notAfter: c.validity.notAfter, 
                     havePrivateKey: havePrivateKey,
+                    fingerprint: new crypto.X509Certificate(pemString).fingerprint,
                 });
 
                 result = { name: name, types: (Array.from(new Set(types))) };
@@ -843,7 +847,7 @@ export class WebServer {
             serialNumber: r.serialNumber.match(/.{1,2}/g).join(':'),
             signer: signer,
             keyPresent: key != null? 'yes' : 'no',
-            // TODO: Add reference to signer
+            fingerprint: r.fingerprint,
          };
     }
 
