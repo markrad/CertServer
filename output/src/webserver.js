@@ -42,6 +42,7 @@ const path_1 = __importDefault(require("path"));
 const http_1 = __importDefault(require("http"));
 const https_1 = __importDefault(require("https"));
 const fs_1 = __importDefault(require("fs"));
+const crypto_1 = __importDefault(require("crypto"));
 const node_forge_1 = require("node-forge");
 const lokijs_1 = __importStar(require("lokijs"));
 const express_1 = __importDefault(require("express"));
@@ -731,6 +732,7 @@ class WebServer {
                         notBefore: c.validity.notBefore,
                         notAfter: c.validity.notAfter,
                         havePrivateKey: havePrivateKey,
+                        fingerprint: new crypto_1.default.X509Certificate(pemString).fingerprint,
                     });
                     result = { name: name, types: (Array.from(new Set(types))) };
                     resolve(result);
@@ -758,7 +760,7 @@ class WebServer {
             serialNumber: r.serialNumber.match(/.{1,2}/g).join(':'),
             signer: signer,
             keyPresent: key != null ? 'yes' : 'no',
-            // TODO: Add reference to signer
+            fingerprint: r.fingerprint,
         };
     }
     _tryDeleteCert(options) {
