@@ -10,13 +10,19 @@ const webserver_1 = require("./webserver");
 // const ROOT_DIRECTORY = path.join(__dirname, '../data');
 // const SERVER_PORT = 5501;
 const defaultConfig = {
-    port: 4141,
-    root: path_1.default.join(__dirname, '../data'),
-    C: 'USA',
-    ST: 'Washington',
-    L: 'Redmond',
-    O: 'Microsoft',
-    OU: 'CSS'
+    certServer: {
+        certificate: null,
+        key: null,
+        port: 4141,
+        root: './data',
+        subject: {
+            C: 'USA',
+            ST: 'Washington',
+            L: 'Redmond',
+            O: 'None',
+            OU: 'None'
+        }
+    }
 };
 let config = {};
 try {
@@ -25,7 +31,7 @@ try {
             config = defaultConfig;
             break;
         case 3:
-            let options = require(process.argv[2]);
+            let options = require('yaml-reader').read(path_1.default.resolve(process.argv[2]));
             config = Object.assign(Object.assign({}, defaultConfig), options);
             break;
         default:

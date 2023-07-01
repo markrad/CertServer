@@ -20,7 +20,7 @@
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "args": [ "../../config.json" ],
+            "args": [ "./config.yml" ],
             "outputCapture": "std",
             "program": "${workspaceFolder}/output/src/index.js",
             "outFiles": [

@@ -1,0 +1,9 @@
+certServer:
+  root: "/data"
+  port: 4141
+  subject:
+    C: USA,
+    ST: Washington,
+    L: Carnation,
+    O: Microsoft,
+    OU: CSS

@@ -1,0 +1,9 @@
+certServer:
+  root: "./data"
+  port: 4141
+  certificate: "/home/markrad/source/CertServer/certs/rr-frigate.lan.pem"
+  key: "/home/markrad/source/CertServer/certs/rr-frigate.lan_key.pem"
+  subject:
+    L: Carnation
+    O: Microsoft
+    OU: CSS

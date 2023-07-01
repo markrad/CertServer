@@ -99,14 +99,14 @@ class WebServer {
             return mostSignificativeHexDigitAsInt.toString() + hexString.substring(1);
         };
         this._config = config;
-        this._port = config.port;
-        this._dataPath = config.root;
-        if (config.certificate || config.key) {
-            if (!config.certificate || !config.key) {
+        this._port = config.certServer.port;
+        this._dataPath = config.certServer.root;
+        if (config.certServer.certificate || config.certServer.key) {
+            if (!config.certServer.certificate || !config.certServer.key) {
                 throw new Error('Certificate and key must both be present of neither be present');
             }
-            this._certificate = fs_1.default.readFileSync(config.certificate, { encoding: 'utf8' });
-            this._key = fs_1.default.readFileSync(config.key, { encoding: 'utf8' });
+            this._certificate = fs_1.default.readFileSync(config.certServer.certificate, { encoding: 'utf8' });
+            this._key = fs_1.default.readFileSync(config.certServer.key, { encoding: 'utf8' });
         }
         this._certificatesPath = path_1.default.join(this._dataPath, 'certificates');
         this._privatekeysPath = path_1.default.join(this._dataPath, 'privatekeys');
@@ -226,11 +226,11 @@ class WebServer {
             this._app.get("/", (_request, response) => {
                 response.render('index', {
                     title: 'Certificates Management Home',
-                    C: this._config.C,
-                    ST: this._config.ST,
-                    L: this._config.L,
-                    O: this._config.O,
-                    OU: this._config.OU,
+                    C: this._config.certServer.subject.C,
+                    ST: this._config.certServer.subject.ST,
+                    L: this._config.certServer.subject.L,
+                    O: this._config.certServer.subject.O,
+                    OU: this._config.certServer.subject.OU,
                 });
             });
             this._app.get("/certlist", (request, response) => {

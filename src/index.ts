@@ -7,13 +7,19 @@ import { WebServer } from './webserver';
 // const SERVER_PORT = 5501;
 
 const defaultConfig: any = {
-    port: 4141,
-    root:path.join(__dirname, '../data'),
-    C: 'USA',
-    ST: 'Washington',
-    L: 'Redmond',
-    O: 'Microsoft',
-    OU: 'CSS'
+    certServer: {
+        certificate: null,
+        key: null,
+        port: 4141,
+        root: './data',
+        subject: {
+            C: 'USA',
+            ST: 'Washington',
+            L: 'Redmond',
+            O: 'None',
+            OU: 'None'
+        }
+    }
 };
 
 let config: any = {};
@@ -24,7 +30,7 @@ try {
             config = defaultConfig;
             break;
         case 3:
-            let options = require(process.argv[2]);
+            let options = require('yaml-reader').read(path.resolve(process.argv[2]));
             config = { ...defaultConfig, ...options };
             break;
         default:

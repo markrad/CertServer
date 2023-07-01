@@ -1,0 +1,13 @@
+# All the values below have been set to their default value
+
+certServer:
+  root: ./data            # Root directory to keep database, certificates, and keys
+  port: 4141              # Webserver port number
+  certificate: ''         # If both this and the key are provided the server will start in https
+  key: ''                 # See above
+  subject:                # Certificate subject defaults
+    C: USA
+    ST: Washington
+    L: Redmond
+    O: None
+    OU: None
