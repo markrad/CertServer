@@ -3,7 +3,7 @@ services:
   frigate:
     container_name: certserver 
     restart: unless-stopped
-    image: certserver:1.0.2
+    image: certserver:1.0.3
     volumes:
       - /home/markrad/source/CertServer/docker/sampledirs/config:/config
       - /home/markrad/source/CertServer/docker/sampledirs/data:/data
