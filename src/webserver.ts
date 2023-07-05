@@ -264,7 +264,12 @@ export class WebServer {
             if (!request.files || Object.keys(request.files).length == 0) {
                 return res.status(400).send('No file selected');
             }
-            let keyFile = request.files.keyfile;
+            let keyFile = request.files.keyFile;
+
+            if (!keyFile) {
+                throw new CertError(404, 'Key file not found in request');
+            }
+            
             let tempName = path.join(this._workPath, keyFile.name);
             keyFile.mv(tempName, async (err: Error) => {
                 if (err) return res.status(500).send(err);
