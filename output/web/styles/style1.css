@@ -75,6 +75,7 @@ span.certArrow {
 span.certLine {
     font-family: 'Courier New', Courier, monospace;
     cursor: pointer;
+    word-wrap: break-word;
 }
 
 span.certButtons {
@@ -113,6 +114,7 @@ span.keyArrow {
 span.keyLine {
     font-family: 'Courier New', Courier, monospace;
     cursor: pointer;
+    word-wrap: break-word;
 }
 
 span.keyButtons {
