@@ -7,7 +7,7 @@ RUN apk update
 RUN apk add curl jq git
 # RUN npm install -g npm@9.3.0
 RUN npm install -g typescript
-RUN git -c advice.detachedHead=false clone -b v1.0.3 https://github.com/markrad/certserver.git
+RUN git -c advice.detachedHead=false clone -b v1.0.4 https://github.com/markrad/certserver.git
 RUN mkdir /config
 RUN echo {} > /config/config.json
 
