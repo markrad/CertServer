@@ -81,6 +81,7 @@ block layout-content
           '<div class="certInfoType">' +
             '<span class="certTypeLabel">Type:&nbsp;</span><span class="certTypeValue">%s</span><span class="certPrivateKey">%s</span></div>' +
           '<div class="certInfoSerial">Serial Number: %s</div>' +  
+          '<div class="certFingerprint">FingerPrint: %s</div>' +
           '<div class="certInfoSubject">Subject:&nbsp;' +
             '<span class="certInfoSubjectC">C=%s;&nbsp;</span>' +
             '<span class="certInfoSubjectST">ST=%s;&nbsp;</span>' +
@@ -139,6 +140,7 @@ block layout-content
               result.certType,
               result.keyPresent == 'yes'? '&nbsp;with private key' : '',
               result.serialNumber,
+              result.fingerprint,
               result.subject.C,
               result.subject.ST,
               result.subject.L, 
@@ -401,7 +403,7 @@ block layout-content
         });
       }
     }
-
+    // TODO: function uploadKey(e) {}
     //- function createCACert(e) {
     //-   let data = new FormData();
     //-   console.log('generate it');
