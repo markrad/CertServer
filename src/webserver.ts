@@ -142,6 +142,7 @@ export class WebServer {
     private _certificate: string = null;
     private _key: string = null;
     private _config: Config;
+    private _version = 'v' + require('../../package.json').version;
     get port() { return this._port; }
     get dataPath() { return this._dataPath; }
     // private constructor(port: number, dataPath: string) {
@@ -291,6 +292,7 @@ export class WebServer {
                 L: this._config.certServer.subject.L,
                 O: this._config.certServer.subject.O,
                 OU: this._config.certServer.subject.OU,
+                version: this._version,
             });
         });
         this._app.get("/certlist", (request, response) => {

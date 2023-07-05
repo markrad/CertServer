@@ -222,3 +222,8 @@ button.button2Red:hover {
 .hidden {
     display: none;
 }
+
+.sub {
+    font-size: 15px;
+    margin-left: 8pt;
+}

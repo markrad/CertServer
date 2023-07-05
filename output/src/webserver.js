@@ -91,6 +91,7 @@ class WebServer {
         this._app = (0, express_1.default)();
         this._certificate = null;
         this._key = null;
+        this._version = 'v' + require('../../package.json').version;
         this._makeNumberPositive = (hexString) => {
             let mostSignificativeHexDigitAsInt = parseInt(hexString[0], 16);
             if (mostSignificativeHexDigitAsInt < 8)
@@ -234,6 +235,7 @@ class WebServer {
                     L: this._config.certServer.subject.L,
                     O: this._config.certServer.subject.O,
                     OU: this._config.certServer.subject.OU,
+                    version: this._version,
                 });
             });
             this._app.get("/certlist", (request, response) => {
