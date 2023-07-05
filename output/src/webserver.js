@@ -219,7 +219,7 @@ class WebServer {
                         return res.status(500).send(err);
                     try {
                         let result = yield this._tryAddKey(tempName, request.query.password);
-                        return res.status(200).json({ message: `Key ${result.name} added`, type: result.types.map((t) => CertTypes[t]).join(';') });
+                        return res.status(200).json({ message: `Key ${result.name} added`, types: result.types.map((t) => CertTypes[t]).join(';') });
                     }
                     catch (err) {
                         return res.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).send(err.message);
@@ -818,7 +818,7 @@ class WebServer {
                 }
                 let krow = { e: k.e, n: k.n, pairSerial: null, name: null, type: CertTypes.key, encrypted: encrypted };
                 let keys = this._privateKeys.find();
-                let publicKey = node_forge_1.pki.setRsaPublicKey(k.e, k.n);
+                let publicKey = node_forge_1.pki.setRsaPublicKey(k.n, k.e);
                 // See if we already have this key
                 for (let i = 0; i < keys.length; i++) {
                     if (this._isIdenticalKey(node_forge_1.pki.setRsaPublicKey(keys[i].n, keys[i].e), publicKey)) {

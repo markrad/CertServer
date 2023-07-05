@@ -403,7 +403,47 @@ block layout-content
         });
       }
     }
-    // TODO: function uploadKey(e) {}
+    function uploadKey(e) {
+      var data = new FormData();
+      var files = $('#keyUpload');
+      if (files[0].files.length == 0) {
+        alert('No files choosen');
+      }
+      else {
+        console.log('we have something to upload');
+        for (let i = 0; i < files[0].files.length; i++) {
+          data.append('keyFile', files[0].files[i]);
+        }
+
+        var request = $.ajax({
+          url: '/uploadKey',
+          method: 'POST',
+          processData: false,
+          contentType: false,
+          data: data,
+          error: (xhr, msg, err) => {
+            document.getElementById('uploadKeyForm').reset();
+            $.magnificPopup.open({
+              items: {
+                src: `<div class="error-popup">${err}: ${xhr.responseText}</div>`,
+                type: 'inline'
+              }
+            });
+            //- alert(JSON.stringify(err));
+          },
+          success: async (result, status) => {
+            document.getElementById('uploadKeyForm').reset();
+            processChanges(result.types);
+            $.magnificPopup.open({
+              items: {
+                src: `<div class="white-popup">Key uploaded</div>`,
+                type: 'inline'
+              }
+            });
+          }
+        });
+      }
+    }
     //- function createCACert(e) {
     //-   let data = new FormData();
     //-   console.log('generate it');
@@ -592,14 +632,14 @@ block layout-content
         div.SubmitButton
           input#fileCertReset(type="reset")
           button#uploadCertButton.SubmitButton(type="button", onClick="uploadCert()" title="submit", value="Upload") Upload
-    form#uploadKeyForm(action="/uploadKey", method="post", encType="multipart/form-data" class='slideForm')
+    form#uploadKeyForm(method="post", encType="multipart/form-data" class='slideForm')
       .Upload
         | Upload a key:&nbsp;
         span.UploadInput
           input#keyUpload(type="file", name="keyFile", accept=".pem,.crt,.key", title="Upload file")
         div.SubmitButton
           input#fileKeyReset(type="reset")
-          button#uploadKeyButton.SubmitButton(type="submit", title="submit", value="Upload") Upload
+          button#uploadKeyButton.SubmitButton(type="button", onClick="uploadKey()" title="submit", value="Upload") Upload
     form.slideForm#generateCertForm(action="/createCACert", method="post", encType="application/x-www-form-urlencoded") This will generate a private key and self-signed root CA pair
       .Country 
         span.SubjectTitle

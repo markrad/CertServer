@@ -269,14 +269,14 @@ export class WebServer {
             if (!keyFile) {
                 throw new CertError(404, 'Key file not found in request');
             }
-            
+
             let tempName = path.join(this._workPath, keyFile.name);
             keyFile.mv(tempName, async (err: Error) => {
                 if (err) return res.status(500).send(err);
 
                 try {
                     let result = await this._tryAddKey(tempName, request.query.password);
-                    return res.status(200).json({ message: `Key ${result.name} added`, type: result.types.map((t) => CertTypes[t]).join(';')});
+                    return res.status(200).json({ message: `Key ${result.name} added`, types: result.types.map((t) => CertTypes[t]).join(';')});
                 }
                 catch (err) {
                     return res.status(err.status ?? 500).send(err.message);
@@ -916,7 +916,7 @@ export class WebServer {
 
             let krow: PrivateKeyRow = { e: k.e, n: k.n, pairSerial: null, name: null, type: CertTypes.key, encrypted: encrypted };
             let keys = this._privateKeys.find();
-            let publicKey = pki.setRsaPublicKey(k.e, k.n);
+            let publicKey = pki.setRsaPublicKey(k.n, k.e);
 
             // See if we already have this key
             for (let i = 0; i < keys.length; i++) {
