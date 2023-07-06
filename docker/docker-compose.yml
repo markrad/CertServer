@@ -1,6 +1,6 @@
 version: "3.9"
 services:
-  frigate:
+  certserver:
     container_name: certserver 
     restart: unless-stopped
     image: certserver:1.0.4

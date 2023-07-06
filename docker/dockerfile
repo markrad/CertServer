@@ -16,9 +16,9 @@ WORKDIR /certserver
 
 # RUN npm install -g npm@9.4.2
 RUN npm install
-RUN tsc
+# RUN tsc
 
 # ADD healthcheck.sh ./healthcheck.sh
 # HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 CMD [ "./healthcheck.sh" ]
 
-CMD [ "node", "./output/src/index.js", "/config/config.json" ]
+CMD [ "node", "./output/src/index.js", "/config/config.yml" ]
