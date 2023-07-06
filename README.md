@@ -17,6 +17,40 @@ You can also generate a root and a leaf and use it for protecting a website with
 You can also upload certificates and keys to it and it will determine if the new files have any relationship to the existing files such as one certificate being signed by another or a key being the pair to a certificate.
 
 The webpage itself is fairly crude. I am not a web or even UI person. 
+## Running the Server
+Configuration is done by passing a yaml file as the only argument to the script as in  
+`node output/index.js ./config.yml`  
+for example. You can find a sample config file [here](./config_sample.yml). This file, due to a restriction in the library I used, must have a file extension of yml. If a configuration file is not passed then it will default to the values in the sample.
+### The Default config File
+```yaml
+certServer:
+  root: "./data"
+  port: 4141
+  subject:
+    C: Country,
+    ST: State,
+    L: City,
+    O: Company,
+    OU: Unit
+``` 
+
+**certServer:** 
+This is required  
+>**root:** 
+This specifies the root directory that the server will use to save certificates, private keys, and its database. Defaults to *./root*  
+>**port:** The port the webserver will listen on. Defaults to *4141*.  
+>**subject:** If you want subject defaults, this is required  
+>>>**C:** Default for subject country  
+>>>**ST:** Default for subject state  
+>>>**L:** Default for subject location (city)  
+>>>**O:** Default for subject organization  
+>>>**OU:** Default for subject organizational unit  
+
+Subject fields will default to nothing.
+
+
+## Running in a Docker Container
+Also provided are a [dockerfile](./docker/dockerfile) that will build an image to run the server in Linux Alpine and a [docker-compose](./docker/docker-compose.yml) file that show how you might run it using mounted volumes for the data and the config. It is recommended that you mount the directory that you specified as the root directory in the config and the directory that contains the config file itself.
 ## REST API
 
 The server does offer a limited REST API as follows:
@@ -39,10 +73,4 @@ The same rules apply as uploading a certificate above
 - To delete a key use DELETE  
 `http://<yourserver>:<yourport>/api/deleteKey?name=<keyname>`
 
-## Running the Server
-Configuration is done by passing a yaml file as the only argument to the script as in  
-`node output/index.js ./config.yml`  
-for example. You can find a sample config file [here](./config_sample.yml). This file, due to a restriction in the library I used, must have a file extension of yml. If a configuration file is not passed then it will default to the values in the sample.  
 And that is pretty much it except for 
-## Running it in a Docker Container
-Also provided are a [dockerfile](./docker/dockerfile) that will build an image to run the server in Linux Alpine and a [docker-compose](./docker/docker-compose.yml) file that show how you might run it using mounted volumes for the data and the config.
