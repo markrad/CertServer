@@ -1,4 +1,5 @@
 import path from 'path';
+import deepmerge from 'deepmerge';
 import { WebServer } from './webserver';
 
 // const ROOT_DIRECTORY = '/workspaces/typescript-node/data';
@@ -30,7 +31,7 @@ try {
             break;
         case 3:
             let options = require('yaml-reader').read(path.resolve(process.argv[2]));
-            config = { ...defaultConfig, ...options };
+            config = deepmerge(defaultConfig, options);
             break;
         default:
             throw 'Invalid number of arguments - only a config file path is allowed'
