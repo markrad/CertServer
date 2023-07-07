@@ -42,6 +42,8 @@ const path_1 = __importDefault(require("path"));
 const http_1 = __importDefault(require("http"));
 const https_1 = __importDefault(require("https"));
 const fs_1 = __importDefault(require("fs"));
+//import * as fspromises from 'fs/promises'
+const promises_1 = require("fs/promises");
 const crypto_1 = __importDefault(require("crypto"));
 const node_forge_1 = require("node-forge");
 const lokijs_1 = __importStar(require("lokijs"));
@@ -51,6 +53,7 @@ const serve_favicon_1 = __importDefault(require("serve-favicon"));
 const log4js = __importStar(require("log4js"));
 const certificateCache_1 = require("./certificateCache");
 const eventWaiter_1 = require("./utility/eventWaiter");
+const exists_1 = require("./utility/exists");
 const ExtensionBasicConstraints_1 = require("./Extensions/ExtensionBasicConstraints");
 const ExtensionKeyUsage_1 = require("./Extensions/ExtensionKeyUsage");
 const ExtensionAuthorityKeyIdentifier_1 = require("./Extensions/ExtensionAuthorityKeyIdentifier");
@@ -85,20 +88,12 @@ class WebServer {
     }
     get port() { return this._port; }
     get dataPath() { return this._dataPath; }
-    // private constructor(port: number, dataPath: string) {
     constructor(config) {
         this.DB_NAME = 'certs.db';
         this._app = (0, express_1.default)();
         this._certificate = null;
         this._key = null;
         this._version = 'v' + require('../../package.json').version;
-        this._makeNumberPositive = (hexString) => {
-            let mostSignificativeHexDigitAsInt = parseInt(hexString[0], 16);
-            if (mostSignificativeHexDigitAsInt < 8)
-                return hexString;
-            mostSignificativeHexDigitAsInt -= 8;
-            return mostSignificativeHexDigitAsInt.toString() + hexString.substring(1);
-        };
         this._config = config;
         this._port = config.certServer.port;
         this._dataPath = config.certServer.root;
@@ -260,7 +255,7 @@ class WebServer {
             });
             this._app.get("/certdetails", (request, response) => __awaiter(this, void 0, void 0, function* () {
                 let filename = path_1.default.join(this._certificatesPath, request.query.name + '.pem');
-                if (!(0, node_fs_1.existsSync)(filename))
+                if (!(yield (0, exists_1.exists)(filename)))
                     response.status(404);
                 let c = this._certificates.findOne({ name: request.query.name });
                 if (c) {
@@ -273,7 +268,7 @@ class WebServer {
             }));
             this._app.get("/keydetails", (request, response) => __awaiter(this, void 0, void 0, function* () {
                 let filename = path_1.default.join(this._privatekeysPath, request.query.name + '.pem');
-                if (!(0, node_fs_1.existsSync)(filename))
+                if (!(yield (0, exists_1.exists)(filename)))
                     response.status(404);
                 let k = this._privateKeys.findOne({ name: request.query.name });
                 if (k) {
@@ -289,7 +284,8 @@ class WebServer {
                     return response.status(400).send('Certificate must be in standard 64 byte line length format - try --data-binary on curl');
                 }
                 try {
-                    (0, node_fs_1.writeFileSync)(path_1.default.join(this._workPath, 'upload.pem'), request.body, { encoding: 'utf8' });
+                    yield (0, promises_1.writeFile)(path_1.default.join(this._workPath, 'upload.pem'), request.body, { encoding: 'utf8' });
+                    //writeFileSync(path.join(this._workPath, 'upload.pem'), request.body, { encoding: 'utf8' });
                     let result = yield this._tryAddCertificate(path_1.default.join(this._workPath, 'upload.pem'));
                     return response.status(200).json({ message: `Certificate ${result.name} added`, types: result.types.map((t) => CertTypes[t]).join(';') });
                 }
@@ -302,7 +298,8 @@ class WebServer {
                     return response.status(400).send('Key must be in standard 64 byte line length format - try --data-binary on curl');
                 }
                 try {
-                    (0, node_fs_1.writeFileSync)(path_1.default.join(this._workPath, 'upload.key'), request.body, { encoding: 'utf8' });
+                    yield (0, promises_1.writeFile)(path_1.default.join(this._workPath, 'upload.key'), request.body, { encoding: 'utf8' });
+                    // writeFileSync(path.join(this._workPath, 'upload.key'), request.body, { encoding: 'utf8' });
                     let result = yield this._tryAddKey(path_1.default.join(this._workPath, 'upload.key'), request.query.password);
                     return response.status(200).json({ message: `Key ${result.name} added`, type: result.types.map((t) => CertTypes[t]).join(';') });
                 }
@@ -310,7 +307,7 @@ class WebServer {
                     response.status(500).send(err.message);
                 }
             }));
-            this._app.delete('/api/deleteCert', (request, response) => {
+            this._app.delete('/api/deleteCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 var _a;
                 try {
                     let options = {};
@@ -318,43 +315,43 @@ class WebServer {
                         options['serialNumber'] = request.query.serialNumber;
                     else
                         options['name'] = request.query.name;
-                    let result = this._tryDeleteCert(options);
+                    let result = yield this._tryDeleteCert(options);
                     return response.status(200).json({ message: `Certificate ${result.name} deleted`, types: result.types.map((t) => CertTypes[t]).join(';') });
                 }
                 catch (err) {
                     return response.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).json(JSON.stringify({ error: err.message }));
                 }
-            });
-            this._app.delete('/api/deleteKey', (request, response) => {
-                var _a;
+            }));
+            this._app.delete('/api/deleteKey', (request, response) => __awaiter(this, void 0, void 0, function* () {
+                var _b;
                 try {
                     let options = { name: null };
                     options.name = request.query.name;
-                    let result = this._tryDeleteKey(options);
+                    let result = yield this._tryDeleteKey(options);
                     return response.status(200).json({ message: `Key ${result.name} deleted`, types: result.types.map((t) => CertTypes[t]).join(';') });
                 }
                 catch (err) {
-                    return response.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).json({ error: err.message });
+                    return response.status((_b = err.status) !== null && _b !== void 0 ? _b : 500).json({ error: err.message });
                 }
-            });
-            this._app.get('/api/chaindownload', (request, response) => {
-                var _a;
+            }));
+            this._app.get('/api/chaindownload', (request, response) => __awaiter(this, void 0, void 0, function* () {
+                var _c;
                 try {
-                    if (!fs_1.default.existsSync(path_1.default.join(this._certificatesPath, request.query.name + '.pem'))) {
-                        response.status(404).end();
+                    if (!(yield (0, exists_1.exists)(path_1.default.join(this._certificatesPath, request.query.name + '.pem')))) {
+                        throw new CertError(404, `${request.query.name} not found`);
                     }
-                    let filename = this._getChain(request.query.name);
-                    response.download(filename, request.query.name + '_full_chain.pem', (err) => {
+                    let filename = yield this._getChain(request.query.name);
+                    response.download(filename, request.query.name + '_full_chain.pem', (err) => __awaiter(this, void 0, void 0, function* () {
                         if (err) {
                             logger.error(`Failed to send chain for ${request.query.name}: ${err.message}`);
                         }
-                        fs_1.default.unlinkSync(filename);
-                    });
+                        yield (0, promises_1.unlink)(filename);
+                    }));
                 }
                 catch (err) {
-                    return response.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).json({ error: err.message });
+                    return response.status((_c = err.status) !== null && _c !== void 0 ? _c : 500).json({ error: err.message });
                 }
-            });
+            }));
             this._app.post('/createCACert', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     logger.debug(request.body);
@@ -377,7 +374,7 @@ class WebServer {
                         return response.status(400).json({ message: errString });
                     }
                     const { privateKey, publicKey } = node_forge_1.pki.rsa.generateKeyPair(2048);
-                    const attributes = this._getAttributes(subject);
+                    const attributes = WebServer._getAttributes(subject);
                     const extensions = [
                         new ExtensionBasicConstraints_1.ExtensionBasicConstraints({ cA: true }),
                         new ExtensionKeyUsage_1.ExtensionKeyUsage({ keyCertSign: true, cRLSign: true }),
@@ -387,7 +384,7 @@ class WebServer {
                     // Set the Certificate attributes for the new Root CA
                     cert.publicKey = publicKey;
                     // cert.privateKey = privateKey;
-                    cert.serialNumber = this._getRandomSerialNumber();
+                    cert.serialNumber = WebServer._getRandomSerialNumber();
                     cert.validity.notBefore = validFrom;
                     cert.validity.notAfter = validTo;
                     cert.setSubject(attributes);
@@ -396,8 +393,8 @@ class WebServer {
                     // Self-sign the Certificate
                     cert.sign(privateKey, node_forge_1.md.sha512.create());
                     // Convert to PEM format
-                    fs_1.default.writeFileSync(path_1.default.join(this._workPath, 'newca.pem'), node_forge_1.pki.certificateToPem(cert), { encoding: 'utf8' });
-                    fs_1.default.writeFileSync(path_1.default.join(this._workPath, 'newca-key.pem'), node_forge_1.pki.privateKeyToPem(privateKey), { encoding: 'utf8' });
+                    yield (0, promises_1.writeFile)(path_1.default.join(this._workPath, 'newca.pem'), node_forge_1.pki.certificateToPem(cert), { encoding: 'utf8' });
+                    yield (0, promises_1.writeFile)(path_1.default.join(this._workPath, 'newca-key.pem'), node_forge_1.pki.privateKeyToPem(privateKey), { encoding: 'utf8' });
                     let certResult = yield this._tryAddCertificate((path_1.default.join(this._workPath, 'newca.pem')));
                     let keyResult = yield this._tryAddKey((path_1.default.join(this._workPath, 'newca-key.pem')));
                     return response.status(200)
@@ -437,14 +434,14 @@ class WebServer {
                     let k;
                     if (c) {
                         if (request.body.intPassword) {
-                            k = node_forge_1.pki.decryptRsaPrivateKey(fs_1.default.readFileSync(path_1.default.join(this._privatekeysPath, kRow.name + '.pem'), { encoding: 'utf8' }), request.body.intPassword);
+                            k = node_forge_1.pki.decryptRsaPrivateKey(yield (0, promises_1.readFile)(path_1.default.join(this._privatekeysPath, kRow.name + '.pem'), { encoding: 'utf8' }), request.body.intPassword);
                         }
                         else {
-                            k = node_forge_1.pki.privateKeyFromPem(fs_1.default.readFileSync(path_1.default.join(this._privatekeysPath, kRow.name + '.pem'), { encoding: 'utf8' }));
+                            k = node_forge_1.pki.privateKeyFromPem(yield (0, promises_1.readFile)(path_1.default.join(this._privatekeysPath, kRow.name + '.pem'), { encoding: 'utf8' }));
                         }
                     }
                     const { privateKey, publicKey } = node_forge_1.pki.rsa.generateKeyPair(2048);
-                    const attributes = this._getAttributes(subject);
+                    const attributes = WebServer._getAttributes(subject);
                     const extensions = [
                         new ExtensionBasicConstraints_1.ExtensionBasicConstraints({ cA: true }),
                         new ExtensionKeyUsage_1.ExtensionKeyUsage({ keyCertSign: true, cRLSign: true }),
@@ -455,7 +452,7 @@ class WebServer {
                     // Set the Certificate attributes for the new Root CA
                     cert.publicKey = publicKey;
                     // cert.privateKey = privateKey;
-                    cert.serialNumber = this._getRandomSerialNumber();
+                    cert.serialNumber = WebServer._getRandomSerialNumber();
                     cert.validity.notBefore = validFrom;
                     cert.validity.notAfter = validTo;
                     cert.setSubject(attributes);
@@ -464,8 +461,8 @@ class WebServer {
                     // Self-sign the Certificate
                     cert.sign(k, node_forge_1.md.sha512.create());
                     // Convert to PEM format
-                    fs_1.default.writeFileSync(path_1.default.join(this._workPath, 'newint.pem'), node_forge_1.pki.certificateToPem(cert), { encoding: 'utf8' });
-                    fs_1.default.writeFileSync(path_1.default.join(this._workPath, 'newint-key.pem'), node_forge_1.pki.privateKeyToPem(privateKey), { encoding: 'utf8' });
+                    yield (0, promises_1.writeFile)(path_1.default.join(this._workPath, 'newint.pem'), node_forge_1.pki.certificateToPem(cert), { encoding: 'utf8' });
+                    yield (0, promises_1.writeFile)(path_1.default.join(this._workPath, 'newint-key.pem'), node_forge_1.pki.privateKeyToPem(privateKey), { encoding: 'utf8' });
                     let certResult = yield this._tryAddCertificate((path_1.default.join(this._workPath, 'newint.pem')));
                     let keyResult = yield this._tryAddKey((path_1.default.join(this._workPath, 'newint-key.pem')));
                     let retTypes = Array.from(new Set(certResult.types.concat(keyResult.types).concat([CertTypes.intermediate]))).map((type) => CertTypes[type]);
@@ -513,7 +510,7 @@ class WebServer {
                         }
                     }
                     const { privateKey, publicKey } = node_forge_1.pki.rsa.generateKeyPair(2048);
-                    const attributes = this._getAttributes(subject);
+                    const attributes = WebServer._getAttributes(subject);
                     let sal = { domains: [subject.CN] };
                     let extensions = [
                         new ExtensionBasicConstraints_1.ExtensionBasicConstraints({ cA: false }),
@@ -528,7 +525,7 @@ class WebServer {
                     // Set the Certificate attributes for the new Root CA
                     cert.publicKey = publicKey;
                     // cert.privateKey = privateKey;
-                    cert.serialNumber = this._getRandomSerialNumber();
+                    cert.serialNumber = WebServer._getRandomSerialNumber();
                     cert.validity.notBefore = validFrom;
                     cert.validity.notAfter = validTo;
                     cert.setSubject(attributes);
@@ -537,8 +534,8 @@ class WebServer {
                     // Self-sign the Certificate
                     cert.sign(k, node_forge_1.md.sha512.create());
                     // Convert to PEM format
-                    fs_1.default.writeFileSync(path_1.default.join(this._workPath, 'newleaf.pem'), node_forge_1.pki.certificateToPem(cert), { encoding: 'utf8' });
-                    fs_1.default.writeFileSync(path_1.default.join(this._workPath, 'newleaf-key.pem'), node_forge_1.pki.privateKeyToPem(privateKey), { encoding: 'utf8' });
+                    yield (0, promises_1.writeFile)(path_1.default.join(this._workPath, 'newleaf.pem'), node_forge_1.pki.certificateToPem(cert), { encoding: 'utf8' });
+                    yield (0, promises_1.writeFile)(path_1.default.join(this._workPath, 'newleaf-key.pem'), node_forge_1.pki.privateKeyToPem(privateKey), { encoding: 'utf8' });
                     let certResult = yield this._tryAddCertificate((path_1.default.join(this._workPath, 'newleaf.pem')));
                     let keyResult = yield this._tryAddKey((path_1.default.join(this._workPath, 'newleaf-key.pem')));
                     let retTypes = Array.from(new Set(certResult.types.concat(keyResult.types).concat([CertTypes.leaf]))).map((type) => CertTypes[type]);
@@ -652,7 +649,7 @@ class WebServer {
                     throw err;
                 }
                 try {
-                    let pemString = fs_1.default.readFileSync(filename, { encoding: 'utf8' });
+                    let pemString = yield (0, promises_1.readFile)(filename, { encoding: 'utf8' });
                     let msg = node_forge_1.pem.decode(pemString)[0];
                     logger.debug(`Received ${msg.type}`);
                     if (msg.type != 'CERTIFICATE') {
@@ -700,23 +697,23 @@ class WebServer {
                     let name = (c.subject.getField('CN').value).replace(/ /g, '_');
                     // Deduplicate if necessary
                     if (name + '.pem' != path_1.default.basename(filename)) {
-                        if (fs_1.default.existsSync(path_1.default.join(path_1.default.dirname(filename), name + '.pem'))) {
+                        if (yield (0, exists_1.exists)(path_1.default.join(path_1.default.dirname(filename), name + '.pem'))) {
                             for (let i = 1; true; i++) {
-                                if (!fs_1.default.existsSync(path_1.default.join(path_1.default.dirname(filename), name + '_' + i.toString() + '.pem'))) {
+                                if (!(yield (0, exists_1.exists)(path_1.default.join(path_1.default.dirname(filename), name + '_' + i.toString() + '.pem')))) {
                                     name = name + '_' + i.toString();
                                     break;
                                 }
                             }
                         }
                         logger.info(`Renamed ${path_1.default.basename(filename)} to ${name}.pem`);
-                        fs_1.default.renameSync(filename, path_1.default.join(this._certificatesPath, name + '.pem'));
+                        yield (0, promises_1.rename)(filename, path_1.default.join(this._certificatesPath, name + '.pem'));
                         // See if we have private key for this certificate
                         let keys = this._privateKeys.chain().find({ pairSerial: null }).data();
                         for (let i = 0; i < keys.length; i++) {
                             if (this._isSignedBy(c, keys[i].n, keys[i].e)) {
                                 logger.info('Found private key for ' + name);
                                 havePrivateKey = true;
-                                fs_1.default.renameSync(path_1.default.join(this._privatekeysPath, keys[i].name + '.pem'), path_1.default.join(this._privatekeysPath, name + '_key.pem'));
+                                yield (0, promises_1.rename)(path_1.default.join(this._privatekeysPath, keys[i].name + '.pem'), path_1.default.join(this._privatekeysPath, name + '_key.pem'));
                                 keys[i].name = name + '_key';
                                 keys[i].pairSerial = c.serialNumber;
                                 this._privateKeys.update(keys[i]);
@@ -732,8 +729,8 @@ class WebServer {
                         publicKey: c.publicKey,
                         privateKey: null,
                         signedBy: signedBy,
-                        issuer: this._getSubject(c.issuer),
-                        subject: this._getSubject(c.subject),
+                        issuer: WebServer._getSubject(c.issuer),
+                        subject: WebServer._getSubject(c.subject),
                         notBefore: c.validity.notBefore,
                         notAfter: c.validity.notAfter,
                         havePrivateKey: havePrivateKey,
@@ -769,93 +766,98 @@ class WebServer {
         };
     }
     _tryDeleteCert(options) {
-        var _a;
-        let cert = this._certificates.findOne(options.serialNumber ? { serialNumber: options.serialNumber } : { name: options.name });
-        if (!cert) {
-            throw new CertError(404, `Unable to find certificate with ${options.serialNumber ? 'serial number' : 'name'} ${(_a = options.serialNumber) !== null && _a !== void 0 ? _a : options.name}`);
-        }
-        let filename = path_1.default.join(this._certificatesPath, cert.name + '.pem');
-        if ((0, node_fs_1.existsSync)(filename)) {
-            fs_1.default.unlinkSync(filename);
-        }
-        let certTypes = [];
-        certTypes.push(cert.type);
-        let key = this._privateKeys.findOne({ pairSerial: cert.serialNumber });
-        if (key) {
-            key.pairSerial = null;
-            let unknownName = this._getUnpairedKeyName();
-            fs_1.default.renameSync(path_1.default.join(this._privatekeysPath, key.name + '.pem'), path_1.default.join(this._privatekeysPath, unknownName + '.pem'));
-            key.name = unknownName;
-            this._privateKeys.update(key);
-            certTypes.push(CertTypes.key);
-        }
-        let signedBy = this._certificates.find({ signedBy: cert.serialNumber });
-        for (let i = 0; i < signedBy.length; i++) {
-            certTypes.push(signedBy[i].type);
-        }
-        this._certificates.remove(cert);
-        return { name: cert.name, types: (Array.from(new Set(certTypes))) };
+        return __awaiter(this, void 0, void 0, function* () {
+            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+                var _a;
+                let cert = this._certificates.findOne(options.serialNumber ? { serialNumber: options.serialNumber } : { name: options.name });
+                if (!cert) {
+                    reject(new CertError(404, `Unable to find certificate with ${options.serialNumber ? 'serial number' : 'name'} ${(_a = options.serialNumber) !== null && _a !== void 0 ? _a : options.name}`));
+                }
+                let filename = path_1.default.join(this._certificatesPath, cert.name + '.pem');
+                if (yield (0, exists_1.exists)(filename)) {
+                    yield (0, promises_1.unlink)(filename);
+                }
+                let certTypes = [];
+                certTypes.push(cert.type);
+                let key = this._privateKeys.findOne({ pairSerial: cert.serialNumber });
+                if (key) {
+                    key.pairSerial = null;
+                    let unknownName = yield this._getUnpairedKeyName();
+                    yield (0, promises_1.rename)(path_1.default.join(this._privatekeysPath, key.name + '.pem'), path_1.default.join(this._privatekeysPath, unknownName + '.pem'));
+                    key.name = unknownName;
+                    this._privateKeys.update(key);
+                    certTypes.push(CertTypes.key);
+                }
+                let signedBy = this._certificates.find({ signedBy: cert.serialNumber });
+                for (let i = 0; i < signedBy.length; i++) {
+                    certTypes.push(signedBy[i].type);
+                }
+                this._certificates.remove(cert);
+                resolve({ name: cert.name, types: (Array.from(new Set(certTypes))) });
+            }));
+        });
     }
     _tryAddKey(filename, password) {
         return __awaiter(this, void 0, void 0, function* () {
-            logger.info(`Trying to add ${path_1.default.basename(filename)}`);
-            if (!fs_1.default.existsSync(filename)) {
-                let err = new CertError(404, `${path_1.default.basename(filename)} does not exist`);
-                throw err;
-            }
-            try {
-                let k;
-                let kpem = fs_1.default.readFileSync(filename, { encoding: 'utf8' });
-                let msg = node_forge_1.pem.decode(kpem)[0];
-                let encrypted = false;
-                if (msg.type == 'ENCRYPTED PRIVATE KEY') {
-                    if (!password) {
-                        throw new CertError(400, 'Password is required');
+            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+                logger.info(`Trying to add ${path_1.default.basename(filename)}`);
+                if (!(yield (0, exists_1.exists)(filename))) {
+                    reject(new CertError(404, `${path_1.default.basename(filename)} does not exist`));
+                }
+                try {
+                    let k;
+                    let kpem = yield (0, promises_1.readFile)(filename, { encoding: 'utf8' });
+                    let msg = node_forge_1.pem.decode(kpem)[0];
+                    let encrypted = false;
+                    if (msg.type == 'ENCRYPTED PRIVATE KEY') {
+                        if (!password) {
+                            reject(new CertError(400, 'Password is required'));
+                        }
+                        k = node_forge_1.pki.decryptRsaPrivateKey(fs_1.default.readFileSync(filename, { encoding: 'utf8' }), password);
+                        encrypted = true;
                     }
-                    k = node_forge_1.pki.decryptRsaPrivateKey(fs_1.default.readFileSync(filename, { encoding: 'utf8' }), password);
-                    encrypted = true;
-                }
-                else {
-                    k = node_forge_1.pki.privateKeyFromPem(fs_1.default.readFileSync(filename, { encoding: 'utf8' }));
-                }
-                let krow = { e: k.e, n: k.n, pairSerial: null, name: null, type: CertTypes.key, encrypted: encrypted };
-                let keys = this._privateKeys.find();
-                let publicKey = node_forge_1.pki.setRsaPublicKey(k.n, k.e);
-                // See if we already have this key
-                for (let i = 0; i < keys.length; i++) {
-                    if (this._isIdenticalKey(node_forge_1.pki.setRsaPublicKey(keys[i].n, keys[i].e), publicKey)) {
-                        throw new CertError(409, `Key already present: ${keys[i].name}`);
+                    else {
+                        k = node_forge_1.pki.privateKeyFromPem(fs_1.default.readFileSync(filename, { encoding: 'utf8' }));
                     }
-                }
-                // See if this is the key pair for a certificate
-                let certs = this._certificates.find();
-                let newfile = 'unknown_key_';
-                let types = [CertTypes.key];
-                for (let i = 0; i < certs.length; i++) {
-                    if (this._isSignedBy(yield this._cache.getCertificate(certs[i].name), k.n, k.e)) {
-                        krow.pairSerial = certs[i].serialNumber;
-                        types.push(certs[i].type);
-                        newfile = certs[i].name + '_key';
-                        break;
+                    let krow = { e: k.e, n: k.n, pairSerial: null, name: null, type: CertTypes.key, encrypted: encrypted };
+                    let keys = this._privateKeys.find();
+                    let publicKey = node_forge_1.pki.setRsaPublicKey(k.n, k.e);
+                    // See if we already have this key
+                    for (let i = 0; i < keys.length; i++) {
+                        if (this._isIdenticalKey(node_forge_1.pki.setRsaPublicKey(keys[i].n, keys[i].e), publicKey)) {
+                            reject(new CertError(409, `Key already present: ${keys[i].name}`));
+                        }
                     }
+                    // See if this is the key pair for a certificate
+                    let certs = this._certificates.find();
+                    let newfile = 'unknown_key_';
+                    let types = [CertTypes.key];
+                    for (let i = 0; i < certs.length; i++) {
+                        if (this._isSignedBy(yield this._cache.getCertificate(certs[i].name), k.n, k.e)) {
+                            krow.pairSerial = certs[i].serialNumber;
+                            types.push(certs[i].type);
+                            newfile = certs[i].name + '_key';
+                            break;
+                        }
+                    }
+                    // Generate a file name for a key without a certificate
+                    if (krow.pairSerial == null) {
+                        newfile = yield this._getUnpairedKeyName();
+                    }
+                    yield (0, promises_1.rename)(filename, path_1.default.join(this._privatekeysPath, newfile + '.pem'));
+                    logger.info(`Renamed ${path_1.default.basename(filename)} to ${newfile}.pem`);
+                    krow.name = newfile;
+                    this._privateKeys.insert(krow);
+                    resolve({ name: newfile, types: types });
                 }
-                // Generate a file name for a key without a certificate
-                if (krow.pairSerial == null) {
-                    newfile = this._getUnpairedKeyName();
+                catch (err) {
+                    logger.error(err.message);
+                    if (!err.status) {
+                        err.status = 500;
+                    }
+                    reject(err);
                 }
-                fs_1.default.renameSync(filename, path_1.default.join(this._privatekeysPath, newfile + '.pem'));
-                logger.info(`Renamed ${path_1.default.basename(filename)} to ${newfile}.pem`);
-                krow.name = newfile;
-                this._privateKeys.insert(krow);
-                return { name: newfile, types: types };
-            }
-            catch (err) {
-                logger.error(err.message);
-                if (!err.status) {
-                    err.status = 500;
-                }
-                throw err;
-            }
+            }));
         });
     }
     _getKeyBrief(r) {
@@ -866,45 +868,56 @@ class WebServer {
         };
     }
     _tryDeleteKey(options) {
-        let key = this._privateKeys.findOne({ name: options.name });
-        if (!key) {
-            throw new CertError(404, `Unable to find key with name ${options.name}`);
-        }
-        let filename = path_1.default.join(this._privatekeysPath, key.name + '.pem');
-        if ((0, node_fs_1.existsSync)(filename)) {
-            fs_1.default.unlinkSync(filename);
-        }
-        let certTypes = [CertTypes.key];
-        if (key.pairSerial) {
-            let cert = this._certificates.findOne({ serialNumber: key.pairSerial });
-            if (!cert) {
-                logger.warn(`Could not find certificate with serial number ${key.pairSerial}`);
+        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            let key = this._privateKeys.findOne({ name: options.name });
+            if (!key) {
+                reject(new CertError(404, `Unable to find key with name ${options.name}`));
             }
-            else {
-                cert.havePrivateKey = false;
-                this._certificates.update(cert);
-                certTypes.push(cert.type);
+            let filename = path_1.default.join(this._privatekeysPath, key.name + '.pem');
+            if (yield (0, exists_1.exists)(filename)) {
+                yield (0, promises_1.unlink)(filename);
             }
-        }
-        this._privateKeys.remove(key);
-        return { name: key.name, types: certTypes };
+            let certTypes = [CertTypes.key];
+            if (key.pairSerial) {
+                let cert = this._certificates.findOne({ serialNumber: key.pairSerial });
+                if (!cert) {
+                    logger.warn(`Could not find certificate with serial number ${key.pairSerial}`);
+                }
+                else {
+                    cert.havePrivateKey = false;
+                    this._certificates.update(cert);
+                    certTypes.push(cert.type);
+                }
+            }
+            this._privateKeys.remove(key);
+            resolve({ name: key.name, types: certTypes });
+        }));
     }
     _getChain(certName) {
-        let newFile = path_1.default.join(this._workPath, 'temp_');
-        let i = 0;
-        while (fs_1.default.existsSync(newFile + i.toString())) {
-            i++;
-        }
-        newFile += i.toString();
-        fs_1.default.copyFileSync(path_1.default.join(this._certificatesPath, certName + '.pem'), newFile);
-        let c = this._certificates.findOne({ name: certName });
-        while (c.serialNumber != c.signedBy) {
-            c = this._certificates.findOne({ serialNumber: c.signedBy });
-            fs_1.default.appendFileSync(newFile, fs_1.default.readFileSync(path_1.default.join(this._certificatesPath, c.name + '.pem')));
-        }
-        return newFile;
+        return __awaiter(this, void 0, void 0, function* () {
+            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    let newFile = path_1.default.join(this._workPath, 'temp_');
+                    let i = 0;
+                    while (yield (0, exists_1.exists)(newFile + i.toString())) {
+                        i++;
+                    }
+                    newFile += i.toString();
+                    yield (0, promises_1.copyFile)(path_1.default.join(this._certificatesPath, certName + '.pem'), newFile);
+                    let c = this._certificates.findOne({ name: certName });
+                    while (c.serialNumber != c.signedBy) {
+                        c = this._certificates.findOne({ serialNumber: c.signedBy });
+                        yield (0, promises_1.appendFile)(newFile, yield (0, promises_1.readFile)(path_1.default.join(this._certificatesPath, c.name + '.pem')));
+                    }
+                    resolve(newFile);
+                }
+                catch (err) {
+                    reject(new CertError(500, err.message));
+                }
+            }));
+        });
     }
-    _getSubject(s) {
+    static _getSubject(s) {
         let getValue = (v) => {
             let work = s.getField(v);
             return work ? work.value : null;
@@ -919,12 +932,16 @@ class WebServer {
         };
     }
     _getUnpairedKeyName() {
-        let newname = 'unknown_key_';
-        for (let i = 0; true; i++) {
-            if (!fs_1.default.existsSync(path_1.default.join(this._privatekeysPath, newname + i.toString() + '.pem'))) {
-                return newname + i.toString();
-            }
-        }
+        return __awaiter(this, void 0, void 0, function* () {
+            return new Promise((resolve, _reject) => __awaiter(this, void 0, void 0, function* () {
+                let newname = 'unknown_key_';
+                for (let i = 0; true; i++) {
+                    if (!(yield (0, exists_1.exists)(path_1.default.join(this._privatekeysPath, newname + i.toString() + '.pem')))) {
+                        resolve(newname + i.toString());
+                    }
+                }
+            }));
+        });
     }
     _findSigner(caList, certificate) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -932,6 +949,7 @@ class WebServer {
                 if (caList) {
                     for (let i = 0; i < caList.length; i++) {
                         try {
+                            // TODO: Deprecate cache
                             let c = yield this._cache.getCertificate(caList[i].name);
                             if (c.verify(certificate)) {
                                 resolve(i);
@@ -953,6 +971,7 @@ class WebServer {
                 let retVal = [];
                 try {
                     signeeList.forEach((s) => __awaiter(this, void 0, void 0, function* () {
+                        // TODO: Deprecate cache
                         let check = yield this._cache.getCertificate(s.name);
                         try {
                             if (certificate.verify(check)) {
@@ -980,13 +999,6 @@ class WebServer {
         let publicKey = node_forge_1.pki.setRsaPublicKey(keyn, keye);
         let certPublicKey = cert.publicKey;
         return this._isIdenticalKey(publicKey, certPublicKey);
-        // if (publicKey.n.data.length != certPublicKey.n.data.length) return false;
-        // for (let i = 0; i < publicKey.n.data.length; i++) {
-        //     if (publicKey.n.data[i] != certPublicKey.n.data[i]) {
-        //         return false;
-        //     }
-        // }
-        // return true;
     }
     _isIdenticalKey(leftKey, rightKey) {
         if (leftKey.n.data.length != rightKey.n.data.length) {
@@ -998,7 +1010,7 @@ class WebServer {
         }
         return true;
     }
-    _getAttributes(subject) {
+    static _getAttributes(subject) {
         let attributes = [];
         if (subject.C)
             attributes.push({ shortName: 'C', value: subject.C });
@@ -1014,10 +1026,17 @@ class WebServer {
         return attributes;
     }
     // Generate a random serial number for the Certificate
-    _getRandomSerialNumber() {
-        return this._makeNumberPositive(node_forge_1.util.bytesToHex(node_forge_1.random.getBytesSync(20)));
+    static _getRandomSerialNumber() {
+        return WebServer._makeNumberPositive(node_forge_1.util.bytesToHex(node_forge_1.random.getBytesSync(20)));
     }
 }
 exports.WebServer = WebServer;
 WebServer.instance = null;
+WebServer._makeNumberPositive = (hexString) => {
+    let mostSignificativeHexDigitAsInt = parseInt(hexString[0], 16);
+    if (mostSignificativeHexDigitAsInt < 8)
+        return hexString;
+    mostSignificativeHexDigitAsInt -= 8;
+    return mostSignificativeHexDigitAsInt.toString() + hexString.substring(1);
+};
 //# sourceMappingURL=webserver.js.map
