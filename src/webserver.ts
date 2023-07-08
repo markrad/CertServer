@@ -13,6 +13,7 @@ import loki, { Collection, LokiFsAdapter } from 'lokijs'
 import Express, { NextFunction } from 'express';
 import FileUpload from 'express-fileupload';
 import serveFavicon from 'serve-favicon';
+import WsServer from 'ws';
 import * as log4js from 'log4js';
 
 import { CertificateCache } from './certificateCache';
@@ -138,6 +139,7 @@ export class WebServer {
     private _workPath: string;
     private _dbPath: string;
     private _app: Express.Application = Express();
+    private _ws = new WsServer.Server({ noServer: true });
     private _db: loki;
     private _certificates: Collection<CertificateRow>;
     private _privateKeys: Collection<PrivateKeyRow>;
@@ -620,17 +622,32 @@ export class WebServer {
             }
         });
 
+        let server: http.Server | https.Server;
+
         if (this._certificate) {
             const options = {
                 cert: this._certificate,
                 key: this._key,
             };
-            https.createServer(options, this._app).listen(this._port, '0.0.0.0');
+            server = https.createServer(options, this._app).listen(this._port, '0.0.0.0');
         }
         else {
-            http.createServer(this._app).listen(this._port, '0.0.0.0');
+            server = http.createServer(this._app).listen(this._port, '0.0.0.0');
         }
         logger.info('Listening on ' + this._port);
+
+        server.on('upgrade', async (request, socket, head) => {
+            try {
+                this._ws.handleUpgrade(request, socket, head, (ws) => {
+                    ws.send('Connected');
+                    logger.debug('WebSocket client connected');
+                });
+            }
+            catch (err) {
+                logger.error('Upgrade failed: ' + err.message);
+                socket.destroy();
+            }
+        });
     }
 
     private async _dbInit(): Promise<void> {

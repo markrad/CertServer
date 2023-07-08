@@ -567,6 +567,14 @@ block layout-content
         width: 350,
         modal: true,
       });
+      let wsURL = (window.location.protocol == 'https:'? 'wss://' : 'ws://') + 
+        window.location.hostname + 
+        ':' + window.location.port;
+      const ws = new WebSocket(wsURL);
+      ws.onopen = () => console.log('WebSocket open');
+      ws.onclose = () => console.log('WebSocket closed');
+      ws.onerror = (err) => console.log('WebSocket error: ' + err.message);
+      ws.onmessage = (message) => console.log('Received: ' + message.data);
     });
   div#newIntermediate(title='** Title **')
    form#newIntermediateForm(action="/createIntermediateCert", method="post", encType="application/x-www-form-urlencoded")

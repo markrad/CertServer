@@ -50,6 +50,7 @@ const lokijs_1 = __importStar(require("lokijs"));
 const express_1 = __importDefault(require("express"));
 const express_fileupload_1 = __importDefault(require("express-fileupload"));
 const serve_favicon_1 = __importDefault(require("serve-favicon"));
+const ws_1 = __importDefault(require("ws"));
 const log4js = __importStar(require("log4js"));
 const certificateCache_1 = require("./certificateCache");
 const eventWaiter_1 = require("./utility/eventWaiter");
@@ -91,6 +92,7 @@ class WebServer {
     constructor(config) {
         this.DB_NAME = 'certs.db';
         this._app = (0, express_1.default)();
+        this._ws = new ws_1.default.Server({ noServer: true });
         this._certificate = null;
         this._key = null;
         this._version = 'v' + require('../../package.json').version;
@@ -546,17 +548,30 @@ class WebServer {
                     return response.status(500).json({ message: err.message });
                 }
             }));
+            let server;
             if (this._certificate) {
                 const options = {
                     cert: this._certificate,
                     key: this._key,
                 };
-                https_1.default.createServer(options, this._app).listen(this._port, '0.0.0.0');
+                server = https_1.default.createServer(options, this._app).listen(this._port, '0.0.0.0');
             }
             else {
-                http_1.default.createServer(this._app).listen(this._port, '0.0.0.0');
+                server = http_1.default.createServer(this._app).listen(this._port, '0.0.0.0');
             }
             logger.info('Listening on ' + this._port);
+            server.on('upgrade', (request, socket, head) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    this._ws.handleUpgrade(request, socket, head, (ws) => {
+                        ws.send('Connected');
+                        logger.debug('WebSocket client connected');
+                    });
+                }
+                catch (err) {
+                    logger.error('Upgrade failed: ' + err.message);
+                    socket.destroy();
+                }
+            }));
         });
     }
     _dbInit() {
