@@ -18,9 +18,7 @@ export class EventWaiter {
     }
 
     async EventWait() {
-        return new Promise<void>((resolve, reject) => {
-            this._promise.then(() => resolve(), (err: any) => reject(err));
-        });
+        return this._promise;
     }
 
     EventSet() {
