@@ -487,6 +487,10 @@ block layout-content
       $('#newLeaf').dialog('close');
     }
 
+    function processChanges(changePacket) {
+      
+    }
+
     $(async function() {
       sprintf = window.sprintf;
       let datePicker;
@@ -567,14 +571,30 @@ block layout-content
         width: 350,
         modal: true,
       });
-      let wsURL = (window.location.protocol == 'https:'? 'wss://' : 'ws://') + 
-        window.location.hostname + 
-        ':' + window.location.port;
-      const ws = new WebSocket(wsURL);
-      ws.onopen = () => console.log('WebSocket open');
-      ws.onclose = () => console.log('WebSocket closed');
-      ws.onerror = (err) => console.log('WebSocket error: ' + err.message);
-      ws.onmessage = (message) => console.log('Received: ' + message.data);
+      let connectWebSocket = () => {
+        let wsURL = (window.location.protocol == 'https:'? 'wss://' : 'ws://') + 
+          window.location.hostname + 
+         ':' + window.location.port;
+        const ws = new WebSocket(wsURL);
+        wsonopen = wsonopen;
+        ws.onclose = wsonclose;
+        ws.onerror = wsonerror;
+        ws.onmessage =  wsonmessage;
+      }
+      let wsonopen = (e) => {
+        console.log('WebSocket is open');
+      }
+      let wsonclose = (e) => {
+        console.log('WebSocket is closed - reopening');
+        connectWebSocket();
+      }
+      let wsonerror = (e) => {
+        console.log('WebSocket error: ' + e.message);
+      }
+      let wsonmessage = (e) => {
+        console.log('Received: ' + e.data);
+      }
+      connectWebSocket();
     });
   div#newIntermediate(title='** Title **')
    form#newIntermediateForm(action="/createIntermediateCert", method="post", encType="application/x-www-form-urlencoded")
