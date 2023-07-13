@@ -132,8 +132,8 @@ out
 
 # Private stuff
 data/
-test*.ts
-test*.js*
+test.ts
+test.js*
 
 certs/
 
