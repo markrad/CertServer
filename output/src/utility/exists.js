@@ -13,15 +13,15 @@ exports.exists = void 0;
 const promises_1 = require("fs/promises");
 function exists(filename) {
     return __awaiter(this, void 0, void 0, function* () {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve, _reject) => __awaiter(this, void 0, void 0, function* () {
             try {
-                (0, promises_1.access)(filename, promises_1.constants.F_OK);
+                yield (0, promises_1.access)(filename, promises_1.constants.F_OK);
                 resolve(true);
             }
             catch (err) {
-                reject(false);
+                resolve(false);
             }
-        });
+        }));
     });
 }
 exports.exists = exists;
