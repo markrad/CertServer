@@ -29,9 +29,10 @@ class EventWaiter {
     }
     EventWait() {
         return __awaiter(this, void 0, void 0, function* () {
-            return new Promise((resolve, reject) => {
-                this._promise.then(() => resolve(), (err) => reject(err));
-            });
+            return this._promise;
+            // return new Promise<void>((resolve, reject) => {
+            //     this._promise.then(() => resolve(), (err: any) => reject(err));
+            // });
         });
     }
     EventSet() {
