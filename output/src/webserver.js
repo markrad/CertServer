@@ -254,12 +254,12 @@ class WebServer {
                     let retVal = {};
                     if (type != CertTypes.key) {
                         retVal['files'] = this._certificates.chain().find({ type: type }).simplesort('name').data().map((entry) => {
-                            return { name: entry.name, id: 'id_' + entry.$loki.toString() };
+                            return { name: entry.name, id: 'id_' + type.toString() + '_' + entry.$loki.toString() };
                         });
                     }
                     else {
                         retVal['files'] = this._privateKeys.chain().find().simplesort('name').data().map((entry) => {
-                            return { name: entry.name, id: 'id_' + entry.$loki.toString() };
+                            return { name: entry.name, id: 'id_' + type.toString() + '_' + entry.$loki.toString() };
                         });
                     }
                     response.status(200).json(retVal);
@@ -294,6 +294,24 @@ class WebServer {
                 if (k) {
                     let retVal = this._getKeyBrief(k);
                     response.status(200).json(retVal);
+                }
+                else {
+                    response.status(404).json({ Message: 'Key not found' });
+                }
+            }));
+            this._app.get('/api/certname', (request, response) => __awaiter(this, void 0, void 0, function* () {
+                let c = this._certificates.findOne({ $loki: parseInt(request.query.id) });
+                if (c) {
+                    response.status(200).json({ 'name': c.name });
+                }
+                else {
+                    response.status(404).json({ Message: 'Certificate not found' });
+                }
+            }));
+            this._app.get('/api/keyname', (request, response) => __awaiter(this, void 0, void 0, function* () {
+                let c = this._privateKeys.findOne({ $loki: parseInt(request.query.id) });
+                if (c) {
+                    response.status(200).json({ 'name': c.name });
                 }
                 else {
                     response.status(404).json({ Message: 'Key not found' });
@@ -942,11 +960,11 @@ class WebServer {
                         if (!password) {
                             reject(new CertError(400, 'Password is required'));
                         }
-                        k = node_forge_1.pki.decryptRsaPrivateKey(fs_1.default.readFileSync(filename, { encoding: 'utf8' }), password);
+                        k = node_forge_1.pki.decryptRsaPrivateKey(kpem, password);
                         encrypted = true;
                     }
                     else {
-                        k = node_forge_1.pki.privateKeyFromPem(fs_1.default.readFileSync(filename, { encoding: 'utf8' }));
+                        k = node_forge_1.pki.privateKeyFromPem(kpem);
                     }
                     let krow = { e: k.e, n: k.n, pairSerial: null, name: null, type: CertTypes.key, encrypted: encrypted };
                     let keys = this._privateKeys.find();

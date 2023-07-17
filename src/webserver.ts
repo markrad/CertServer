@@ -348,12 +348,12 @@ export class WebServer {
                 let retVal: any = {};
                 if (type != CertTypes.key) {
                     retVal['files'] = this._certificates.chain().find({ type: type }).simplesort('name').data().map((entry) => { 
-                        return { name: entry.name, id: 'id_' + entry.$loki.toString() }; 
+                        return { name: entry.name, id: 'id_' + type.toString() + '_' + entry.$loki.toString() }; 
                     });
                 }
                 else {
                     retVal['files'] = this._privateKeys.chain().find().simplesort('name').data().map((entry) => {
-                        return { name: entry.name, id: 'id_' + entry.$loki.toString() };
+                        return { name: entry.name, id: 'id_' + type.toString() + '_' + entry.$loki.toString() };
                     });
                 }
                 response.status(200).json(retVal);
@@ -384,6 +384,24 @@ export class WebServer {
             if (k) {
                 let retVal: KeyBrief = this._getKeyBrief(k);
                 response.status(200).json(retVal);
+            }
+            else {
+                response.status(404).json({ Message: 'Key not found' });
+            }
+        });
+        this._app.get('/api/certname', async(request, response) => {
+            let c = this._certificates.findOne({ $loki: parseInt(request.query.id as string)});
+            if (c) {
+                response.status(200).json({ 'name': c.name });
+            }
+            else {
+                response.status(404).json({ Message: 'Certificate not found' });
+            }
+        });
+        this._app.get('/api/keyname', async(request, response) => {
+            let c = this._privateKeys.findOne({ $loki: parseInt(request.query.id as string)});
+            if (c) {
+                response.status(200).json({ 'name': c.name });
             }
             else {
                 response.status(404).json({ Message: 'Key not found' });
@@ -1077,11 +1095,11 @@ export class WebServer {
                     if (!password) {
                         reject(new CertError(400, 'Password is required'));
                     }
-                    k = pki.decryptRsaPrivateKey(fs.readFileSync(filename, { encoding: 'utf8' }), password);
+                    k = pki.decryptRsaPrivateKey(kpem , password);
                     encrypted = true;
                 }
                 else {
-                    k = pki.privateKeyFromPem(fs.readFileSync(filename, { encoding: 'utf8' }));
+                    k = pki.privateKeyFromPem(kpem);
                 }
 
                 let krow: PrivateKeyRow = { e: k.e, n: k.n, pairSerial: null, name: null, type: CertTypes.key, encrypted: encrypted };

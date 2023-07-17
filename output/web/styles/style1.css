@@ -72,7 +72,7 @@ span.certArrow {
     cursor: pointer;
 }
 
-span.certLine {
+span.certValue {
     font-family: 'Courier New', Courier, monospace;
     cursor: pointer;
     word-wrap: break-word;
