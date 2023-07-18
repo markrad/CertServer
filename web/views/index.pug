@@ -6,8 +6,7 @@ block layout-content
     let sprintf = null;
     let nameLookup = [];
     let keyLookup = [];
-    let lineCache = {};
-
+    
     const typeLookup = [
       '',
       'root',
@@ -26,7 +25,6 @@ block layout-content
             reject(err);
           },
           success: (result, status, xhr) => {
-            lineCache[dir] = result;
             resolve(result);
           }
         });

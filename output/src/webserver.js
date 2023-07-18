@@ -121,7 +121,7 @@ class WebServer {
         if (!(0, node_fs_1.existsSync)(this._dbPath))
             (0, node_fs_1.mkdirSync)(this._dbPath);
         this._cache = new certificateCache_1.CertificateCache(this._certificatesPath, 10 * 60 * 60);
-        this._app.set('views', path_1.default.join(__dirname, '../web/views'));
+        this._app.set('views', path_1.default.join(__dirname, '../../web/views'));
         this._app.set('view engine', 'pug');
     }
     start() {
@@ -160,15 +160,15 @@ class WebServer {
             }
             // this._app.use(Express.bodyParser.json());
             this._app.use(express_1.default.urlencoded({ extended: true }));
-            this._app.use((0, serve_favicon_1.default)(path_1.default.join(__dirname, "../web/icons/doc_lock.ico"), { maxAge: 2592000000 }));
+            this._app.use((0, serve_favicon_1.default)(path_1.default.join(__dirname, "../../web/icons/doc_lock.ico"), { maxAge: 2592000000 }));
             this._app.use(express_1.default.text({ type: 'text/plain' }));
             this._app.use(express_1.default.text({ type: 'application/x-www-form-urlencoded' }));
             this._app.use(express_1.default.text({ type: 'application/json' }));
-            this._app.use('/scripts', express_1.default.static(path_1.default.join(__dirname, '../web/scripts')));
-            this._app.use('/styles', express_1.default.static(path_1.default.join(__dirname, '../web/styles')));
-            this._app.use('/icons', express_1.default.static(path_1.default.join(__dirname, '../web/icons')));
-            this._app.use('/files', express_1.default.static(path_1.default.join(__dirname, '../web/files')));
-            this._app.use('/images', express_1.default.static(path_1.default.join(__dirname, '../web/images')));
+            this._app.use('/scripts', express_1.default.static(path_1.default.join(__dirname, '../../web/scripts')));
+            this._app.use('/styles', express_1.default.static(path_1.default.join(__dirname, '../../web/styles')));
+            this._app.use('/icons', express_1.default.static(path_1.default.join(__dirname, '../../web/icons')));
+            this._app.use('/files', express_1.default.static(path_1.default.join(__dirname, '../../web/files')));
+            this._app.use('/images', express_1.default.static(path_1.default.join(__dirname, '../../web/images')));
             this._app.use('/certificates', express_1.default.static(this._certificatesPath));
             this._app.use('/keys', express_1.default.static(this._privatekeysPath));
             this._app.use((0, express_fileupload_1.default)());
@@ -740,17 +740,7 @@ class WebServer {
                         throw new CertError(400, 'Unsupported type ' + msg.type);
                     }
                     let result = { name: '', types: [], added: [], updated: [], deleted: [] };
-                    // let certificatesAdded: number[] = [];
-                    // let certificatesUpdated: number[] = [];
-                    // let rootsUpdated: number[] = [];
-                    // let intermediatesUpdated: number[] = [];
-                    // let leavesUpdated: number[] = [];
-                    // let rootsAdded: number[] = [];
-                    // let intermediatesAdded: number[] = [];
-                    // let leavesAdded: number[] = [];
-                    // let keysUpdated: number[] = [];
                     let c = node_forge_1.pki.certificateFromPem(pemString);
-                    // let types: CertTypes[] = [];
                     let signedBy = null;
                     let havePrivateKey = false;
                     // See if we already have this certificate
@@ -780,7 +770,6 @@ class WebServer {
                     if (result.types[0] != CertTypes.leaf) {
                         // Update certificates that this one signed
                         let signeeList = this._certificates.find({ 'type': { '$in': [CertTypes.leaf, CertTypes.intermediate] } });
-                        // TODO: Fix this
                         let list = yield this._findSigned(signeeList, c);
                         result.types = result.types.concat(list.types);
                         result.updated = result.updated.concat(list.updated);

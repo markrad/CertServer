@@ -69,7 +69,7 @@ where the POST data contains the pem contents and the Content-Type is text/plain
 The same rules apply as uploading a certificate above
 - To delete a certificate use DELETE  
 `http://<yourserver>:<yourport>/api/deleteCert?name=<certname>` or  
-`http://<yourserver>:<yourport>/api/deleteCert?serialNumber-<serialNumber>` 
+`http://<yourserver>:<yourport>/api/deleteCert?serialNumber=<serialNumber>` 
 - To delete a key use DELETE  
 `http://<yourserver>:<yourport>/api/deleteKey?name=<keyname>`
 

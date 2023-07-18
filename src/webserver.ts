@@ -210,7 +210,7 @@ export class WebServer {
             mkdirSync(this._dbPath);
 
         this._cache = new CertificateCache(this._certificatesPath, 10 * 60 * 60);
-        this._app.set('views', path.join(__dirname, '../web/views'));
+        this._app.set('views', path.join(__dirname, '../../web/views'));
         this._app.set('view engine', 'pug');
     }
 
@@ -252,15 +252,15 @@ export class WebServer {
         }
         // this._app.use(Express.bodyParser.json());
         this._app.use(Express.urlencoded({ extended: true }));
-        this._app.use(serveFavicon(path.join(__dirname, "../web/icons/doc_lock.ico"), { maxAge: 2592000000 }));
+        this._app.use(serveFavicon(path.join(__dirname, "../../web/icons/doc_lock.ico"), { maxAge: 2592000000 }));
         this._app.use(Express.text({ type: 'text/plain' }));
         this._app.use(Express.text({ type: 'application/x-www-form-urlencoded' }));
         this._app.use(Express.text({ type: 'application/json' }))
-        this._app.use('/scripts', Express.static(path.join(__dirname, '../web/scripts')))
-        this._app.use('/styles', Express.static(path.join(__dirname, '../web/styles')));
-        this._app.use('/icons', Express.static(path.join(__dirname, '../web/icons')));
-        this._app.use('/files', Express.static(path.join(__dirname, '../web/files')));
-        this._app.use('/images', Express.static(path.join(__dirname, '../web/images')));
+        this._app.use('/scripts', Express.static(path.join(__dirname, '../../web/scripts')))
+        this._app.use('/styles', Express.static(path.join(__dirname, '../../web/styles')));
+        this._app.use('/icons', Express.static(path.join(__dirname, '../../web/icons')));
+        this._app.use('/files', Express.static(path.join(__dirname, '../../web/files')));
+        this._app.use('/images', Express.static(path.join(__dirname, '../../web/images')));
         this._app.use('/certificates', Express.static(this._certificatesPath));
         this._app.use('/keys', Express.static(this._privatekeysPath));
         this._app.use(FileUpload());
@@ -853,17 +853,7 @@ export class WebServer {
                 }
 
                 let result: OperationResultEx2 = { name: '', types: [], added: [], updated: [], deleted: [] };
-                // let certificatesAdded: number[] = [];
-                // let certificatesUpdated: number[] = [];
-                // let rootsUpdated: number[] = [];
-                // let intermediatesUpdated: number[] = [];
-                // let leavesUpdated: number[] = [];
-                // let rootsAdded: number[] = [];
-                // let intermediatesAdded: number[] = [];
-                // let leavesAdded: number[] = [];
-                // let keysUpdated: number[] = [];
                 let c: pki.Certificate = pki.certificateFromPem(pemString);
-                // let types: CertTypes[] = [];
                 let signedBy: string = null;
                 let havePrivateKey: boolean = false;
 
@@ -899,7 +889,6 @@ export class WebServer {
                 if (result.types[0] != CertTypes.leaf) {
                     // Update certificates that this one signed
                     let signeeList = this._certificates.find({ 'type': { '$in': [ CertTypes.leaf, CertTypes.intermediate ] }});
-                    // TODO: Fix this
                     let list: { types: CertTypes[], updated: OperationResultItem[] } = await this._findSigned(signeeList, c);
 
                     result.types = result.types.concat(list.types);
