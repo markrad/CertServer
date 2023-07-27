@@ -680,14 +680,12 @@ class WebServer {
                     yield Promise.all(adding);
                     // let addresults: string[] = await Promise.all(adding);
                     // logger.debug(addresults.join(';'));
-                    let caList = this._certificates.find({ 'type': { '$in': [CertTypes.root, CertTypes.intermediate] } });
                     let nonRoot = this._certificates.find({ '$and': [{ 'type': { '$ne': CertTypes.root } }, { signedBy: null }] });
-                    // let nonRoot = certificates.chain().find({ 'type': certTypes.root }).find({ 'signedBy': null });
                     for (let i = 0; i < nonRoot.length; i++) {
-                        let signer = yield this._findSigner(caList, node_forge_1.pki.certificateFromPem(fs_1.default.readFileSync(path_1.default.join(this._certificatesPath, nonRoot[i].name + '.pem'), { encoding: 'utf8' })));
-                        if (signer != -1) {
-                            logger.info(`${nonRoot[i].name} is signed by ${caList[signer].name}`);
-                            nonRoot[i].signedBy = caList[signer].serialNumber;
+                        let signer = yield this._findSigner(node_forge_1.pki.certificateFromPem(fs_1.default.readFileSync(path_1.default.join(this._certificatesPath, nonRoot[i].name + '.pem'), { encoding: 'utf8' })));
+                        if (signer != null) {
+                            logger.info(`${nonRoot[i].name} is signed by ${signer.name}`);
+                            nonRoot[i].signedBy = signer.serialNumber;
                             this._certificates.update(nonRoot[i]);
                         }
                     }
@@ -766,10 +764,9 @@ class WebServer {
                             result.types.push(CertTypes.leaf);
                         }
                         // See if any existing certificates signed this one
-                        let caList = this._certificates.find({ 'type': { '$in': [CertTypes.root, CertTypes.intermediate] } });
-                        let signer = yield this._findSigner(caList, c);
-                        if (signer != -1) {
-                            signedBy = caList[signer].serialNumber;
+                        let signer = yield this._findSigner(c);
+                        if (signer != null) {
+                            signedBy = signer.serialNumber;
                         }
                     }
                     if (result.types[0] != CertTypes.leaf) {
@@ -1103,25 +1100,24 @@ class WebServer {
             }));
         });
     }
-    _findSigner(caList, certificate) {
+    _findSigner(certificate) {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, _reject) => __awaiter(this, void 0, void 0, function* () {
-                if (caList) {
-                    for (let i = 0; i < caList.length; i++) {
-                        try {
-                            // TODO: Deprecate cache
-                            let c = yield this._cache.getCertificate(caList[i].name);
-                            if (c.verify(certificate)) {
-                                resolve(i);
-                            }
-                        }
-                        catch (_err) {
-                            // logger.debug('Not ' + caList[i].name);
-                            // verify should return false but appearently throws an exception - do nothing
+                let caList = this._certificates.find({ 'type': { '$in': [CertTypes.root, CertTypes.intermediate] } });
+                for (let i = 0; i < caList.length; i++) {
+                    try {
+                        // TODO: Deprecate cache
+                        let c = yield this._cache.getCertificate(caList[i].name);
+                        if (c.verify(certificate)) {
+                            resolve(caList[i]);
                         }
                     }
+                    catch (_err) {
+                        // logger.debug('Not ' + caList[i].name);
+                        // verify should return false but apparently throws an exception - do nothing
+                    }
                 }
-                resolve(-1);
+                resolve(null);
             }));
         });
     }
@@ -1183,6 +1179,9 @@ class WebServer {
                 }
             });
         });
+    }
+    static _sanitizeName(name) {
+        return name.replace(/[\w-_=+{}\[\]\(\)"'\]]/g, '_');
     }
     static _getAttributes(subject) {
         let attributes = [];

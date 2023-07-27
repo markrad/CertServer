@@ -789,15 +789,13 @@ export class WebServer {
                 // let addresults: string[] = await Promise.all(adding);
                 // logger.debug(addresults.join(';'));
 
-                let caList = this._certificates.find({ 'type': { '$in': [ CertTypes.root, CertTypes.intermediate ] }});
                 let nonRoot = this._certificates.find( { '$and': [ { 'type': { '$ne': CertTypes.root }}, { signedBy: null } ] });
-                // let nonRoot = certificates.chain().find({ 'type': certTypes.root }).find({ 'signedBy': null });
 
                 for (let i: number = 0; i < nonRoot.length; i++) {
-                    let signer = await this._findSigner(caList, pki.certificateFromPem(fs.readFileSync(path.join(this._certificatesPath, nonRoot[i].name + '.pem'), { encoding: 'utf8' })));
-                    if (signer != -1) {
-                        logger.info(`${nonRoot[i].name} is signed by ${caList[signer].name}`);
-                        nonRoot[i].signedBy = caList[signer].serialNumber;
+                    let signer = await this._findSigner(pki.certificateFromPem(fs.readFileSync(path.join(this._certificatesPath, nonRoot[i].name + '.pem'), { encoding: 'utf8' })));
+                    if (signer != null) {
+                        logger.info(`${nonRoot[i].name} is signed by ${signer.name}`);
+                        nonRoot[i].signedBy = signer.serialNumber;
                         this._certificates.update(nonRoot[i]);
                     }
                 }
@@ -885,11 +883,10 @@ export class WebServer {
                     }
 
                     // See if any existing certificates signed this one
-                    let caList = this._certificates.find({ 'type': { '$in': [ CertTypes.root, CertTypes.intermediate ] }});
-                    let signer = await this._findSigner(caList, c);
+                    let signer = await this._findSigner(c);
 
-                    if (signer != -1) {
-                        signedBy = caList[signer].serialNumber;
+                    if (signer != null) {
+                        signedBy = signer.serialNumber;
                     }
                 }
                 
@@ -1256,26 +1253,25 @@ export class WebServer {
         });
     }
 
-    private async _findSigner(caList: CertificateRow[], certificate: pki.Certificate): Promise<number> {
-        return new Promise<number>(async(resolve, _reject) => {
-            if (caList) {
-                for (let i = 0; i < caList.length; i++) {
-                    try {
-                        // TODO: Deprecate cache
-                        let c = await this._cache.getCertificate(caList[i].name);
-                        if (c.verify(certificate)) {
-                            resolve(i);
-                        }
+    private async _findSigner(certificate: pki.Certificate): Promise<CertificateRow & LokiObj> {
+        return new Promise<CertificateRow & LokiObj>(async(resolve, _reject) => {
+            let caList = this._certificates.find({ 'type': { '$in': [ CertTypes.root, CertTypes.intermediate ] }});
+            for (let i = 0; i < caList.length; i++) {
+                try {
+                    // TODO: Deprecate cache
+                    let c = await this._cache.getCertificate(caList[i].name);
+                    if (c.verify(certificate)) {
+                        resolve(caList[i]);
                     }
-                    catch (_err) {
-                        // logger.debug('Not ' + caList[i].name);
-                        // verify should return false but appearently throws an exception - do nothing
-                    }
+                }
+                catch (_err) {
+                    // logger.debug('Not ' + caList[i].name);
+                    // verify should return false but apparently throws an exception - do nothing
                 }
             }
     
-            resolve(-1);
-        })
+            resolve(null);
+        });
     }
 
     private async _findSigned(signeeList: (CertificateRow & LokiObj)[], certificate: pki.Certificate): Promise<{ types: CertTypes[], updated: OperationResultItem[] }> {
@@ -1340,6 +1336,10 @@ export class WebServer {
                 }
             });
         });
+    }
+
+    private static _sanitizeName(name: string): string {
+        return name.replace(/[\w-_=+{}\[\]\(\)"'\]]/g, '_');
     }
  
     private static _getAttributes(subject: CertificateSubject): pki.CertificateField[] {
