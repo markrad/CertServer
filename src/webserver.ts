@@ -65,6 +65,7 @@ type CertificateRow = {
     type: CertTypes, 
     serialNumber: string, 
     fingerprint: string,
+    fingerprint256: string,
     publicKey: any, 
     privateKey: string,
     signedBy: string;
@@ -96,6 +97,7 @@ type CertificateBrief = {
     keyPresent: string,
     serialNumber: string,
     fingerprint: string,
+    fingerprint256: string,
 }
 
 type KeyBrief = {
@@ -256,7 +258,7 @@ export class WebServer {
         this._app.use(Express.text({ type: 'text/plain' }));
         this._app.use(Express.text({ type: 'application/x-www-form-urlencoded' }));
         this._app.use(Express.text({ type: 'application/json' }))
-        this._app.use('/scripts', Express.static(path.join(__dirname, '../../web/scripts')))
+        this._app.use('/scripts', Express.static(path.join(__dirname, '../../web/scripts')));
         this._app.use('/styles', Express.static(path.join(__dirname, '../../web/styles')));
         this._app.use('/icons', Express.static(path.join(__dirname, '../../web/icons')));
         this._app.use('/files', Express.static(path.join(__dirname, '../../web/files')));
@@ -278,6 +280,18 @@ export class WebServer {
                 OU: this._config.certServer.subject.OU,
                 version: this._version,
             });
+        });
+        this._app.post('/createCACert', async (request, _response, next) => {
+            request.url = '/api/createcacert'
+            next();
+        });
+        this._app.post('/createIntermediateCert', async (request, _response, next) => {
+            request.url = '/api/createIntermediateCert';
+            next();
+        });
+        this._app.post('/createLeafCert', async (request, _response, next) => {
+            request.url = '/api/createLeafCert';
+            next();
         });
         this._app.post('/uploadCert', ((req: any, res) => {
             // FUTURE Allow multiple files to be submitted
@@ -306,38 +320,6 @@ export class WebServer {
             request.url = '/api/deleteCert';
             next();
         }));
-        this._app.post('/uploadKey', ((request: any, res) => {
-            if (!request.files || Object.keys(request.files).length == 0) {
-                return res.status(400).send('No file selected');
-            }
-            let keyFile = request.files.keyFile;
-
-            if (!keyFile) {
-                throw new CertError(404, 'Key file not found in request');
-            }
-
-            let tempName = path.join(this._workPath, keyFile.name);
-            keyFile.mv(tempName, async (err: Error) => {
-                if (err) return res.status(500).send(err);
-
-                try {
-                    let result = await this._tryAddKey(tempName, request.query.password);
-                    this._broadcast(result);
-                    return res.status(200).json({ message: `Key ${result.name} added`, types: result.types.map((t) => CertTypes[t]).join(';')});
-                }
-                catch (err) {
-                    return res.status(err.status ?? 500).send(err.message);
-                }
-            });
-        }));
-        this._app.delete('/deleteKey', ((request, _response, next: NextFunction) => {
-            request.url = '/api/deleteKey';
-            next();
-        }))
-        this._app.get('/keylist', (request, _response, next) => {
-            request.url = '/certlist';
-            next();
-        });
         this._app.get('/certlist', (request, response) => {
             let type: CertTypes = CertTypes[(request.query.type as any)] as unknown as CertTypes;
 
@@ -374,6 +356,38 @@ export class WebServer {
                 response.status(404).json({ Message: 'Certificate not found' });
             }
         });
+        this._app.post('/uploadKey', ((request: any, res) => {
+            if (!request.files || Object.keys(request.files).length == 0) {
+                return res.status(400).send('No file selected');
+            }
+            let keyFile = request.files.keyFile;
+
+            if (!keyFile) {
+                throw new CertError(404, 'Key file not found in request');
+            }
+
+            let tempName = path.join(this._workPath, keyFile.name);
+            keyFile.mv(tempName, async (err: Error) => {
+                if (err) return res.status(500).send(err);
+
+                try {
+                    let result = await this._tryAddKey(tempName, request.query.password);
+                    this._broadcast(result);
+                    return res.status(200).json({ message: `Key ${result.name} added`, types: result.types.map((t) => CertTypes[t]).join(';')});
+                }
+                catch (err) {
+                    return res.status(err.status ?? 500).send(err.message);
+                }
+            });
+        }));
+        this._app.delete('/deleteKey', ((request, _response, next: NextFunction) => {
+            request.url = '/api/deleteKey';
+            next();
+        }))
+        this._app.get('/keylist', (request, _response, next) => {
+            request.url = '/certlist';
+            next();
+        });
         this._app.get('/keydetails', async (request, response) => {
             let query = {};
             if (request.query.name) query = { name: request.query.name as string };
@@ -387,108 +401,6 @@ export class WebServer {
             }
             else {
                 response.status(404).json({ Message: 'Key not found' });
-            }
-        });
-        this._app.get('/api/certname', async(request, response) => {
-            let c = this._certificates.findOne({ $loki: parseInt(request.query.id as string)});
-            if (c) {
-                response.status(200).json({ 'name': c.name });
-            }
-            else {
-                response.status(404).json({ Message: 'Certificate not found' });
-            }
-        });
-        this._app.get('/api/keyname', async(request, response) => {
-            let c = this._privateKeys.findOne({ $loki: parseInt(request.query.id as string)});
-            if (c) {
-                response.status(200).json({ 'name': c.name });
-            }
-            else {
-                response.status(404).json({ Message: 'Key not found' });
-            }
-        });
-        this._app.post('/createCACert', async (request, _response, next) => {
-            request.url = '/api/createcacert'
-            next();
-        });
-        this._app.post('/createIntermediateCert', async (request, _response, next) => {
-            request.url = '/api/createIntermediateCert';
-            next();
-        });
-        this._app.post('/createLeafCert', async (request, _response, next) => {
-            request.url = '/api/createLeafCert';
-            next();
-        });
-        this._app.post('/api/uploadCert', async (request, response) => {
-            if (!(request.body as string).includes('\n')) {
-                return response.status(400).send('Certificate must be in standard 64 byte line length format - try --data-binary on curl');
-            }
-            try {
-                await writeFile(path.join(this._workPath, 'upload.pem'), request.body, { encoding: 'utf8' });
-                //writeFileSync(path.join(this._workPath, 'upload.pem'), request.body, { encoding: 'utf8' });
-                let result: OperationResultEx2 = await this._tryAddCertificate(path.join(this._workPath, 'upload.pem'));
-                this._broadcast(result);
-                return response.status(200).json({ message: `Certificate ${result.name} added`, types: result.types.map((t) => CertTypes[t]).join(';') });
-            }
-            catch (err) {
-                response.status(500).send(err.message);
-            }
-        });
-        this._app.post('/api/uploadKey', async (request, response) => {
-            if (!(request.body as string).includes('\n')) {
-                return response.status(400).send('Key must be in standard 64 byte line length format - try --data-binary on curl');
-            }
-            try {
-                await writeFile(path.join(this._workPath, 'upload.key'), request.body, { encoding: 'utf8' });
-                // writeFileSync(path.join(this._workPath, 'upload.key'), request.body, { encoding: 'utf8' });
-                let result: OperationResultEx2 = await this._tryAddKey(path.join(this._workPath, 'upload.key'), request.query.password as string);
-                this._broadcast(result);
-                return response.status(200).json({ message: `Key ${result.name} added`, type: result.types.map((t) => CertTypes[t]).join(';')});
-            }
-            catch (err) {
-                response.status(500).send(err.message);
-            }
-        });
-        this._app.delete('/api/deleteCert', async (request, response) => {
-            try {
-                let options: { serialNumber?: string, name?: string } = {};
-                if (request.query.serialNumber) options['serialNumber'] = request.query.serialNumber as string;
-                else options['name'] = request.query.name as string;
-                let result: OperationResultEx2 = await this._tryDeleteCert(options);
-                this._broadcast(result);
-                return response.status(200).json({ message: `Certificate ${result.name} deleted` , types: result.types.map((t) => CertTypes[t]).join(';') });
-            }
-            catch (err) {
-                return response.status(err.status?? 500).json(JSON.stringify({ error: err.message }));
-            }
-        });
-        this._app.delete('/api/deleteKey', async (request, response) => {
-            try {
-                let options: { name: string } = { name: null };
-                options.name = request.query.name as string;
-                let result: OperationResultEx2 = await this._tryDeleteKey(options);
-                this._broadcast(result);
-                return response.status(200).json({ message: `Key ${result.name} deleted` , types: result.types.map((t) => CertTypes[t]).join(';') });
-            }
-            catch (err) {
-                return response.status(err.status?? 500).json({ error: err.message });
-            }
-        });
-        this._app.get('/api/chaindownload', async (request, response) => {
-            try {
-                if (!await exists(path.join(this._certificatesPath, request.query.name + '.pem'))) {
-                    throw new CertError(404, `${request.query.name} not found`);
-                }
-                let filename = await this._getChain(request.query.name as string);
-                response.download(filename, request.query.name + '_full_chain.pem', async (err) => {
-                    if (err) {
-                        logger.error(`Failed to send chain for ${request.query.name}: ${err.message}`);
-                    }
-                    await unlink(filename);
-                });
-            }
-            catch (err) {
-                return response.status(err.status?? 500).json({ error: err.message });
             }
         });
         this._app.post('/api/createcacert', async (request, response) => {
@@ -716,6 +628,99 @@ export class WebServer {
                 return response.status(500).json({ message: err.message })
             }
         });
+        this._app.get('/api/certname', async(request, response) => {
+            let c = this._certificates.findOne({ $loki: parseInt(request.query.id as string)});
+            if (c) {
+                response.status(200).json({ 'name': c.name });
+            }
+            else {
+                response.status(404).json({ Message: 'Certificate not found' });
+            }
+        });
+        this._app.post('/api/uploadCert', async (request, response) => {
+            if (!(request.body as string).includes('\n')) {
+                return response.status(400).send('Certificate must be in standard 64 byte line length format - try --data-binary on curl');
+            }
+            try {
+                await writeFile(path.join(this._workPath, 'upload.pem'), request.body, { encoding: 'utf8' });
+                //writeFileSync(path.join(this._workPath, 'upload.pem'), request.body, { encoding: 'utf8' });
+                let result: OperationResultEx2 = await this._tryAddCertificate(path.join(this._workPath, 'upload.pem'));
+                this._broadcast(result);
+                return response.status(200).json({ message: `Certificate ${result.name} added`, types: result.types.map((t) => CertTypes[t]).join(';') });
+            }
+            catch (err) {
+                response.status(500).send(err.message);
+            }
+        });
+        this._app.delete('/api/deleteCert', async (request, response) => {
+            try {
+                let options: { serialNumber?: string, name?: string } = {};
+                if (request.query.serialNumber) options['serialNumber'] = request.query.serialNumber as string;
+                else options['name'] = request.query.name as string;
+                let result: OperationResultEx2 = await this._tryDeleteCert(options);
+                this._broadcast(result);
+                return response.status(200).json({ message: `Certificate ${result.name} deleted` , types: result.types.map((t) => CertTypes[t]).join(';') });
+            }
+            catch (err) {
+                return response.status(err.status?? 500).json(JSON.stringify({ error: err.message }));
+            }
+        });
+        this._app.get('/api/keyname', async(request, response) => {
+            let c = this._privateKeys.findOne({ $loki: parseInt(request.query.id as string)});
+            if (c) {
+                response.status(200).json({ 'name': c.name });
+            }
+            else {
+                response.status(404).json({ Message: 'Key not found' });
+            }
+        });
+        this._app.post('/api/uploadKey', async (request, response) => {
+            try {
+                if (typeof request.body != 'string') {
+                    return response.status(400).send('Content type must be text/plain');
+                }
+                if (!(request.body as string).includes('\n')) {
+                    return response.status(400).send('Key must be in standard 64 byte line length format - try --data-binary on curl');
+                }
+                await writeFile(path.join(this._workPath, 'upload.key'), request.body, { encoding: 'utf8' });
+                // writeFileSync(path.join(this._workPath, 'upload.key'), request.body, { encoding: 'utf8' });
+                let result: OperationResultEx2 = await this._tryAddKey(path.join(this._workPath, 'upload.key'), request.query.password as string);
+                this._broadcast(result);
+                return response.status(200).json({ message: `Key ${result.name} added`, type: result.types.map((t) => CertTypes[t]).join(';')});
+            }
+            catch (err) {
+                response.status(500).send(err.message);
+            }
+        });
+        this._app.delete('/api/deleteKey', async (request, response) => {
+            try {
+                let options: { name: string } = { name: null };
+                options.name = request.query.name as string;
+                let result: OperationResultEx2 = await this._tryDeleteKey(options);
+                this._broadcast(result);
+                return response.status(200).json({ message: `Key ${result.name} deleted` , types: result.types.map((t) => CertTypes[t]).join(';') });
+            }
+            catch (err) {
+                return response.status(err.status?? 500).json({ error: err.message });
+            }
+        });
+        this._app.get('/api/chaindownload', async (request, response) => {
+            try {
+                if (!await exists(path.join(this._certificatesPath, request.query.name + '.pem'))) {
+                    throw new CertError(404, `${request.query.name} not found`);
+                }
+                let filename = await this._getChain(request.query.name as string);
+                response.download(filename, request.query.name + '_full_chain.pem', async (err) => {
+                    if (err) {
+                        logger.error(`Failed to send chain for ${request.query.name}: ${err.message}`);
+                    }
+                    await unlink(filename);
+                });
+            }
+            catch (err) {
+                return response.status(err.status?? 500).json({ error: err.message });
+            }
+        });
 
         let server: http.Server | https.Server;
 
@@ -816,12 +821,14 @@ export class WebServer {
                         try {
                             adding.push(this._tryAddKey(path.join(this._privatekeysPath, file)));
                         }
-                        catch (err) {}
+                        catch (err) {
+                            logger.debug('WTF');
+                        }
                     }
                 });
 
                 // addresults = await Promise.all(adding);
-                await Promise.all(adding);
+                await Promise.allSettled(adding);
                 // logger.debug(addresults.join(';'));
 
                 this._db.saveDatabase((err) => {
@@ -944,7 +951,8 @@ export class WebServer {
                     notBefore: c.validity.notBefore,
                     notAfter: c.validity.notAfter, 
                     havePrivateKey: havePrivateKey,
-                    fingerprint: new crypto.X509Certificate(pemString).fingerprint256,
+                    fingerprint: new crypto.X509Certificate(pemString).fingerprint,
+                    fingerprint256: new crypto.X509Certificate(pemString).fingerprint256,
                 });
 
                 // Loki returns a LokiObj but doesn't declare it
@@ -986,7 +994,12 @@ export class WebServer {
     }
 
     private _getCertificateBrief(r: CertificateRow & LokiObj): CertificateBrief {
-        let signer = (r.signedBy == null)? null : this._certificates.findOne({ serialNumber: r.signedBy }).name;
+        let signer = null;
+        if (r.signedBy != null) {
+            let s = this._certificates.findOne({ serialNumber: r.signedBy });
+            if (s != null) signer = s.name;
+            else logger.warn(`Signed by certificate missing for ${r.name}`);
+        } 
         let key = this._privateKeys.findOne({ pairSerial: r.serialNumber });
         return { 
             id: r.$loki,
@@ -996,10 +1009,11 @@ export class WebServer {
             subject: r.subject,
             validFrom: r.notBefore,
             validTo: r.notAfter,
-            serialNumber: r.serialNumber.match(/.{1,2}/g).join(':'),
+            serialNumber: r.serialNumber == null? '' : r.serialNumber.match(/.{1,2}/g).join(':'),  // Hacky fix for dude entries in db
             signer: signer,
             keyPresent: key != null? 'yes' : 'no',
             fingerprint: r.fingerprint,
+            fingerprint256: r.fingerprint256,
          };
     }
 
@@ -1082,7 +1096,8 @@ export class WebServer {
                 let encrypted: boolean = false;
                 if (msg.type == 'ENCRYPTED PRIVATE KEY') {
                     if (!password) {
-                        reject(new CertError(400, 'Password is required'));
+                        logger.warn(`Cannot add ${filename} - no pasword for encrypted key`); 
+                        return reject(new CertError(400, 'Password is required for key ' + filename));
                     }
                     k = pki.decryptRsaPrivateKey(kpem , password);
                     encrypted = true;
@@ -1253,7 +1268,7 @@ export class WebServer {
                         }
                     }
                     catch (_err) {
-                        logger.debug('Not ' + caList[i].name);
+                        // logger.debug('Not ' + caList[i].name);
                         // verify should return false but appearently throws an exception - do nothing
                     }
                 }

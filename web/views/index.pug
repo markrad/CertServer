@@ -98,6 +98,7 @@ block layout-content
             '<span class="certTypeLabel">Type:&nbsp;</span><span class="certTypeValue">%s</span><span class="certPrivateKey">%s</span></div>' +
           '<div class="certInfoSerial">Serial Number: %s</div>' +  
           '<div class="certFingerprint">FingerPrint: %s</div>' +
+          '<div class="certFingerprint256">FingerPrint256: %s</div>' +
           '<div class="certInfoSubject">Subject:&nbsp;' +
             '<span class="certInfoSubjectC">C=%s;&nbsp;</span>' +
             '<span class="certInfoSubjectST">ST=%s;&nbsp;</span>' +
@@ -145,6 +146,7 @@ block layout-content
             result.keyPresent == 'yes'? ' with private key' : '',
             result.serialNumber,
             result.fingerprint,
+            result.fingerprint256,
             result.subject.C,
             result.subject.ST,
             result.subject.L, 
@@ -280,7 +282,7 @@ block layout-content
 
     async function keyClick(id) {
       let detailHTML =
-        '<div class="keyInfo">' +
+        '<div class="keyInfo slideform">' +
           '<div class="certInfoButtons">' + 
             '<button type="button" class="button2 keyBtnDownload" onClick="keyDownload(\'%s\')">Download</button>' +
             '<button type="button" class="button2 button2Red keyBtnDelete" onClick="keyDelete(\'%s\')">Delete</button>' +
@@ -299,18 +301,19 @@ block layout-content
       let details = line.find('.keyDetails');
       let arrow = line.find('.keyArrow');
       if (details.is(':hidden') == false) {
-        details.hide();
-        details['0'].innerText = '';
-        arrow['0'].innerText = '>';
+        details.slideUp(400, () => {
+          details['0'].innerText = '';
+          arrow['0'].innerText = '>';
+        });
       }
       else {
-        details.show();           // &#9650
         arrow['0'].innerText = '˅';
         try {
           result = await getKeyDetails({ name: keyLookup[id] });
           let content = sprintf(detailHTML, result.name, result.name, result.name, result.certPair, result.encrypted? 'yes' : 'no');
           details['0'].innerHTML = content;
           console.log('success');
+          details.slideDown(500);           // &#9650
         }
         catch (err) {
           $.magnificPopup.open({
@@ -616,6 +619,7 @@ block layout-content
               $(`#id_${change.type}_${change.id} .certInfoSignerValue`).text(result.signer);
               $(`#id_${change.type}_${change.id} .certInfoKeyValue`).text(result.keyPresent);
               if (result.keyPresent == 'no') $(`#id_${change.type}_${change.id} .certOptionalButtons`).hide();
+              else $(`#id_${change.type}_${change.id} .certOptionalButtons`).show();
             }
             catch({ error, message }) {
               $.magnificPopup.open({
@@ -628,16 +632,6 @@ block layout-content
           }
         }
       });
-
-      //- $('#rootList li').each(function() {
-      //-   console.log($(this).attr('class'));
-      //-   let span = $(this).find('span.certValue');
-      //-   //- certs.push(span);
-      //-   console.log(span.attr('class'));
-      //-   console.log('*****>' + span.text() + '<*****');
-      //-   //- value = element.find('.certValue');
-      //-   //- console.log(value.text);
-      //- });
     }
 
     $(async function() {

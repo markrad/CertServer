@@ -187,6 +187,18 @@ class WebServer {
                     version: this._version,
                 });
             });
+            this._app.post('/createCACert', (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
+                request.url = '/api/createcacert';
+                next();
+            }));
+            this._app.post('/createIntermediateCert', (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
+                request.url = '/api/createIntermediateCert';
+                next();
+            }));
+            this._app.post('/createLeafCert', (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
+                request.url = '/api/createLeafCert';
+                next();
+            }));
             this._app.post('/uploadCert', ((req, res) => {
                 // FUTURE Allow multiple files to be submitted
                 // FUTURE: Allow chain style files to be submitted
@@ -214,37 +226,6 @@ class WebServer {
                 request.url = '/api/deleteCert';
                 next();
             }));
-            this._app.post('/uploadKey', ((request, res) => {
-                if (!request.files || Object.keys(request.files).length == 0) {
-                    return res.status(400).send('No file selected');
-                }
-                let keyFile = request.files.keyFile;
-                if (!keyFile) {
-                    throw new CertError(404, 'Key file not found in request');
-                }
-                let tempName = path_1.default.join(this._workPath, keyFile.name);
-                keyFile.mv(tempName, (err) => __awaiter(this, void 0, void 0, function* () {
-                    var _a;
-                    if (err)
-                        return res.status(500).send(err);
-                    try {
-                        let result = yield this._tryAddKey(tempName, request.query.password);
-                        this._broadcast(result);
-                        return res.status(200).json({ message: `Key ${result.name} added`, types: result.types.map((t) => CertTypes[t]).join(';') });
-                    }
-                    catch (err) {
-                        return res.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).send(err.message);
-                    }
-                }));
-            }));
-            this._app.delete('/deleteKey', ((request, _response, next) => {
-                request.url = '/api/deleteKey';
-                next();
-            }));
-            this._app.get('/keylist', (request, _response, next) => {
-                request.url = '/certlist';
-                next();
-            });
             this._app.get('/certlist', (request, response) => {
                 let type = CertTypes[request.query.type];
                 if (type == undefined) {
@@ -282,6 +263,37 @@ class WebServer {
                     response.status(404).json({ Message: 'Certificate not found' });
                 }
             }));
+            this._app.post('/uploadKey', ((request, res) => {
+                if (!request.files || Object.keys(request.files).length == 0) {
+                    return res.status(400).send('No file selected');
+                }
+                let keyFile = request.files.keyFile;
+                if (!keyFile) {
+                    throw new CertError(404, 'Key file not found in request');
+                }
+                let tempName = path_1.default.join(this._workPath, keyFile.name);
+                keyFile.mv(tempName, (err) => __awaiter(this, void 0, void 0, function* () {
+                    var _a;
+                    if (err)
+                        return res.status(500).send(err);
+                    try {
+                        let result = yield this._tryAddKey(tempName, request.query.password);
+                        this._broadcast(result);
+                        return res.status(200).json({ message: `Key ${result.name} added`, types: result.types.map((t) => CertTypes[t]).join(';') });
+                    }
+                    catch (err) {
+                        return res.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).send(err.message);
+                    }
+                }));
+            }));
+            this._app.delete('/deleteKey', ((request, _response, next) => {
+                request.url = '/api/deleteKey';
+                next();
+            }));
+            this._app.get('/keylist', (request, _response, next) => {
+                request.url = '/certlist';
+                next();
+            });
             this._app.get('/keydetails', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 let query = {};
                 if (request.query.name)
@@ -297,113 +309,6 @@ class WebServer {
                 }
                 else {
                     response.status(404).json({ Message: 'Key not found' });
-                }
-            }));
-            this._app.get('/api/certname', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                let c = this._certificates.findOne({ $loki: parseInt(request.query.id) });
-                if (c) {
-                    response.status(200).json({ 'name': c.name });
-                }
-                else {
-                    response.status(404).json({ Message: 'Certificate not found' });
-                }
-            }));
-            this._app.get('/api/keyname', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                let c = this._privateKeys.findOne({ $loki: parseInt(request.query.id) });
-                if (c) {
-                    response.status(200).json({ 'name': c.name });
-                }
-                else {
-                    response.status(404).json({ Message: 'Key not found' });
-                }
-            }));
-            this._app.post('/createCACert', (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
-                request.url = '/api/createcacert';
-                next();
-            }));
-            this._app.post('/createIntermediateCert', (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
-                request.url = '/api/createIntermediateCert';
-                next();
-            }));
-            this._app.post('/createLeafCert', (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
-                request.url = '/api/createLeafCert';
-                next();
-            }));
-            this._app.post('/api/uploadCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                if (!request.body.includes('\n')) {
-                    return response.status(400).send('Certificate must be in standard 64 byte line length format - try --data-binary on curl');
-                }
-                try {
-                    yield (0, promises_1.writeFile)(path_1.default.join(this._workPath, 'upload.pem'), request.body, { encoding: 'utf8' });
-                    //writeFileSync(path.join(this._workPath, 'upload.pem'), request.body, { encoding: 'utf8' });
-                    let result = yield this._tryAddCertificate(path_1.default.join(this._workPath, 'upload.pem'));
-                    this._broadcast(result);
-                    return response.status(200).json({ message: `Certificate ${result.name} added`, types: result.types.map((t) => CertTypes[t]).join(';') });
-                }
-                catch (err) {
-                    response.status(500).send(err.message);
-                }
-            }));
-            this._app.post('/api/uploadKey', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                if (!request.body.includes('\n')) {
-                    return response.status(400).send('Key must be in standard 64 byte line length format - try --data-binary on curl');
-                }
-                try {
-                    yield (0, promises_1.writeFile)(path_1.default.join(this._workPath, 'upload.key'), request.body, { encoding: 'utf8' });
-                    // writeFileSync(path.join(this._workPath, 'upload.key'), request.body, { encoding: 'utf8' });
-                    let result = yield this._tryAddKey(path_1.default.join(this._workPath, 'upload.key'), request.query.password);
-                    this._broadcast(result);
-                    return response.status(200).json({ message: `Key ${result.name} added`, type: result.types.map((t) => CertTypes[t]).join(';') });
-                }
-                catch (err) {
-                    response.status(500).send(err.message);
-                }
-            }));
-            this._app.delete('/api/deleteCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _a;
-                try {
-                    let options = {};
-                    if (request.query.serialNumber)
-                        options['serialNumber'] = request.query.serialNumber;
-                    else
-                        options['name'] = request.query.name;
-                    let result = yield this._tryDeleteCert(options);
-                    this._broadcast(result);
-                    return response.status(200).json({ message: `Certificate ${result.name} deleted`, types: result.types.map((t) => CertTypes[t]).join(';') });
-                }
-                catch (err) {
-                    return response.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).json(JSON.stringify({ error: err.message }));
-                }
-            }));
-            this._app.delete('/api/deleteKey', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _b;
-                try {
-                    let options = { name: null };
-                    options.name = request.query.name;
-                    let result = yield this._tryDeleteKey(options);
-                    this._broadcast(result);
-                    return response.status(200).json({ message: `Key ${result.name} deleted`, types: result.types.map((t) => CertTypes[t]).join(';') });
-                }
-                catch (err) {
-                    return response.status((_b = err.status) !== null && _b !== void 0 ? _b : 500).json({ error: err.message });
-                }
-            }));
-            this._app.get('/api/chaindownload', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _c;
-                try {
-                    if (!(yield (0, exists_1.exists)(path_1.default.join(this._certificatesPath, request.query.name + '.pem')))) {
-                        throw new CertError(404, `${request.query.name} not found`);
-                    }
-                    let filename = yield this._getChain(request.query.name);
-                    response.download(filename, request.query.name + '_full_chain.pem', (err) => __awaiter(this, void 0, void 0, function* () {
-                        if (err) {
-                            logger.error(`Failed to send chain for ${request.query.name}: ${err.message}`);
-                        }
-                        yield (0, promises_1.unlink)(filename);
-                    }));
-                }
-                catch (err) {
-                    return response.status((_c = err.status) !== null && _c !== void 0 ? _c : 500).json({ error: err.message });
                 }
             }));
             this._app.post('/api/createcacert', (request, response) => __awaiter(this, void 0, void 0, function* () {
@@ -617,6 +522,104 @@ class WebServer {
                     return response.status(500).json({ message: err.message });
                 }
             }));
+            this._app.get('/api/certname', (request, response) => __awaiter(this, void 0, void 0, function* () {
+                let c = this._certificates.findOne({ $loki: parseInt(request.query.id) });
+                if (c) {
+                    response.status(200).json({ 'name': c.name });
+                }
+                else {
+                    response.status(404).json({ Message: 'Certificate not found' });
+                }
+            }));
+            this._app.post('/api/uploadCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
+                if (!request.body.includes('\n')) {
+                    return response.status(400).send('Certificate must be in standard 64 byte line length format - try --data-binary on curl');
+                }
+                try {
+                    yield (0, promises_1.writeFile)(path_1.default.join(this._workPath, 'upload.pem'), request.body, { encoding: 'utf8' });
+                    //writeFileSync(path.join(this._workPath, 'upload.pem'), request.body, { encoding: 'utf8' });
+                    let result = yield this._tryAddCertificate(path_1.default.join(this._workPath, 'upload.pem'));
+                    this._broadcast(result);
+                    return response.status(200).json({ message: `Certificate ${result.name} added`, types: result.types.map((t) => CertTypes[t]).join(';') });
+                }
+                catch (err) {
+                    response.status(500).send(err.message);
+                }
+            }));
+            this._app.delete('/api/deleteCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
+                var _a;
+                try {
+                    let options = {};
+                    if (request.query.serialNumber)
+                        options['serialNumber'] = request.query.serialNumber;
+                    else
+                        options['name'] = request.query.name;
+                    let result = yield this._tryDeleteCert(options);
+                    this._broadcast(result);
+                    return response.status(200).json({ message: `Certificate ${result.name} deleted`, types: result.types.map((t) => CertTypes[t]).join(';') });
+                }
+                catch (err) {
+                    return response.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).json(JSON.stringify({ error: err.message }));
+                }
+            }));
+            this._app.get('/api/keyname', (request, response) => __awaiter(this, void 0, void 0, function* () {
+                let c = this._privateKeys.findOne({ $loki: parseInt(request.query.id) });
+                if (c) {
+                    response.status(200).json({ 'name': c.name });
+                }
+                else {
+                    response.status(404).json({ Message: 'Key not found' });
+                }
+            }));
+            this._app.post('/api/uploadKey', (request, response) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    if (typeof request.body != 'string') {
+                        return response.status(400).send('Content type must be text/plain');
+                    }
+                    if (!request.body.includes('\n')) {
+                        return response.status(400).send('Key must be in standard 64 byte line length format - try --data-binary on curl');
+                    }
+                    yield (0, promises_1.writeFile)(path_1.default.join(this._workPath, 'upload.key'), request.body, { encoding: 'utf8' });
+                    // writeFileSync(path.join(this._workPath, 'upload.key'), request.body, { encoding: 'utf8' });
+                    let result = yield this._tryAddKey(path_1.default.join(this._workPath, 'upload.key'), request.query.password);
+                    this._broadcast(result);
+                    return response.status(200).json({ message: `Key ${result.name} added`, type: result.types.map((t) => CertTypes[t]).join(';') });
+                }
+                catch (err) {
+                    response.status(500).send(err.message);
+                }
+            }));
+            this._app.delete('/api/deleteKey', (request, response) => __awaiter(this, void 0, void 0, function* () {
+                var _b;
+                try {
+                    let options = { name: null };
+                    options.name = request.query.name;
+                    let result = yield this._tryDeleteKey(options);
+                    this._broadcast(result);
+                    return response.status(200).json({ message: `Key ${result.name} deleted`, types: result.types.map((t) => CertTypes[t]).join(';') });
+                }
+                catch (err) {
+                    return response.status((_b = err.status) !== null && _b !== void 0 ? _b : 500).json({ error: err.message });
+                }
+            }));
+            this._app.get('/api/chaindownload', (request, response) => __awaiter(this, void 0, void 0, function* () {
+                var _c;
+                try {
+                    if (!(yield (0, exists_1.exists)(path_1.default.join(this._certificatesPath, request.query.name + '.pem')))) {
+                        throw new CertError(404, `${request.query.name} not found`);
+                    }
+                    let filename = yield this._getChain(request.query.name);
+                    response.download(filename, request.query.name + '_full_chain.pem', (err) => __awaiter(this, void 0, void 0, function* () {
+                        if (err) {
+                            logger.error(`Failed to send chain for ${request.query.name}: ${err.message}`);
+                        }
+                        yield (0, promises_1.unlink)(filename);
+                    }));
+                }
+                catch (err) {
+                    return response.status((_c = err.status) !== null && _c !== void 0 ? _c : 500).json({ error: err.message });
+                }
+            }));
             let server;
             if (this._certificate) {
                 const options = {
@@ -704,11 +707,13 @@ class WebServer {
                             try {
                                 adding.push(this._tryAddKey(path_1.default.join(this._privatekeysPath, file)));
                             }
-                            catch (err) { }
+                            catch (err) {
+                                logger.debug('WTF');
+                            }
                         }
                     }));
                     // addresults = await Promise.all(adding);
-                    yield Promise.all(adding);
+                    yield Promise.allSettled(adding);
                     // logger.debug(addresults.join(';'));
                     this._db.saveDatabase((err) => {
                         if (err)
@@ -819,7 +824,8 @@ class WebServer {
                         notBefore: c.validity.notBefore,
                         notAfter: c.validity.notAfter,
                         havePrivateKey: havePrivateKey,
-                        fingerprint: new crypto_1.default.X509Certificate(pemString).fingerprint256,
+                        fingerprint: new crypto_1.default.X509Certificate(pemString).fingerprint,
+                        fingerprint256: new crypto_1.default.X509Certificate(pemString).fingerprint256,
                     });
                     // Loki returns a LokiObj but doesn't declare it
                     // certificatesAdded.push((newRecord as unknown as LokiObj).$loki);
@@ -858,7 +864,14 @@ class WebServer {
         });
     }
     _getCertificateBrief(r) {
-        let signer = (r.signedBy == null) ? null : this._certificates.findOne({ serialNumber: r.signedBy }).name;
+        let signer = null;
+        if (r.signedBy != null) {
+            let s = this._certificates.findOne({ serialNumber: r.signedBy });
+            if (s != null)
+                signer = s.name;
+            else
+                logger.warn(`Signed by certificate missing for ${r.name}`);
+        }
         let key = this._privateKeys.findOne({ pairSerial: r.serialNumber });
         return {
             id: r.$loki,
@@ -868,10 +881,11 @@ class WebServer {
             subject: r.subject,
             validFrom: r.notBefore,
             validTo: r.notAfter,
-            serialNumber: r.serialNumber.match(/.{1,2}/g).join(':'),
+            serialNumber: r.serialNumber == null ? '' : r.serialNumber.match(/.{1,2}/g).join(':'),
             signer: signer,
             keyPresent: key != null ? 'yes' : 'no',
             fingerprint: r.fingerprint,
+            fingerprint256: r.fingerprint256,
         };
     }
     _tryDeleteCert(options) {
@@ -947,7 +961,8 @@ class WebServer {
                     let encrypted = false;
                     if (msg.type == 'ENCRYPTED PRIVATE KEY') {
                         if (!password) {
-                            reject(new CertError(400, 'Password is required'));
+                            logger.warn(`Cannot add ${filename} - no pasword for encrypted key`);
+                            return reject(new CertError(400, 'Password is required for key ' + filename));
                         }
                         k = node_forge_1.pki.decryptRsaPrivateKey(kpem, password);
                         encrypted = true;
@@ -1101,7 +1116,7 @@ class WebServer {
                             }
                         }
                         catch (_err) {
-                            logger.debug('Not ' + caList[i].name);
+                            // logger.debug('Not ' + caList[i].name);
                             // verify should return false but appearently throws an exception - do nothing
                         }
                     }
