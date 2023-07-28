@@ -46,7 +46,7 @@ class CertificateCache {
                 if (!entry.certificate) {
                     try {
                         // entry.certificate = pki.certificateFromPem(fs.readFileSync(path.join(this._location, name + '.pem') ,{ encoding: 'utf8' }));
-                        entry.certificate = node_forge_1.pki.certificateFromPem(yield (0, promises_1.readFile)(path_1.default.join(this._location, name + '.pem'), { encoding: 'utf8' }));
+                        entry.certificate = node_forge_1.pki.certificateFromPem(yield (0, promises_1.readFile)(path_1.default.join(this._location, name), { encoding: 'utf8' }));
                     }
                     catch (err) {
                         reject(err);

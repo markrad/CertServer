@@ -43,7 +43,7 @@ export class CertificateCache {
             if (!entry.certificate) {
                 try {
                     // entry.certificate = pki.certificateFromPem(fs.readFileSync(path.join(this._location, name + '.pem') ,{ encoding: 'utf8' }));
-                    entry.certificate = pki.certificateFromPem(await readFile(path.join(this._location, name + '.pem') ,{ encoding: 'utf8' }));
+                    entry.certificate = pki.certificateFromPem(await readFile(path.join(this._location, name) ,{ encoding: 'utf8' }));
                 }
                 catch (err) {
                     reject(err);

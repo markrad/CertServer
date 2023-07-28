@@ -75,6 +75,7 @@ var newLeaf = {
     leafValidTo: then.toISOString(),
     leafSigner: 'intName',
 };
+let stepNo = 0;
 const types = ['root', 'intermediate', 'leaf', 'key'];
 (() => __awaiter(void 0, void 0, void 0, function* () {
     let webServer;
@@ -93,7 +94,7 @@ const types = ['root', 'intermediate', 'leaf', 'key'];
         webServer = (0, child_process_1.spawn)('node', [path_1.default.join(__dirname, '../src/index.js'), testConfig]);
         webServer.on('error', (err) => console.log(`webserver failed: ${err}`));
         webServer.on('close', (code, signal) => console.log(`Server terminated = code=${code};signal=${signal}`));
-        // webServer.stdout.on('data', (data) => console.log(data.toString()));
+        webServer.stdout.on('data', (data) => console.log(data.toString()));
         yield new Promise((resolve) => setTimeout(() => resolve(), 2000));
         step = _step('connect WebSocket');
         const wsQueue = [];
@@ -113,7 +114,7 @@ const types = ['root', 'intermediate', 'leaf', 'key'];
         step = _step('check database is empty');
         for (let dir in types) {
             step = _step(`get empty ${types[dir]} list`);
-            res = yield httpRequest('get', url + '/certlist?type=' + types[dir]);
+            res = yield httpRequest('get', url + '/api/certlist?type=' + types[dir]);
             node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
             node_assert_1.default.equal(res.body.files.length, 0, `Failed: Expected zero entries for ${types[dir]} request`);
             console.log(`Passed: zero entries returned for ${types[dir]}`);
@@ -149,6 +150,36 @@ const types = ['root', 'intermediate', 'leaf', 'key'];
         checkItems(msg.added, [{ type: 3, id: 3 }, { type: 4, id: 3 }]);
         // console.log(msg);
         console.log('passed');
+        step = _step('get root certificate list');
+        res = yield httpRequest('get', url + '/api/certlist?type=root');
+        node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body}`);
+        node_assert_1.default.notEqual(res.body.files, null, 'Did not receive the files element');
+        node_assert_1.default.equal(res.body.files.length, 1, `Files element is expected to be length 1 but received ${res.body.files.length}`);
+        node_assert_1.default.equal(res.body.files[0].name, 'someName', `File has incorrect name ${res.body.files[0].name}`);
+        node_assert_1.default.equal(res.body.files[0].type, 'root', `File has incorrect type ${res.body.files[0].type}`);
+        node_assert_1.default.equal(res.body.files[0].id, 1, `File has incorrect id ${res.body.files[0].id}`);
+        let rootId = res.body.files[0].id;
+        console.log('passed');
+        step = _step('get intermediate certificate list');
+        res = yield httpRequest('get', url + '/api/certlist?type=intermediate');
+        node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body}`);
+        node_assert_1.default.notEqual(res.body.files, null, 'Did not receive the files element');
+        node_assert_1.default.equal(res.body.files.length, 1, `Files element is expected to be length 1 but received ${res.body.files.length}`);
+        node_assert_1.default.equal(res.body.files[0].name, 'intName', `File has incorrect name ${res.body.files[0].name}`);
+        node_assert_1.default.equal(res.body.files[0].type, 'intermediate', `File has incorrect type ${res.body.files[0].type}`);
+        node_assert_1.default.equal(res.body.files[0].id, 2, `File has incorrect id ${res.body.files[0].id}`);
+        let intId = res.body.files[0].id;
+        console.log('passed');
+        step = _step('get leaf certificate list');
+        res = yield httpRequest('get', url + '/api/certlist?type=leaf');
+        node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body}`);
+        node_assert_1.default.notEqual(res.body.files, null, 'Did not receive the files element');
+        node_assert_1.default.equal(res.body.files.length, 1, `Files element is expected to be length 1 but received ${res.body.files.length}`);
+        node_assert_1.default.equal(res.body.files[0].name, 'leafName', `File has incorrect name ${res.body.files[0].name}`);
+        node_assert_1.default.equal(res.body.files[0].type, 'leaf', `File has incorrect type ${res.body.files[0].type}`);
+        node_assert_1.default.equal(res.body.files[0].id, 3, `File has incorrect id ${res.body.files[0].id}`);
+        let leafId = res.body.files[0].id;
+        console.log('passed');
         step = _step('get certificate details by id');
         res = yield httpRequest('get', url + '/certdetails?id=3');
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
@@ -173,19 +204,22 @@ const types = ['root', 'intermediate', 'leaf', 'key'];
             // console.log(JSON.stringify(res, null, 4));
         }
         step = _step('get root certificate file');
-        res = yield httpRequest('get', url + '/certificates/someName.pem');
+        res = yield httpRequest('get', url + '/api/getcertificatepem?id=' + rootId.toString());
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         fs_1.default.writeFileSync(path_1.default.join(testPath, 'someName.pem'), res.body);
+        console.log('passed');
         step = _step('get intermediate certificate file');
-        res = yield httpRequest('get', url + '/certificates/intName.pem');
+        res = yield httpRequest('get', url + '/api/getcertificatepem?id=' + intId.toString());
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         fs_1.default.writeFileSync(path_1.default.join(testPath, 'intName.pem'), res.body);
+        console.log('passed');
         step = _step('get leaf certificate file');
-        res = yield httpRequest('get', url + '/certificates/leafName.pem');
+        res = yield httpRequest('get', url + '/api/getcertificatepem?id=' + leafId.toString());
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         fs_1.default.writeFileSync(path_1.default.join(testPath, 'leafName.pem'), res.body);
+        console.log('passed');
         step = _step('get intermediate key file');
-        res = yield httpRequest('get', url + '/keys/intName_key.pem');
+        res = yield httpRequest('get', url + '/api/getkeypem?id=2');
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         fs_1.default.writeFileSync(path_1.default.join(testPath, 'intName_key.pem'), res.body);
         step = _step('delete root certificate');
@@ -263,7 +297,7 @@ function checkItems(items, test) {
     }
 }
 function _step(msg) {
-    console.log('\n' + msg);
+    console.log(`\nStep: ${++stepNo}: ${msg}`);
     return msg;
 }
 function httpRequest(method, url, body = null) {
