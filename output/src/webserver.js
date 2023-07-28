@@ -52,6 +52,7 @@ const express_fileupload_1 = __importDefault(require("express-fileupload"));
 const serve_favicon_1 = __importDefault(require("serve-favicon"));
 const ws_1 = __importDefault(require("ws"));
 const log4js = __importStar(require("log4js"));
+// import { CertificateCache } from './certificateCache';
 const eventWaiter_1 = require("./utility/eventWaiter");
 const exists_1 = require("./utility/exists");
 const ExtensionBasicConstraints_1 = require("./Extensions/ExtensionBasicConstraints");

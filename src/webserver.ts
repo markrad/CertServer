@@ -16,7 +16,7 @@ import serveFavicon from 'serve-favicon';
 import WsServer from 'ws';
 import * as log4js from 'log4js';
 
-import { CertificateCache } from './certificateCache';
+// import { CertificateCache } from './certificateCache';
 import { EventWaiter } from './utility/eventWaiter';
 import { exists } from './utility/exists';
 import { ExtensionParent } from './Extensions/ExtensionParent';
