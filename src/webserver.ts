@@ -174,7 +174,8 @@ export class WebServer {
     private _db: loki;
     private _certificates: Collection<CertificateRow>;
     private _privateKeys: Collection<PrivateKeyRow>;
-    private _cache: CertificateCache;
+    private _pkis: Collection<pki.Certificate>;
+    // private _cache: CertificateCache;
     private _certificate: string = null;
     private _key: string = null;
     private _config: Config;
@@ -211,7 +212,7 @@ export class WebServer {
         if (!existsSync(this._dbPath)) 
             mkdirSync(this._dbPath);
 
-        this._cache = new CertificateCache(this._certificatesPath, 10 * 60 * 60);
+        // this._cache = new CertificateCache(this._certificatesPath, 10 * 60 * 60);
         this._app.set('views', path.join(__dirname, '../../web/views'));
         this._app.set('view engine', 'pug');
     }
@@ -225,6 +226,9 @@ export class WebServer {
             if (null == (privateKeys = db.getCollection<PrivateKeyRow>('privateKeys'))) {
                 privateKeys = db.addCollection<PrivateKeyRow>('privateKeys', { });
             }
+            if (null == (pkis = db.getCollection<pki.Certificate>('pkis'))) {
+                pkis = db.addCollection<pki.Certificate>('pkis', { });
+            }
 
             ew.EventSet();
         }
@@ -233,6 +237,7 @@ export class WebServer {
             var ew = new EventWaiter();
             var certificates: Collection<CertificateRow> = null;
             var privateKeys: Collection<PrivateKeyRow> = null;
+            var pkis: Collection<pki.Certificate> = null;
             var db = new loki(path.join(this._dbPath.toString(), this.DB_NAME), { 
                 autosave: true, 
                 autosaveInterval: 2000, 
@@ -246,6 +251,7 @@ export class WebServer {
             this._db = db;
             this._certificates = certificates;
             this._privateKeys = privateKeys;
+            this._pkis = pkis;
             await this._dbInit();
         }
         catch (err) {
@@ -1009,6 +1015,7 @@ export class WebServer {
                     fingerprint256: new crypto.X509Certificate(pemString).fingerprint256,
                 })) as CertificateRow & LokiObj;    // Return value erroneous omits LokiObj
 
+                this._pkis.insert(c);
                 // This guarantees a unique filename
                 let newName = WebServer._getCertificateFilenameFromRow(newRecord);
                 logger.info(`Renamed ${path.basename(filename)} to ${newName}`)
@@ -1128,6 +1135,7 @@ export class WebServer {
             // }
 
             this._certificates.remove(cert);
+            this._pkis.removeWhere({ serialNumber: cert.serialNumber });
 
             resolve(result);
         });
@@ -1182,7 +1190,8 @@ export class WebServer {
                 // let types: CertTypes[] = [CertTypes.key];
 
                 for (let i = 0; i < certs.length; i++) {
-                    if (WebServer._isSignedBy(await this._cache.getCertificate(WebServer._getCertificateFilenameFromRow(certs[i])), k.n, k.e)) {
+                    // if (WebServer._isSignedBy(await this._cache.getCertificate(WebServer._getCertificateFilenameFromRow(certs[i])), k.n, k.e)) {
+                    if (WebServer._isSignedBy(this._pkis.findOne({ serialNumber: certs[i].serialNumber }), k.n, k.e)) {
                         krow.pairSerial = certs[i].serialNumber;
                         result.types.push(certs[i].type);
                         result.updated.push({ type: certs[i].type, id: certs[i].$loki });
@@ -1321,7 +1330,8 @@ export class WebServer {
             for (let i = 0; i < caList.length; i++) {
                 try {
                     // TODO: Deprecate cache
-                    let c = await this._cache.getCertificate(WebServer._getCertificateFilenameFromRow(caList[i]));
+                    // let c = await this._cache.getCertificate(WebServer._getCertificateFilenameFromRow(caList[i]));
+                    let c = this._pkis.findOne({ serialNumber: caList[i].serialNumber });
                     if (c.verify(certificate)) {
                         resolve(caList[i]);
                     }
@@ -1343,7 +1353,8 @@ export class WebServer {
             try {
                 signeeList.forEach(async (s) => {
                     // TODO: Deprecate cache
-                    let check = await this._cache.getCertificate(WebServer._getCertificateFilenameFromRow(s));
+                    // let check = await this._cache.getCertificate(WebServer._getCertificateFilenameFromRow(s));
+                    let check = this._pkis.findOne({ serialNumber: s.serialNumber });
                     try {
                         if (certificate.verify(check)) {
                             // BUG I think there is a better way to do this
@@ -1353,7 +1364,7 @@ export class WebServer {
                             logger.debug(`Marked ${s.name} as signed by ${certificate.subject.getField('CN').name}`);
                             retVal.types.push(s.type);
                             retVal.updated.push({ type: s.type, id: s.$loki });
-                            this._cache.markDirty(s.name);
+                            // this._cache.markDirty(s.name);
                         }
                     }
                     catch (_err) {

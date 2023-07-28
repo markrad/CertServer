@@ -52,7 +52,6 @@ const express_fileupload_1 = __importDefault(require("express-fileupload"));
 const serve_favicon_1 = __importDefault(require("serve-favicon"));
 const ws_1 = __importDefault(require("ws"));
 const log4js = __importStar(require("log4js"));
-const certificateCache_1 = require("./certificateCache");
 const eventWaiter_1 = require("./utility/eventWaiter");
 const exists_1 = require("./utility/exists");
 const ExtensionBasicConstraints_1 = require("./Extensions/ExtensionBasicConstraints");
@@ -93,6 +92,7 @@ class WebServer {
         this.DB_NAME = 'certs.db';
         this._app = (0, express_1.default)();
         this._ws = new ws_1.default.Server({ noServer: true });
+        // private _cache: CertificateCache;
         this._certificate = null;
         this._key = null;
         this._version = 'v' + require('../../package.json').version;
@@ -120,7 +120,7 @@ class WebServer {
             (0, node_fs_1.mkdirSync)(this._workPath);
         if (!(0, node_fs_1.existsSync)(this._dbPath))
             (0, node_fs_1.mkdirSync)(this._dbPath);
-        this._cache = new certificateCache_1.CertificateCache(this._certificatesPath, 10 * 60 * 60);
+        // this._cache = new CertificateCache(this._certificatesPath, 10 * 60 * 60);
         this._app.set('views', path_1.default.join(__dirname, '../../web/views'));
         this._app.set('view engine', 'pug');
     }
@@ -133,12 +133,16 @@ class WebServer {
                 if (null == (privateKeys = db.getCollection('privateKeys'))) {
                     privateKeys = db.addCollection('privateKeys', {});
                 }
+                if (null == (pkis = db.getCollection('pkis'))) {
+                    pkis = db.addCollection('pkis', {});
+                }
                 ew.EventSet();
             };
             try {
                 var ew = new eventWaiter_1.EventWaiter();
                 var certificates = null;
                 var privateKeys = null;
+                var pkis = null;
                 var db = new lokijs_1.default(path_1.default.join(this._dbPath.toString(), this.DB_NAME), {
                     autosave: true,
                     autosaveInterval: 2000,
@@ -152,6 +156,7 @@ class WebServer {
                 this._db = db;
                 this._certificates = certificates;
                 this._privateKeys = privateKeys;
+                this._pkis = pkis;
                 yield this._dbInit();
             }
             catch (err) {
@@ -878,6 +883,7 @@ class WebServer {
                         fingerprint: new crypto_1.default.X509Certificate(pemString).fingerprint,
                         fingerprint256: new crypto_1.default.X509Certificate(pemString).fingerprint256,
                     })); // Return value erroneous omits LokiObj
+                    this._pkis.insert(c);
                     // This guarantees a unique filename
                     let newName = WebServer._getCertificateFilenameFromRow(newRecord);
                     logger.info(`Renamed ${path_1.default.basename(filename)} to ${newName}`);
@@ -991,6 +997,7 @@ class WebServer {
                 //     signed[i]
                 // }
                 this._certificates.remove(cert);
+                this._pkis.removeWhere({ serialNumber: cert.serialNumber });
                 resolve(result);
             }));
         });
@@ -1039,7 +1046,8 @@ class WebServer {
                     let newfile = 'unknown_key_';
                     // let types: CertTypes[] = [CertTypes.key];
                     for (let i = 0; i < certs.length; i++) {
-                        if (WebServer._isSignedBy(yield this._cache.getCertificate(WebServer._getCertificateFilenameFromRow(certs[i])), k.n, k.e)) {
+                        // if (WebServer._isSignedBy(await this._cache.getCertificate(WebServer._getCertificateFilenameFromRow(certs[i])), k.n, k.e)) {
+                        if (WebServer._isSignedBy(this._pkis.findOne({ serialNumber: certs[i].serialNumber }), k.n, k.e)) {
                             krow.pairSerial = certs[i].serialNumber;
                             result.types.push(certs[i].type);
                             result.updated.push({ type: certs[i].type, id: certs[i].$loki });
@@ -1163,7 +1171,8 @@ class WebServer {
                 for (let i = 0; i < caList.length; i++) {
                     try {
                         // TODO: Deprecate cache
-                        let c = yield this._cache.getCertificate(WebServer._getCertificateFilenameFromRow(caList[i]));
+                        // let c = await this._cache.getCertificate(WebServer._getCertificateFilenameFromRow(caList[i]));
+                        let c = this._pkis.findOne({ serialNumber: caList[i].serialNumber });
                         if (c.verify(certificate)) {
                             resolve(caList[i]);
                         }
@@ -1185,7 +1194,8 @@ class WebServer {
                 try {
                     signeeList.forEach((s) => __awaiter(this, void 0, void 0, function* () {
                         // TODO: Deprecate cache
-                        let check = yield this._cache.getCertificate(WebServer._getCertificateFilenameFromRow(s));
+                        // let check = await this._cache.getCertificate(WebServer._getCertificateFilenameFromRow(s));
+                        let check = this._pkis.findOne({ serialNumber: s.serialNumber });
                         try {
                             if (certificate.verify(check)) {
                                 // BUG I think there is a better way to do this
@@ -1195,7 +1205,7 @@ class WebServer {
                                 logger.debug(`Marked ${s.name} as signed by ${certificate.subject.getField('CN').name}`);
                                 retVal.types.push(s.type);
                                 retVal.updated.push({ type: s.type, id: s.$loki });
-                                this._cache.markDirty(s.name);
+                                // this._cache.markDirty(s.name);
                             }
                         }
                         catch (_err) {
