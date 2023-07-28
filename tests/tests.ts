@@ -88,6 +88,7 @@ var newLeaf = {
     leafSigner: 'intName',
 }
 
+let stepNo = 0;
 const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
 
 (async () => {
@@ -109,7 +110,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
 
         webServer.on('error', (err) => console.log(`webserver failed: ${err}`));
         webServer.on('close', (code, signal) => console.log(`Server terminated = code=${code};signal=${signal}`));
-        // webServer.stdout.on('data', (data) => console.log(data.toString()));
+        webServer.stdout.on('data', (data) => console.log(data.toString()));
 
         await new Promise<void>((resolve) => setTimeout(() => resolve(), 2000));
         step = _step('connect WebSocket');
@@ -134,7 +135,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
 
         for (let dir in types) {
             step = _step(`get empty ${types[dir]} list`);
-            res = await httpRequest('get', url + '/certlist?type=' + types[dir]);
+            res = await httpRequest('get', url + '/api/certlist?type=' + types[dir]);
             assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
             assert.equal(res.body.files.length, 0, `Failed: Expected zero entries for ${types[dir]} request`);
             console.log(`Passed: zero entries returned for ${types[dir]}`);
@@ -174,6 +175,39 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         // console.log(msg);
         console.log('passed');
 
+        step = _step('get root certificate list');
+        res = await httpRequest('get', url + '/api/certlist?type=root');
+        assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body}`);
+        assert.notEqual(res.body.files, null, 'Did not receive the files element');
+        assert.equal(res.body.files.length, 1, `Files element is expected to be length 1 but received ${res.body.files.length}`);
+        assert.equal(res.body.files[0].name, 'someName', `File has incorrect name ${res.body.files[0].name}`);
+        assert.equal(res.body.files[0].type, 'root', `File has incorrect type ${res.body.files[0].type}`);
+        assert.equal(res.body.files[0].id, 1, `File has incorrect id ${res.body.files[0].id}`);
+        let rootId = res.body.files[0].id;
+        console.log('passed');
+
+        step = _step('get intermediate certificate list');
+        res = await httpRequest('get', url + '/api/certlist?type=intermediate');
+        assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body}`);
+        assert.notEqual(res.body.files, null, 'Did not receive the files element');
+        assert.equal(res.body.files.length, 1, `Files element is expected to be length 1 but received ${res.body.files.length}`);
+        assert.equal(res.body.files[0].name, 'intName', `File has incorrect name ${res.body.files[0].name}`);
+        assert.equal(res.body.files[0].type, 'intermediate', `File has incorrect type ${res.body.files[0].type}`);
+        assert.equal(res.body.files[0].id, 2, `File has incorrect id ${res.body.files[0].id}`);
+        let intId = res.body.files[0].id;
+        console.log('passed');
+
+        step = _step('get leaf certificate list');
+        res = await httpRequest('get', url + '/api/certlist?type=leaf');
+        assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body}`);
+        assert.notEqual(res.body.files, null, 'Did not receive the files element');
+        assert.equal(res.body.files.length, 1, `Files element is expected to be length 1 but received ${res.body.files.length}`);
+        assert.equal(res.body.files[0].name, 'leafName', `File has incorrect name ${res.body.files[0].name}`);
+        assert.equal(res.body.files[0].type, 'leaf', `File has incorrect type ${res.body.files[0].type}`);
+        assert.equal(res.body.files[0].id, 3, `File has incorrect id ${res.body.files[0].id}`);
+        let leafId = res.body.files[0].id;
+        console.log('passed');
+
         step = _step('get certificate details by id');
         res = await httpRequest('get', url + '/certdetails?id=3');
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
@@ -202,22 +236,25 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         }
         
         step = _step('get root certificate file');
-        res = await httpRequest('get', url + '/certificates/someName.pem');
+        res = await httpRequest('get', url + '/api/getcertificatepem?id=' + rootId.toString());
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         fs.writeFileSync(path.join(testPath, 'someName.pem'), res.body);
+        console.log('passed');
         
         step = _step('get intermediate certificate file');
-        res = await httpRequest('get', url + '/certificates/intName.pem');
+        res = await httpRequest('get', url + '/api/getcertificatepem?id=' + intId.toString());
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         fs.writeFileSync(path.join(testPath, 'intName.pem'), res.body);
+        console.log('passed');
         
         step = _step('get leaf certificate file');
-        res = await httpRequest('get', url + '/certificates/leafName.pem');
+        res = await httpRequest('get', url + '/api/getcertificatepem?id=' + leafId.toString());
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         fs.writeFileSync(path.join(testPath, 'leafName.pem'), res.body);
+        console.log('passed');
         
         step = _step('get intermediate key file');
-        res = await httpRequest('get', url + '/keys/intName_key.pem');
+        res = await httpRequest('get', url + '/api/getkeypem?id=2');
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         fs.writeFileSync(path.join(testPath, 'intName_key.pem'), res.body);
 
@@ -242,7 +279,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         msg = JSON.parse(wsQueue.shift());
         checkPacket(msg, 'someName', 1, 2, 0);
         checkItems(msg.added, [{ type: 1, id: 4 }]);
-        checkItems(msg.updated, [{ type: 2, id:2 }, { type: 4, id: 1 }]);
+        checkItems(msg.updated, [{ type: 2, id: 2 }, { type: 4, id: 1 }]);
         console.log('passed')
 
         step = _step('delete intermediate key');
@@ -307,7 +344,7 @@ function checkItems(items: OperationResultItem[], test: OperationResultItem[]) {
 }
 
 function _step(msg: string): string {
-    console.log('\n' + msg);
+    console.log(`\nStep: ${++stepNo}: ${msg}`);
     return msg;
 }
 
