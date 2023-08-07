@@ -266,6 +266,18 @@ const types = ['root', 'intermediate', 'leaf', 'key'];
         checkItems(msg.added, [{ type: 4, id: 4 }]);
         checkItems(msg.updated, [{ type: 2, id: 2 }]);
         console.log('passed');
+        step = _step('get certificate with no name or id');
+        res = yield httpRequest('get', url + '/api/getCertificatePem?xx=bad');
+        node_assert_1.default.equal(res.statusCode, 400, 'This should have failed');
+        console.log('passed');
+        step = _step('get certificate with name not found');
+        res = yield httpRequest('get', url + '/api/getCertificatePem?name=bad');
+        node_assert_1.default.equal(res.statusCode, 404, 'This should have failed');
+        console.log('passed');
+        step = _step('get certificate with id not found');
+        res = yield httpRequest('get', url + '/api/getCertificatePem?id=bad');
+        node_assert_1.default.equal(res.statusCode, 404, 'This should have failed');
+        console.log('passed');
         step = _step('tests complete');
     }
     catch (err) {

@@ -1,5 +1,5 @@
 export type ExtensionParentObject = {
-    name: string;
+    name?: string;
     critical?: boolean;
 };
 

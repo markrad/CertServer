@@ -13,6 +13,6 @@ export class ExtensionSubjectKeyIdentifier extends ExtensionParent {
     }
 
     getObject(): ExtensionSubjectKeyIdentifierObject {
-        return { ...{ name: ExtensionSubjectKeyIdentifier.extensionName } }
+        return { ...{ name: ExtensionSubjectKeyIdentifier.extensionName }, ...this._options }
     }
 }

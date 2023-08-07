@@ -3,6 +3,7 @@ extends layout
 block layout-content
   script(type="text/javascript").
 
+    //- BUG Fix key insertion sort sequence
     let sprintf = null;
     let nameLookup = [];
     let keyLookup = [];
@@ -34,7 +35,7 @@ block layout-content
     function buildKeyList(target, files) {
       target.empty();
       if (files.length == 0)
-        target.append('<li>None</li>');
+        target.append('<li class="empty">None</li>');
       else
         files.sort((l, r) => l.name.localeCompare(r))
         .forEach((file) => {
@@ -43,22 +44,23 @@ block layout-content
     }
 
     function buildKeyEntry(file) {
-      let listEntryHTML = '<li class="keyLine" id="%s">' +
+      let listEntryHTML = '<li class="keyLine" id="k%s">' +
         '  <span onclick="keyClick(\'%s\')">' +
         '    <span class="keyArrow">></span>' +
         '    <span class="certValue">%s</span>' +
+        '    <span class="idLine"><span class="idLabel">Id: </span><span class="idValue">%s</span></span>' +
         '  </span>' +
         '  <div class="keyDetails">' +
         '  </div>' +
         '</li>';
       keyLookup[file.id] = file.name;
-      return sprintf(listEntryHTML, file.id, file.id, file.name);
+      return sprintf(listEntryHTML, file.id, file.id, file.name, file.id);
     }
 
     function buildCertList(target, files) {
       target.empty();
       if (files.length == 0)
-        target.append('<li>None</li>');
+        target.append('<li class="empty">None</li>');
       else
         files.sort((l, r) => l.name.localeCompare(r))
         .forEach((file) => {
@@ -67,16 +69,17 @@ block layout-content
     }
 
     function buildCertEntry(file) {
-      let listEntryHTML = '<li class="certLine" id="%s">' +
+      let listEntryHTML = '<li class="certLine" id="c%s">' +
         '  <span onclick="certClick(\'%s\')">' +
         '    <span class="certArrow">˃</span>' +
         '    <span class="certValue">%s</span>' +
+        '    <span class="idLine"><span class="idLabel">Id: </span><span class="idValue">%s</span></span>' +
         '  </span>' +
         '  <div class="certDetails">' +
         '  </div>' +
         '</li>';
       nameLookup[file.id] = file.name;
-      return sprintf(listEntryHTML, file.id, file.id, file.name);
+      return sprintf(listEntryHTML, file.id, file.id, file.name, file.id);
     }
     //- button(type='button' class='button1' onclick='togglePane(\'#uploadCertForm\')') Upload Certificate
 
@@ -86,9 +89,9 @@ block layout-content
           '<div class="certInfoButtons">' + 
             //- '<button type="button" class="button2 certBtnDownload" onClick="certDownload(\'%s\')">Download</button>' +
             //- '<button type="button" class="button2 certBtnDownloadChain">Download Chain</button>' +
-            '<a href="/certificates/%s.pem" class="button2 certBtnDownload">Download</a>' +
-            '<a href="/api/chaindownload?name=%s" class="button2 certBtnDownloadChain">Download Chain</a>' +
-            '<button type="button" class="button2 button2Red certBtnDelete" onClick="certDelete(\'%s\', \'%s\', \'%s\')">Delete</button>' +
+            '<a href="/api/getCertificatePem?id=%s" class="button2 certBtnDownload">Download</a>' +
+            '<a href="/api/chaindownload?id=%s" class="button2 certBtnDownloadChain">Download Chain</a>' +
+            '<button type="button" class="button2 button2Red certBtnDelete" onClick="certDelete(\'%s\', \'%s\')">Delete</button>' +
             '<span class="certOptionalButtons">' +
             '  <button type="button" class="button2" onClick="newIntermediateDialog(\'%s\')">New Intermediate</button>' +
             '  <button type="button" class="button2" onClick="newLeafDialog(\'%s\')">New Leaf</button>' +
@@ -120,8 +123,8 @@ block layout-content
           '<div class="certInfoSigner"><span class="certInfoSignerLabel">Signed by:&nbsp;</span><span class="certInfoSignerValue">%s</span></div>' +
           '<div class="certInfoKey"><span class="certInfoKeyLabel">Key Present:&nbsp;</span><span class="certInfoKeyValue">%s</span></div>' +
         '</div>'
-      console.log('.certLine#' + id);
-      let line = $('.certLine#' + id);
+      console.log('.certLine#c' + id);
+      let line = $('.certLine#c' + id);
       let details = line.find('.certDetails');
       let arrow = line.find('.certArrow');
       if (details.is(':hidden') == false) {
@@ -133,15 +136,14 @@ block layout-content
       else {
         arrow['0'].innerText = '˅';
         try {
-          var result = await getCertDetails({ id: id.substring(5)});
+          var result = await getCertDetails({ id: id});
           let content = sprintf(detailHTML, 
-            nameLookup[id],
-            nameLookup[id],
-            nameLookup[id],
-            result.serialNumber,
-            result.certType,
-            nameLookup[id],
-            nameLookup[id],
+            result.id,
+            result.id,
+            result.name,
+            result.id,
+            result.id,
+            result.id,
             result.certType,
             result.keyPresent == 'yes'? ' with private key' : '',
             result.serialNumber,
@@ -226,11 +228,11 @@ block layout-content
       });
     }
 
-    function certDelete(name, serialNumber, type) {
+    function certDelete(name, id) {
       if (confirm(`This will delete certificate ${name}. \n\nDo you wish to continue?`)) {
-        console.log('Would delete ' + serialNumber.split(':').join(''));
+        console.log('Would delete ' + name);
         var request = $.ajax({
-          url: '/deleteCert?serialNumber=' + serialNumber.split(':').join(''),
+          url: '/deleteCert?id=' + id,
           method: 'DELETE',
           processData: false,
           contentType: false,
@@ -267,7 +269,7 @@ block layout-content
     function newIntermediateDialog(name) {
       console.log(name);
       let dialog = $('#newIntermediate');
-      dialog.dialog('option', 'title', 'Sign with ' + name);
+      dialog.dialog('option', 'title', `${name} -> intermediate`);
       $('#intermediateSigner').val(name); 
       dialog.dialog('open');
     }
@@ -275,7 +277,7 @@ block layout-content
     function newLeafDialog(name) {
       console.log(name);
       let dialog = $('#newLeaf');
-      dialog.dialog('option', 'title', 'Sign with ' + name);
+      dialog.dialog('option', 'title', `${name} -> leaf`);
       $('#leafSigner').val(name); 
       dialog.dialog('open');
     }
@@ -297,7 +299,7 @@ block layout-content
           '  <span class="keyEncryptedLabel">Encrypted:&nbsp;</span><span class="keyEncryptedValue">%s</span>' +
           '</div>'; 
       console.log('key click ' + id);
-      let line = $('.keyLine#' + id);
+      let line = $('.keyLine#k' + id);
       let details = line.find('.keyDetails');
       let arrow = line.find('.keyArrow');
       if (details.is(':hidden') == false) {
@@ -309,8 +311,8 @@ block layout-content
       else {
         arrow['0'].innerText = '˅';
         try {
-          result = await getKeyDetails({ name: keyLookup[id] });
-          let content = sprintf(detailHTML, result.name, result.name, result.name, result.certPair, result.encrypted? 'yes' : 'no');
+          result = await getKeyDetails({ id: id });
+          let content = sprintf(detailHTML, result.id, result.id, result.name, result.certPair, result.encrypted? 'yes' : 'no');
           details['0'].innerHTML = content;
           console.log('success');
           details.slideDown(500);           // &#9650
@@ -323,26 +325,6 @@ block layout-content
             }
           });
         };
-        //- console.log(arrow['0'].innerText);
-        //- var request = $.ajax({
-        //-   url: '/keyDetails?name=' + keyLookup[id],
-        //-   method: 'GET',
-        //-   processData: false,
-        //-   contentType: false,
-        //-   error: (xhr, msg, err) => {
-        //-     $.magnificPopup.open({
-        //-       items: {
-        //-         src: `<div class="error-popup">${err}: ${xhr.responseText}</div>`,
-        //-         type: 'inline'
-        //-       }
-        //-     });
-        //-   },
-        //-   success: (result, status) => {
-        //-     let content = sprintf(detailHTML, result.name, result.name, result.name, result.certPair, result.encrypted? 'yes' : 'no');
-        //-     details['0'].innerHTML = content;
-        //-     console.log('success');
-        //-   }
-        //- });
       };
     }
 
@@ -364,19 +346,19 @@ block layout-content
       })      
     }
 
-    function keyDownload(name) {
+    function keyDownload(id) {
       let filename = name + '.pem';
-      let filelocation = 'keys/' + filename;
+      let filelocation = '/api/getkeypem?id=' + id;
       const anchor = $('<a>', { href: filelocation, download: filename })[0];
       $('body').append(anchor);
       anchor.click();
       $(anchor).remove();
     }
 
-    function keyDelete(name) {
-      if (confirm(`This will delete ${name}. \n\nDo you wish to continue?`)) {
+    function keyDelete(id) {
+      if (confirm(`This will delete ${id}. \n\nDo you wish to continue?`)) {
         var request = $.ajax({
-          url: '/deleteKey?name=' + name,
+          url: '/deleteKey?id=' + id,
           method: 'DELETE',
           processData: false,
           contentType: false,
@@ -482,7 +464,6 @@ block layout-content
                 type: 'inline'
               }
             });
-            //- alert(JSON.stringify(err));
           },
           success: async (result, status) => {
             document.getElementById('uploadKeyForm').reset();
@@ -497,10 +478,6 @@ block layout-content
         });
       }
     }
-    //- function createCACert(e) {
-    //-   let data = new FormData();
-    //-   console.log('generate it');
-    //- }
 
     function createCACertResponse(result) {
       console.log(result);
@@ -516,7 +493,6 @@ block layout-content
 
     function createIntermediateCertResponse(result) {
       console.log(result);
-      //- processChanges(result.types);
       $('#generateIntermediateReset').click();
       $.magnificPopup.open({
         items: {
@@ -540,6 +516,11 @@ block layout-content
       $('#newLeaf').dialog('close');
     }
 
+    function resetLeafForm() {
+      $('#newLeafForm')[0].reset();
+      $('#SANList').empty();
+    }
+
     async function getName(type, id) {
       return new Promise((resolve, reject) => {
         let url = type == 4? '/api/keyname' : '/api/certname';
@@ -559,19 +540,52 @@ block layout-content
       });
     }
 
+    function AddSAN() {
+      let list = $('#SANList');
+      let input = $('#SANInput');
+      let type = input.find('.SANType');
+      let value = input.find('.SANValue');
+      let spanId = 'SAN' + list.children().length;
+      let newSpan = $(`<div id=${spanId}></div>`);
+      let newButton = $(`<input type='button' value='✘' onClick="removeSAN('${spanId}')"></input>`);
+      let newEntry = $(`<input type='text' name='SANArray' value='${type.val()}: ${value.val()}' class='SANList' readonly></input>`);
+      newSpan.append(newButton);
+      newSpan.append(newEntry);
+      list.append(newSpan);
+      type.val('DNS');
+      value.val('');
+    }
+
+    function removeSAN(spanId) {
+      $('#' + spanId).remove();
+    }
+
     function processUpdates(changePacket) {
       console.log('Changes: ' + changePacket);
       changeJSON = JSON.parse(changePacket);
+      let lists = ['#rootList', '#intermediateList', '#leafList', '#keyList'];
 
       changeJSON.deleted.forEach((change) => {
         console.log(change);
-        $(`#id_${change.type}_${change.id}`).remove();
+        $(`#${change.type == 4? 'k' : 'c'}${change.id}`).remove();
+      });
+
+      lists.forEach((header) => {
+        if ($(`${header} li`).length == 0) {
+          $(header).append('<li class="empty">None</li>');
+        }
       });
 
       changeJSON.added.forEach(async (change) => {
         let certs = [];
         let name = await getName(change.type, change.id);
-        let entry = await (change.type == 4? buildKeyEntry({ name: name, id: `id_${change.type}_${change.id}` }) : buildCertEntry({ name: name, id: `id_${change.type}_${change.id}` }));
+        let header = $(`${lists[change.type - 1]} li`);
+        let entry = await (change.type == 4? buildKeyEntry({ name: name, id: change.id }) : buildCertEntry({ name: name, id: change.id }));
+
+        if (header.length > 0 && header.first().attr('class') == 'empty') {
+          header.first().remove();
+        }
+
         console.log(name);
         $(`#${typeLookup[change.type]}List li`).each(function() {
           let span = $(this).find('span.certValue');
@@ -594,8 +608,15 @@ block layout-content
       });
 
       changeJSON.updated.forEach(async (change) => {
-        let line = $(`#id_${change.type}_${change.id}`);
-        let name = $(`#id_${change.type}_${change.id} .certValue`);
+        let idName;
+        if (change.type == 4) {
+          idName = '#k'
+        }
+        else {
+          idName = '#c';
+        }
+        let line = $(`${idName}${change.id}`);
+        let name = $(`${idName}${change.id} .certValue`);
         if (change.type == 4) {
           let keyDetails = await getKeyDetails({ id: change.id });
           if (keyDetails.name != name.text()) {
@@ -606,20 +627,20 @@ block layout-content
 
           let details = null;
           if ((details =  $(`#id_${change.type}_${change.id} .keyDetails`))) {
-            $(`#id_${change.type}_${change.id} .keyNameValue`).text(keyDetails.name);
-            $(`#id_${change.type}_${change.id} .keyPairValue`).text(keyDetails.certPair);
+            $(`${idName}${change.id} .keyNameValue`).text(keyDetails.name);
+            $(`${idName}${change.id} .keyPairValue`).text(keyDetails.certPair);
           }
         }
         else {
-          let info = $(`#id_${change.type}_${change.id} .certInfo`);
+          let info = $(`${idName}${change.id} .certInfo`);
           if (info.length > 0) {
             try {
               let result = await getCertDetails({ name: name.text() });
-              $(`#id_${change.type}_${change.id} .certPrivateKey`).text(result.keyPresent == 'yes'? ' with private key' : '');
-              $(`#id_${change.type}_${change.id} .certInfoSignerValue`).text(result.signer);
-              $(`#id_${change.type}_${change.id} .certInfoKeyValue`).text(result.keyPresent);
-              if (result.keyPresent == 'no') $(`#id_${change.type}_${change.id} .certOptionalButtons`).hide();
-              else $(`#id_${change.type}_${change.id} .certOptionalButtons`).show();
+              $(`${idName}${change.id} .certPrivateKey`).text(result.keyPresent == 'yes'? ' with private key' : '');
+              $(`${idName}${change.id} .certInfoSignerValue`).text(result.signer);
+              $(`${idName}${change.id} .certInfoKeyValue`).text(result.keyPresent);
+              if (result.keyPresent == 'no') $(`${idName}${change.id} .certOptionalButtons`).hide();
+              else $(`${idName}${change.id} .certOptionalButtons`).show();
             }
             catch({ error, message }) {
               $.magnificPopup.open({
@@ -703,7 +724,7 @@ block layout-content
 
       let dialogInt = $('#newIntermediate').dialog({
         autoOpen: false,
-        height: 680,
+        height: 600,
         width: 350,
         modal: true,
       });
@@ -775,7 +796,7 @@ block layout-content
       label.modalLabel(for='Country') Country: 
       input(type='text' name='leafCountry' id='leafC' value=C class='text ui-widget-content ui-corner-all')
       label.modalLabel(for='State' styles { float: left; }) State:
-      input(type='text' name='leafState' id='leafST' value=ST class='text ui-widget-content ui-corner-all')
+      input(type='text' name='leafState' title='State' id='leafST' value=ST class='text ui-widget-content ui-corner-all')
       label.modalLabel(for='Location') Location:
       input(type='text' name='leafLocation' id='leafL' value=L class='text ui-widget-content ui-corner-all')
       label.modalLabel(for='Organization') Organization:
@@ -784,13 +805,22 @@ block layout-content
       input(type='text' name='leafUnit' id='leafOU' value=OU class='text ui-widget-content ui-corner-all')
       label.modalLabel(for='Common Name') Common Name:
       input(type='text' name='leafCommonName' id='leafCN' value='' class='text ui-widget-content ui-corner-all')
+      label.modalLabel(for='SANs') SANs
+      div#SANList
+      div#SANInput
+        select.SANType(title='SAN Type')
+          option DNS 
+          option IP
+        input.SANValue(type='text')
+        input.SANEnter(name='SanEnter' type='button' value='✔' onClick='AddSAN()')
       label.modalLabel(for='Valid From') Valid from:
       input#LeafValidFrom(type='text' name='leafValidFrom')
       label.modalLabel(for='Valid To') Valid to:
       input#LeafValidTo(type='text' name='leafValidTo')
       input#leafSigner(type='text' name='leafSigner' value='' class='hidden')
       div.intButtons
-        input.button2#generateLeafReset(type="reset", value="Reset" title="Reset")
+        //- input.button2#generateLeafReset(type="reset", value="Reset" title="Reset")
+        input.button2#generateLeafReset(type="button", value="Reset" title="Reset" onClick="resetLeafForm()")
         input.button2#generateLeafButton.SubmitButton(type="submit" title="submit", value="Generate")
   div.View
     span 

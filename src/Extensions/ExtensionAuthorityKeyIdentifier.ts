@@ -1,8 +1,9 @@
 import { ExtensionParent, ExtensionParentObject } from "./ExtensionParent";
 
 type ExtensionAuthorityKeyIdentifierOptons = {
-    authorityCertIssuer: boolean,
-    serialNumber: string
+    authorityCertIssuer?: boolean,
+    keyIdentifier?: boolean,
+    serialNumber?: string,
 };
 type ExtensionAuthorityKeyIdentifierObject = ExtensionParentObject & {}
 

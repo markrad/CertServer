@@ -8,7 +8,7 @@ class ExtensionSubjectKeyIdentifier extends ExtensionParent_1.ExtensionParent {
         this._options = options;
     }
     getObject() {
-        return Object.assign({ name: ExtensionSubjectKeyIdentifier.extensionName });
+        return Object.assign({ name: ExtensionSubjectKeyIdentifier.extensionName }, this._options);
     }
 }
 exports.ExtensionSubjectKeyIdentifier = ExtensionSubjectKeyIdentifier;

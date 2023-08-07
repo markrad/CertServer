@@ -67,6 +67,13 @@ button#uploadButton {
     margin-left: 8px;
 }
 
+span.idLine {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: smaller;
+    float: right;
+    cursor: pointer;
+}
+
 span.certArrow {
     font-family: 'Courier New', Courier, monospace;
     cursor: pointer;
@@ -226,4 +233,25 @@ button.button2Red:hover {
 .sub {
     font-size: 15px;
     margin-left: 8pt;
+}
+
+.SANValue {
+    margin-left: 8pt;
+    width: 120pt;
+}
+
+.SANEnter {
+    float: right;
+    cursor: pointer;
+}
+
+.SANList {
+    border-width: 0px;
+    outline: none;
+    margin-left: 8pt;
+}
+
+.SANList:focus {
+    border-width: 0px;
+    outline: none;
 }

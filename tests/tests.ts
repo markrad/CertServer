@@ -306,6 +306,21 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         checkItems(msg.updated, [{ type: 2, id:2 }]);
         console.log('passed')
 
+        step = _step('get certificate with no name or id');
+        res = await httpRequest('get', url + '/api/getCertificatePem?xx=bad');
+        assert.equal(res.statusCode, 400, 'This should have failed');
+        console.log('passed');
+
+        step = _step('get certificate with name not found');
+        res = await httpRequest('get', url + '/api/getCertificatePem?name=bad');
+        assert.equal(res.statusCode, 404, 'This should have failed');
+        console.log('passed');
+
+        step = _step('get certificate with id not found');
+        res = await httpRequest('get', url + '/api/getCertificatePem?id=bad');
+        assert.equal(res.statusCode, 404, 'This should have failed');
+        console.log('passed');
+
         step = _step('tests complete');
     }
     catch (err) {

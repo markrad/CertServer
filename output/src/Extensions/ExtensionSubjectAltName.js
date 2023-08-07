@@ -4,15 +4,21 @@ exports.ExtensionSubjectAltName = void 0;
 const ExtensionParent_1 = require("./ExtensionParent");
 class ExtensionSubjectAltName extends ExtensionParent_1.ExtensionParent {
     constructor(options) {
-        var _a, _b;
         super();
-        if (options.name) {
+        if (false /*options.name*/) {
             this._options = options;
         }
         else {
             this._options = {
                 name: ExtensionSubjectAltName.extensionName,
-                altNames: ((_a = options.domains) !== null && _a !== void 0 ? _a : []).map(domain => { return { type: 2, value: domain }; }).concat(((_b = options.IPs) !== null && _b !== void 0 ? _b : []).map(IP => { return { type: 7, value: IP }; }))
+                altNames: [
+                    ...options.domains != undefined
+                        ? options.domains.map((domain) => ({ type: 2, value: domain }))
+                        : [],
+                    ...options.IPs != undefined
+                        ? options.IPs.map((ip) => ({ type: 7, ip: ip }))
+                        : []
+                ]
             };
         }
     }

@@ -6,8 +6,9 @@ export type ExtensionSubjectAltNameOptions = {
 };
 
 type SubjectAltName = {
-    type: number,
-    value: string
+    type?: number,
+    value?: string,
+    ip?: string,
 }
 
 type ExtensionSubjectAltNameObject = ExtensionParentObject & { altNames: SubjectAltName[] }
@@ -18,15 +19,22 @@ export class ExtensionSubjectAltName extends ExtensionParent {
     protected _options: ExtensionSubjectAltNameObject;
     constructor(options: ExtensionSubjectAltNameOptions) {
         super();
-        if ((options as ExtensionSubjectAltNameObject).name) {
+        if (false /*options.name*/) {
             this._options = options as ExtensionSubjectAltNameObject;
         }
         else {
-            this._options = { 
+            this._options = {
                 name: ExtensionSubjectAltName.extensionName,
-                altNames: (options.domains ?? []).map(domain => { return { type: 2, value: domain } }).concat((options.IPs ?? []).map(IP => { return { type: 7, value: IP }}))
+                altNames: [
+                    ...options.domains != undefined
+                    ? options.domains.map((domain) => ({ type: 2, value: domain }))
+                    : [],
+                    ...options.IPs != undefined
+                    ? options.IPs.map((ip) => ({ type: 7, ip: ip}))
+                    : []
+                ]
             }
-        }
+        } 
     }
  
     getObject(): ExtensionSubjectAltNameObject {

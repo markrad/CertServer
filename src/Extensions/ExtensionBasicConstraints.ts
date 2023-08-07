@@ -1,6 +1,6 @@
 import { ExtensionParent, ExtensionParentObject } from "./ExtensionParent";
 
-type ExtensionBasicConstraintsOptions = {
+type ExtensionBasicConstraintsOptions = ExtensionParentObject & {
     cA: boolean,
     pathlenConstraint?: number
 }
