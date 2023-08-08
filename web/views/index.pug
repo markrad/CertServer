@@ -93,8 +93,8 @@ block layout-content
             '<a href="/api/chaindownload?id=%s" class="button2 certBtnDownloadChain">Download Chain</a>' +
             '<button type="button" class="button2 button2Red certBtnDelete" onClick="certDelete(\'%s\', \'%s\')">Delete</button>' +
             '<span class="certOptionalButtons">' +
-            '  <button type="button" class="button2" onClick="newIntermediateDialog(\'%s\')">New Intermediate</button>' +
-            '  <button type="button" class="button2" onClick="newLeafDialog(\'%s\')">New Leaf</button>' +
+            '  <button type="button" class="button2" onClick="newIntermediateDialog(\'%s\', \'%s\')">New Intermediate</button>' +
+            '  <button type="button" class="button2" onClick="newLeafDialog(\'%s\', \'%s\')">New Leaf</button>' +
             '</span>' +
           '</div>' +
           '<div class="certInfoType">' +
@@ -143,7 +143,9 @@ block layout-content
             result.name,
             result.id,
             result.id,
+            result.name,
             result.id,
+            result.name,
             result.certType,
             result.keyPresent == 'yes'? ' with private key' : '',
             result.serialNumber,
@@ -266,19 +268,19 @@ block layout-content
       });
     }
 
-    function newIntermediateDialog(name) {
+    function newIntermediateDialog(id, name) {
       console.log(name);
       let dialog = $('#newIntermediate');
       dialog.dialog('option', 'title', `${name} -> intermediate`);
-      $('#intermediateSigner').val(name); 
+      $('#intermediateSigner').val(id); 
       dialog.dialog('open');
     }
 
-    function newLeafDialog(name) {
+    function newLeafDialog(id, name) {
       console.log(name);
       let dialog = $('#newLeaf');
       dialog.dialog('option', 'title', `${name} -> leaf`);
-      $('#leafSigner').val(name); 
+      $('#leafSigner').val(id); 
       dialog.dialog('open');
     }
 
