@@ -77,6 +77,9 @@ class CertError extends Error {
 }
 const logger = log4js.getLogger();
 logger.level = "debug";
+/**
+ * @classdesc Web server to help maintain test certificates and keys
+ */
 class WebServer {
     static createWebServer(config) {
         if (!WebServer.instance) {
@@ -89,6 +92,10 @@ class WebServer {
     }
     get port() { return this._port; }
     get dataPath() { return this._dataPath; }
+    /**
+     * @constructor
+     * @param config Configuration information such as port, etc.
+     */
     constructor(config) {
         this.DB_NAME = 'certs.db';
         this._app = (0, express_1.default)();
@@ -124,6 +131,11 @@ class WebServer {
         this._app.set('views', path_1.default.join(__dirname, '../../web/views'));
         this._app.set('view engine', 'pug');
     }
+    /**
+     * Starts the webserver
+     *
+     * @returns Promise\<void>
+     */
     start() {
         return __awaiter(this, void 0, void 0, function* () {
             let getCollections = () => {
@@ -389,14 +401,17 @@ class WebServer {
                     }
                     // Create an empty Certificate
                     let cert = node_forge_1.pki.createCertificate();
-                    const ski = c.getExtension({ name: 'subjectKeyIdentifier' });
+                    // const ski: any = c.getExtension({ name: 'subjectKeyIdentifier' });
                     const { privateKey, publicKey } = node_forge_1.pki.rsa.generateKeyPair(2048);
                     const attributes = WebServer._setAttributes(subject);
                     const extensions = [
                         new ExtensionBasicConstraints_1.ExtensionBasicConstraints({ cA: true, critical: true }),
                         new ExtensionKeyUsage_1.ExtensionKeyUsage({ keyCertSign: true, cRLSign: true }),
+                        // new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, keyIdentifier: true, serialNumber: ski['subjectKeyIdentifier'] }),
+                        new ExtensionAuthorityKeyIdentifier_1.ExtensionAuthorityKeyIdentifier({ keyIdentifier: c.generateSubjectKeyIdentifier().getBytes() }),
                         // new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, serialNumber: c.serialNumber }),
-                        new ExtensionAuthorityKeyIdentifier_1.ExtensionAuthorityKeyIdentifier({ /*authorityCertIssuer: true, keyIdentifier: true,*/ serialNumber: ski['subjectKeyIdentifier'] }),
+                        // new ExtensionAuthorityKeyIdentifier({ /*authorityCertIssuer: true, keyIdentifier: true,*/ serialNumber: ski['subjectKeyIdentifier'] }),
+                        // new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, keyIdentifier: true, authorityCertSerialNumber: true }),
                         new ExtensionSubjectKeyIdentifier_1.ExtensionSubjectKeyIdentifier({}),
                     ];
                     // Set the Certificate attributes for the new Root CA
@@ -689,6 +704,11 @@ class WebServer {
             }));
         });
     }
+    /**
+     * Initializes the database from the file system and cleans up the file system
+     * @private
+     * @returns Promise\<void>
+     */
     _dbInit() {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
@@ -820,22 +840,7 @@ class WebServer {
                     }
                     // Generate a filename for the common name
                     let name = WebServer._sanitizeName(c.subject.getField('CN').value);
-                    // let name = (c.subject.getField('CN').value).replace(/ /g, '_');
                     result.name = name;
-                    // Deduplicate if necessary
-                    // if (name + '.pem' != path.basename(filename)) {
-                    //     if (await exists(path.join(path.dirname(filename), name + '.pem'))) {
-                    //         for (let i = 1; true; i++) {
-                    //             if (await exists(path.join(path.dirname(filename), name + '_' + i.toString() + '.pem'))) {
-                    //                 name = name + '_' + i.toString();
-                    //                 break;
-                    //             }
-                    //         }
-                    //     }
-                    // logger.info(`Renamed ${path.basename(filename)} to ${name}.pem`)
-                    // await rename(filename, path.join(this._certificatesPath, name + '.pem'));
-                    // See if we have private key for this certificate
-                    // }
                     // See if we have a private key for this certificate
                     let keys = this._privateKeys.chain().find({ pairSerial: null }).data();
                     for (let i = 0; i < keys.length; i++) {
@@ -958,6 +963,14 @@ class WebServer {
             }));
         });
     }
+    /**
+     * Tries to add the key specified by the pem file to the database and file store.
+     *
+     * @param filename - The path to the file containing the key's pem
+     * @param password - Optional password for encrypted keys
+     *
+     * @returns OperationResultEx2 promise containing updated entries
+     */
     _tryAddKey(filename, password) {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
@@ -1109,16 +1122,6 @@ class WebServer {
     _getWorkDir(filename) {
         return path_1.default.join(this._workPath, filename);
     }
-    // private async _getUnpairedKeyName(): Promise<string> {
-    //     return new Promise(async (resolve, _reject) => {
-    //         let newname = 'unknown_key_';
-    //         for (let i = 0; true; i++) {
-    //             if (!await exists(path.join(this._privatekeysPath, newname + i.toString() + '.pem'))) {
-    //                 resolve(newname + i.toString());
-    //             }
-    //         }
-    //     });
-    // }
     _findSigner(certificate) {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, _reject) => __awaiter(this, void 0, void 0, function* () {
@@ -1131,8 +1134,8 @@ class WebServer {
                         }
                     }
                     catch (err) {
-                        logger.debug(err.message);
-                        // logger.debug('Not ' + caList[i].name);
+                        // TODO Make sure the error actually is from verify
+                        logger.debug(`Verify error? ${err.message}`);
                         // verify should return false but apparently throws an exception - do nothing
                     }
                 }
