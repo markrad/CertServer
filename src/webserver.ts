@@ -114,6 +114,15 @@ type OperationResultItem = {
     id: number
 }
 
+/**
+ * Used to return database entries that have been added, deleted, or updated.
+ * 
+ * @member name: The common name of the certificate or key - will be deprecated
+ * @member types Deprecated
+ * @member added Array of certificates or keys added
+ * @member updated Array of certificates or keys updated
+ * @member deleted Array of certificates or keys deleted
+ */
 type OperationResultEx2 = {
     name: string,
     types: CertTypes[],
@@ -133,6 +142,9 @@ class CertError extends Error {
 const logger = log4js.getLogger();
 logger.level = "debug";
 
+/**
+ * @classdesc Web server to help maintain test certificates and keys
+ */
 export class WebServer {
     static instance: WebServer = null;
     static createWebServer(config: any): WebServer {
@@ -163,6 +175,10 @@ export class WebServer {
     private _version = 'v' + require('../../package.json').version;
     get port() { return this._port; }
     get dataPath() { return this._dataPath; }
+    /**
+     * @constructor
+     * @param config Configuration information such as port, etc.
+     */
     private constructor(config: Config) {
         this._config = config;
         this._port = config.certServer.port;
@@ -198,6 +214,11 @@ export class WebServer {
         this._app.set('view engine', 'pug');
     }
 
+    /**
+     * Starts the webserver
+     * 
+     * @returns Promise\<void>
+     */
     async start() {
         
         let getCollections: () => void = () => {
@@ -466,17 +487,21 @@ export class WebServer {
                         k = pki.privateKeyFromPem(await readFile(path.join(this._privatekeysPath, WebServer._getKeyFilenameFromRow(kRow)), { encoding: 'utf8' }));
                     }
                 }
+
                 // Create an empty Certificate
                 let cert = pki.createCertificate();
         
-                const ski: any = c.getExtension({ name: 'subjectKeyIdentifier' });
+                // const ski: any = c.getExtension({ name: 'subjectKeyIdentifier' });
                 const { privateKey, publicKey } = pki.rsa.generateKeyPair(2048);
                 const attributes = WebServer._setAttributes(subject);
                 const extensions: ExtensionParent[] = [
                     new ExtensionBasicConstraints({ cA: true, critical: true }),
                     new ExtensionKeyUsage({ keyCertSign: true, cRLSign: true }),
+                    // new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, keyIdentifier: true, serialNumber: ski['subjectKeyIdentifier'] }),
+                    new ExtensionAuthorityKeyIdentifier({ keyIdentifier: c.generateSubjectKeyIdentifier().getBytes() }),
                     // new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, serialNumber: c.serialNumber }),
-                    new ExtensionAuthorityKeyIdentifier({ /*authorityCertIssuer: true, keyIdentifier: true,*/ serialNumber: ski['subjectKeyIdentifier'] }),
+                    // new ExtensionAuthorityKeyIdentifier({ /*authorityCertIssuer: true, keyIdentifier: true,*/ serialNumber: ski['subjectKeyIdentifier'] }),
+                    // new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, keyIdentifier: true, authorityCertSerialNumber: true }),
                     new ExtensionSubjectKeyIdentifier({ }),
                 ]
                 // Set the Certificate attributes for the new Root CA
@@ -774,6 +799,11 @@ export class WebServer {
         });
     }
 
+    /**
+     * Initializes the database from the file system and cleans up the file system
+     * @private
+     * @returns Promise\<void>
+     */
     private async _dbInit(): Promise<void> {
         return new Promise<void>(async (resolve, reject) => {
             try {
@@ -924,24 +954,8 @@ export class WebServer {
 
                 // Generate a filename for the common name
                 let name = WebServer._sanitizeName(c.subject.getField('CN').value);
-                // let name = (c.subject.getField('CN').value).replace(/ /g, '_');
                 result.name = name;
 
-                // Deduplicate if necessary
-                // if (name + '.pem' != path.basename(filename)) {
-                //     if (await exists(path.join(path.dirname(filename), name + '.pem'))) {
-                //         for (let i = 1; true; i++) {
-                //             if (await exists(path.join(path.dirname(filename), name + '_' + i.toString() + '.pem'))) {
-                //                 name = name + '_' + i.toString();
-                //                 break;
-                //             }
-                //         }
-                //     }
-                    // logger.info(`Renamed ${path.basename(filename)} to ${name}.pem`)
-                    // await rename(filename, path.join(this._certificatesPath, name + '.pem'));
-
-                    // See if we have private key for this certificate
-                // }
                 // See if we have a private key for this certificate
                 let keys: (PrivateKeyRow & LokiObj)[] = this._privateKeys.chain().find({ pairSerial: null }).data();
 
@@ -1072,6 +1086,14 @@ export class WebServer {
         });
     }
 
+    /**
+     * Tries to add the key specified by the pem file to the database and file store.
+     * 
+     * @param filename - The path to the file containing the key's pem
+     * @param password - Optional password for encrypted keys
+     * 
+     * @returns OperationResultEx2 promise containing updated entries
+     */
     private async _tryAddKey(filename: string, password?: string): Promise<OperationResultEx2> {
         return new Promise<OperationResultEx2>(async (resolve, reject) => {
             logger.info(`Trying to add ${path.basename(filename)}`);
@@ -1242,17 +1264,6 @@ export class WebServer {
         return path.join(this._workPath, filename);
     }
 
-    // private async _getUnpairedKeyName(): Promise<string> {
-    //     return new Promise(async (resolve, _reject) => {
-    //         let newname = 'unknown_key_';
-    //         for (let i = 0; true; i++) {
-    //             if (!await exists(path.join(this._privatekeysPath, newname + i.toString() + '.pem'))) {
-    //                 resolve(newname + i.toString());
-    //             }
-    //         }
-    //     });
-    // }
-
     private async _findSigner(certificate: pki.Certificate): Promise<CertificateRow & LokiObj> {
         return new Promise<CertificateRow & LokiObj>(async(resolve, _reject) => {
             let caList = this._certificates.find({ 'type': { '$in': [ CertTypes.root, CertTypes.intermediate ] }});
@@ -1264,8 +1275,8 @@ export class WebServer {
                     }
                 }
                 catch (err) {
-                    logger.debug(err.message);
-                    // logger.debug('Not ' + caList[i].name);
+                    // TODO Make sure the error actually is from verify
+                    logger.debug(`Verify error? ${err.message}`);
                     // verify should return false but apparently throws an exception - do nothing
                 }
             }
