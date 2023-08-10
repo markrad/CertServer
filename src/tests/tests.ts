@@ -3,10 +3,11 @@ import path from 'path';
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import assert from 'node:assert';
 import http from 'http';
+import { pki } from 'node-forge';
 
 import WebSocket from 'ws';
 
-import { EventWaiter } from '../src/utility/eventWaiter';
+import { EventWaiter } from '../utility/eventWaiter';
 
 const testPath = path.join(__dirname, '../testdata');
 const testConfig = path.join(testPath, 'testconfig.yml');
@@ -73,7 +74,7 @@ var newInt = {
     intCommonName: 'intName',
     intValidFrom: new Date().toISOString(),
     intValidTo: then.toISOString(),
-    intSigner: 'someName',
+    intSigner: '1',
 }
 
 var newLeaf = {
@@ -85,7 +86,7 @@ var newLeaf = {
     leafCommonName: 'leafName',
     leafValidFrom: new Date().toISOString(),
     leafValidTo: then.toISOString(),
-    leafSigner: 'intName',
+    leafSigner: '2',
 }
 
 let stepNo = 0;
@@ -106,7 +107,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         // Create server
         step = _step('create server');
         let ew = new EventWaiter();
-        webServer = spawn('node', [ path.join(__dirname, '../src/index.js'), testConfig ]);
+        webServer = spawn('node', [ path.join(__dirname, '../index.js'), testConfig ]);
 
         webServer.on('error', (err) => console.log(`webserver failed: ${err}`));
         webServer.on('close', (code, signal) => console.log(`Server terminated = code=${code};signal=${signal}`));
@@ -147,7 +148,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         await ew.EventWait();
         ew.EventReset();
-        msg = JSON.parse(wsQueue.shift());
+        msg = JSON.parse(wsQueue.shift() as string);
         checkPacket(msg, 'someName/someName_key', 2, 0, 0);
         checkItems(msg.added, [{ type: 1, id: 1 }, { type: 4, id: 1 }]);
         // console.log(msg);
@@ -158,7 +159,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         await ew.EventWait();
         ew.EventReset();
-        msg = JSON.parse(wsQueue.shift());
+        msg = JSON.parse(wsQueue.shift() as string);
         checkPacket(msg, 'intName/intName_key', 2, 0, 0);
         checkItems(msg.added, [{ type: 2, id: 2 }, { type: 4, id: 2 }]);
         // console.log(msg);
@@ -169,7 +170,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         await ew.EventWait();
         ew.EventReset();
-        msg = JSON.parse(wsQueue.shift());
+        msg = JSON.parse(wsQueue.shift() as string);
         checkPacket(msg, 'leafName/leafName_key', 2, 0, 0);
         checkItems(msg.added, [{ type: 3, id: 3 }, { type: 4, id: 3 }]);
         // console.log(msg);
@@ -239,20 +240,30 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         res = await httpRequest('get', url + '/api/getcertificatepem?id=' + rootId.toString());
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         fs.writeFileSync(path.join(testPath, 'someName.pem'), res.body);
+        let rootcert = pki.certificateFromPem(res.body);
+        let rski = rootcert.getExtension('subjectKeyIdentifier');
+        console.log(JSON.stringify(rski, null, 4));
         console.log('passed');
         
         step = _step('get intermediate certificate file');
         res = await httpRequest('get', url + '/api/getcertificatepem?id=' + intId.toString());
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         fs.writeFileSync(path.join(testPath, 'intName.pem'), res.body);
+        let intermediatecert = pki.certificateFromPem(res.body);
+        let iski = intermediatecert.getExtension('subjectKeyIdentifier');
+        let iaki = intermediatecert.getExtension('authorityKeyIdentifier');
+        assert.equal((rski as any).value.slice(1), (iaki as any).value.slice(3), 'Authority key identifier does not match parent\'s subject key identifier');
         console.log('passed');
         
         step = _step('get leaf certificate file');
         res = await httpRequest('get', url + '/api/getcertificatepem?id=' + leafId.toString());
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         fs.writeFileSync(path.join(testPath, 'leafName.pem'), res.body);
+        let leafcert = pki.certificateFromPem(res.body);
+        let laki = leafcert.getExtension('authorityKeyIdentifier');
+        assert.equal((iski as any).value.slice(1), (laki as any).value.slice(3), 'Authority key identifier does not match parent\'s subject key identifier');
         console.log('passed');
-        
+
         step = _step('get intermediate key file');
         res = await httpRequest('get', url + '/api/getkeypem?id=2');
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
@@ -263,7 +274,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         await ew.EventWait();
         ew.EventReset();
-        msg = JSON.parse(wsQueue.shift());
+        msg = JSON.parse(wsQueue.shift() as string);
         checkPacket(msg, '', 0, 2, 1);
         checkItems(msg.updated, [{ type: 4, id: 1 }, { type: 2, id: 2 }]);
         checkItems(msg.deleted, [{ type: 1, id: 1 }]);
@@ -276,7 +287,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         await ew.EventWait();
         ew.EventReset();
-        msg = JSON.parse(wsQueue.shift());
+        msg = JSON.parse(wsQueue.shift() as string);
         checkPacket(msg, 'someName', 1, 2, 0);
         checkItems(msg.added, [{ type: 1, id: 4 }]);
         checkItems(msg.updated, [{ type: 2, id: 2 }, { type: 4, id: 1 }]);
@@ -287,7 +298,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         await ew.EventWait();
         ew.EventReset();
-        msg = JSON.parse(wsQueue.shift());
+        msg = JSON.parse(wsQueue.shift() as string);
         checkPacket(msg, '', 0, 1, 1);
         checkItems(msg.updated, [{ type: 2, id: 2 }]);
         checkItems(msg.deleted, [{ type: 4, id: 2 }]);
@@ -300,7 +311,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         await ew.EventWait();
         ew.EventReset();
-        msg = JSON.parse(wsQueue.shift());
+        msg = JSON.parse(wsQueue.shift() as string);
         checkPacket(msg, 'intName_key', 1, 1, 0);
         checkItems(msg.added, [{ type: 4, id: 4 }]);
         checkItems(msg.updated, [{ type: 2, id:2 }]);

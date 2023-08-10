@@ -498,7 +498,7 @@ export class WebServer {
                     new ExtensionBasicConstraints({ cA: true, critical: true }),
                     new ExtensionKeyUsage({ keyCertSign: true, cRLSign: true }),
                     // new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, keyIdentifier: true, serialNumber: ski['subjectKeyIdentifier'] }),
-                    new ExtensionAuthorityKeyIdentifier({ keyIdentifier: c.generateSubjectKeyIdentifier().getBytes() }),
+                    new ExtensionAuthorityKeyIdentifier({ keyIdentifier: c.generateSubjectKeyIdentifier().getBytes(), authorityCertSerialNumber: true }),
                     // new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, serialNumber: c.serialNumber }),
                     // new ExtensionAuthorityKeyIdentifier({ /*authorityCertIssuer: true, keyIdentifier: true,*/ serialNumber: ski['subjectKeyIdentifier'] }),
                     // new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, keyIdentifier: true, authorityCertSerialNumber: true }),
@@ -574,7 +574,7 @@ export class WebServer {
                         k = pki.privateKeyFromPem(fs.readFileSync(path.join(this._privatekeysPath, WebServer._getKeyFilenameFromRow(kRow)), { encoding: 'utf8' }));
                     }
                 }
-                const ski: any = c.getExtension({ name: 'subjectKeyIdentifier' });
+                // const ski: any = c.getExtension({ name: 'subjectKeyIdentifier' });
                 const { privateKey, publicKey } = pki.rsa.generateKeyPair(2048);
                 const attributes = WebServer._setAttributes(subject);
                 let sal:ExtensionSubjectAltNameOptions = { domains: [ subject.CN ] };
@@ -591,7 +591,8 @@ export class WebServer {
                     new ExtensionBasicConstraints({ cA: false }),
                     new ExtensionSubjectKeyIdentifier({ }),
                     new ExtensionKeyUsage({ nonRepudiation: true, digitalSignature: true, keyEncipherment: true }),
-                    new ExtensionAuthorityKeyIdentifier({ /*authorityCertIssuer: true, keyIdentifier: true,*/ serialNumber: ski['subjectKeyIdentifier'] }),
+                    // new ExtensionAuthorityKeyIdentifier({ /*authorityCertIssuer: true, keyIdentifier: true,*/ serialNumber: ski['subjectKeyIdentifier'] }),
+                    new ExtensionAuthorityKeyIdentifier({ keyIdentifier: c.generateSubjectKeyIdentifier().getBytes(), authorityCertSerialNumber: true }),
                     new ExtensionExtKeyUsage({ serverAuth: true, clientAuth: true,  }),
                     new ExtensionSubjectAltName(sal),
                 ];
@@ -1290,8 +1291,10 @@ export class WebServer {
             let signeeList = this._certificates.find({ 'type': { '$in': [ CertTypes.leaf, CertTypes.intermediate ] }});
             let retVal: { types: CertTypes[], updated: OperationResultItem[] } = { types: [], updated: [] };
             try {
-                signeeList.forEach(async (s) => {
+                for (const s of signeeList) {
+                // signeeList.forEach(async (s) => {
                     let check = await this._pkiCertFromPem(s);
+                    logger.debug(`Checking ${check.subject.getField('CN').value }`);
                     try {
                         if (certificate.verify(check)) {
                             // BUG I think there is a better way to do this
@@ -1303,11 +1306,15 @@ export class WebServer {
                             retVal.updated.push({ type: s.type, id: s.$loki });
                             // this._cache.markDirty(s.name);
                         }
+                        else {
+                            logger.debug(`Did not sign ${check.subject.getField('CN').value }`);
+                        }
                     }
-                    catch (_err) {
+                    catch (err) {
+                        logger.debug('Verify correct error: ' + err.message);
                         // verify should return false but appearently throws an exception - do nothing
                     }
-                });
+                }
                 resolve(retVal);
             }
             catch (err) {

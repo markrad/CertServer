@@ -21,7 +21,7 @@
         },
         {
             "name": "Test Suite",
-            "program": "${workspaceFolder}/output/tests/tests.js",
+            "program": "${workspaceFolder}/output/src/tests/tests.js",
             "request": "launch",
             "skipFiles": [
                 "<node_internals>/**"

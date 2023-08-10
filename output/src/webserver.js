@@ -408,7 +408,7 @@ class WebServer {
                         new ExtensionBasicConstraints_1.ExtensionBasicConstraints({ cA: true, critical: true }),
                         new ExtensionKeyUsage_1.ExtensionKeyUsage({ keyCertSign: true, cRLSign: true }),
                         // new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, keyIdentifier: true, serialNumber: ski['subjectKeyIdentifier'] }),
-                        new ExtensionAuthorityKeyIdentifier_1.ExtensionAuthorityKeyIdentifier({ keyIdentifier: c.generateSubjectKeyIdentifier().getBytes() }),
+                        new ExtensionAuthorityKeyIdentifier_1.ExtensionAuthorityKeyIdentifier({ keyIdentifier: c.generateSubjectKeyIdentifier().getBytes(), authorityCertSerialNumber: true }),
                         // new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, serialNumber: c.serialNumber }),
                         // new ExtensionAuthorityKeyIdentifier({ /*authorityCertIssuer: true, keyIdentifier: true,*/ serialNumber: ski['subjectKeyIdentifier'] }),
                         // new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, keyIdentifier: true, authorityCertSerialNumber: true }),
@@ -479,7 +479,7 @@ class WebServer {
                             k = node_forge_1.pki.privateKeyFromPem(fs_1.default.readFileSync(path_1.default.join(this._privatekeysPath, WebServer._getKeyFilenameFromRow(kRow)), { encoding: 'utf8' }));
                         }
                     }
-                    const ski = c.getExtension({ name: 'subjectKeyIdentifier' });
+                    // const ski: any = c.getExtension({ name: 'subjectKeyIdentifier' });
                     const { privateKey, publicKey } = node_forge_1.pki.rsa.generateKeyPair(2048);
                     const attributes = WebServer._setAttributes(subject);
                     let sal = { domains: [subject.CN] };
@@ -498,7 +498,8 @@ class WebServer {
                         new ExtensionBasicConstraints_1.ExtensionBasicConstraints({ cA: false }),
                         new ExtensionSubjectKeyIdentifier_1.ExtensionSubjectKeyIdentifier({}),
                         new ExtensionKeyUsage_1.ExtensionKeyUsage({ nonRepudiation: true, digitalSignature: true, keyEncipherment: true }),
-                        new ExtensionAuthorityKeyIdentifier_1.ExtensionAuthorityKeyIdentifier({ /*authorityCertIssuer: true, keyIdentifier: true,*/ serialNumber: ski['subjectKeyIdentifier'] }),
+                        // new ExtensionAuthorityKeyIdentifier({ /*authorityCertIssuer: true, keyIdentifier: true,*/ serialNumber: ski['subjectKeyIdentifier'] }),
+                        new ExtensionAuthorityKeyIdentifier_1.ExtensionAuthorityKeyIdentifier({ keyIdentifier: c.generateSubjectKeyIdentifier().getBytes(), authorityCertSerialNumber: true }),
                         new ExtensionExtKeyUsage_1.ExtensionExtKeyUsage({ serverAuth: true, clientAuth: true, }),
                         new ExtensionSubjectAltName_1.ExtensionSubjectAltName(sal),
                     ];
@@ -1149,8 +1150,10 @@ class WebServer {
                 let signeeList = this._certificates.find({ 'type': { '$in': [CertTypes.leaf, CertTypes.intermediate] } });
                 let retVal = { types: [], updated: [] };
                 try {
-                    signeeList.forEach((s) => __awaiter(this, void 0, void 0, function* () {
+                    for (const s of signeeList) {
+                        // signeeList.forEach(async (s) => {
                         let check = yield this._pkiCertFromPem(s);
+                        logger.debug(`Checking ${check.subject.getField('CN').value}`);
                         try {
                             if (certificate.verify(check)) {
                                 // BUG I think there is a better way to do this
@@ -1162,11 +1165,15 @@ class WebServer {
                                 retVal.updated.push({ type: s.type, id: s.$loki });
                                 // this._cache.markDirty(s.name);
                             }
+                            else {
+                                logger.debug(`Did not sign ${check.subject.getField('CN').value}`);
+                            }
                         }
-                        catch (_err) {
+                        catch (err) {
+                            logger.debug('Verify correct error: ' + err.message);
                             // verify should return false but appearently throws an exception - do nothing
                         }
-                    }));
+                    }
                     resolve(retVal);
                 }
                 catch (err) {
