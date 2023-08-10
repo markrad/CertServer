@@ -3,7 +3,7 @@ services:
   certserver:
     container_name: certserver 
     restart: unless-stopped
-    image: certserver:1.2.1
+    image: certserver:1.2.2
     volumes:
       - /home/markrad/source/CertServer/docker/sampledirs/config:/config
       - /home/markrad/source/CertServer/docker/sampledirs/data:/data
