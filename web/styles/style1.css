@@ -255,3 +255,8 @@ button.button2Red:hover {
     border-width: 0px;
     outline: none;
 }
+
+#keyPasswordLabel {
+    padding-left: 6pt;
+    padding-right: 3pt;
+}

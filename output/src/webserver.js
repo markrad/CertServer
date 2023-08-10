@@ -975,6 +975,7 @@ class WebServer {
     _tryAddKey(filename, password) {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+                // TODO Figure out how to check if this key has already been uploaded
                 logger.info(`Trying to add ${path_1.default.basename(filename)}`);
                 if (!(yield (0, exists_1.exists)(filename))) {
                     reject(new CertError(404, `${path_1.default.basename(filename)} does not exist`));

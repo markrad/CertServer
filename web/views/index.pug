@@ -452,8 +452,10 @@ block layout-content
           data.append('keyFile', files[0].files[i]);
         }
 
+        let url = '/uploadKey' + ($('#keyPasswordValue').val() == ''? '' : `?password=${$('#keyPasswordValue').val()}`);
+
         var request = $.ajax({
-          url: '/uploadKey',
+          url: url,
           method: 'POST',
           processData: false,
           contentType: false,
@@ -849,6 +851,8 @@ block layout-content
         div.SubmitButton
           input#fileKeyReset(type="reset")
           button#uploadKeyButton.SubmitButton(type="button", onClick="uploadKey()" title="submit", value="Upload") Upload
+          label#keyPasswordLabel(for='Optional Key Password') Optional Key Password:
+          input#keyPasswordValue(type='text' name='keyPasswordValue' value='' class='text ui-widget-content ui-corner-all')
     form.slideForm#generateCertForm(action="/createCACert", method="post", encType="application/x-www-form-urlencoded") This will generate a private key and self-signed root CA pair
       .Country 
         span.SubjectTitle

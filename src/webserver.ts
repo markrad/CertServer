@@ -1097,6 +1097,7 @@ export class WebServer {
      */
     private async _tryAddKey(filename: string, password?: string): Promise<OperationResultEx2> {
         return new Promise<OperationResultEx2>(async (resolve, reject) => {
+            // TODO Figure out how to check if this key has already been uploaded
             logger.info(`Trying to add ${path.basename(filename)}`);
             if (!await exists(filename)) {
                 reject(new CertError(404, `${path.basename(filename)} does not exist`));
