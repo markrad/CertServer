@@ -209,6 +209,19 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         let leafId = res.body.files[0].id;
         console.log('passed');
 
+        step = _step('get key list');
+        res = await httpRequest('get', url + '/api/keylist');
+        assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body}`);
+        assert.notEqual(res.body.files, null, 'Did not receive the files element');
+        assert.equal(res.body.files.length, 3, `Files element is expected to be length 1 but received ${res.body.files.length}`);
+        let names = [ [ 'intName_key', 2 ], [ 'leafName_key', 3 ], [ 'someName_key', 1]  ];
+        for (let i = 0; i < names.length; i++) {
+            assert.equal(res.body.files[i].name, names[i][0], `File has incorrect name ${res.body.files[i].name}`)
+            assert.equal(res.body.files[i].type, 'key', `File has incorrect type ${res.body.files[i].type}`);
+            assert.equal(res.body.files[i].id, names[i][1], `File has incorrect id ${res.body.files[i].id}`);
+        }
+        console.log('passed');
+
         step = _step('get certificate details by id');
         res = await httpRequest('get', url + '/certdetails?id=3');
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
