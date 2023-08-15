@@ -544,7 +544,8 @@ class WebServer {
                 }
             }));
             this._app.get('/api/keyList', (request, _response, next) => {
-                request.url = '/api/certList?type=key';
+                request.url = '/api/certList';
+                request.query = { type: 'key' };
                 next();
             });
             this._app.get('/api/certList', (request, response) => {
