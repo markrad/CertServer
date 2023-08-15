@@ -6,8 +6,8 @@ certServer:
   certificate: ''         # If both this and the key are provided the server will start in https
   key: ''                 # See above
   subject:                # Certificate subject defaults
-    C: Country
-    ST: State
+    C: USA
+    ST: Washington
     L: Redmond
     O: None
     OU: None
