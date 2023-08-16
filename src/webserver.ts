@@ -131,6 +131,9 @@ type OperationResultEx2 = {
     deleted: OperationResultItem[],
 }
 
+type QueryType = {
+} & ({ name: string} | { id: string });
+
 class CertError extends Error {
     public status: number;
     constructor(status: number, message: string) {
@@ -260,7 +263,7 @@ export class WebServer {
         this._app.use(serveFavicon(path.join(__dirname, "../../web/icons/doc_lock.ico"), { maxAge: 2592000000 }));
         this._app.use(Express.text({ type: 'text/plain' }));
         this._app.use(Express.text({ type: 'application/x-www-form-urlencoded' }));
-        this._app.use(Express.text({ type: 'application/json' }))
+        this._app.use(Express.text({ type: 'application/json' }));
         this._app.use('/scripts', Express.static(path.join(__dirname, '../../web/scripts')));
         this._app.use('/styles', Express.static(path.join(__dirname, '../../web/styles')));
         this._app.use('/icons', Express.static(path.join(__dirname, '../../web/icons')));
@@ -329,7 +332,7 @@ export class WebServer {
         });
         this._app.get('/certDetails', async (request, response) => {
             try {
-                let c = this._resolveCertificateQuery(request.query);
+                let c = this._resolveCertificateQuery(request.query as QueryType);
                 let retVal: CertificateBrief = this._getCertificateBrief(c as CertificateRow & LokiObj);
                 response.status(200).json(retVal);
             }
@@ -384,15 +387,15 @@ export class WebServer {
             try {
                 logger.debug(request.body);
                 let body = typeof request.body == 'string'? JSON.parse(request.body) : request.body;
-                let validFrom: Date = body.caValidFrom? new Date(body.caValidFrom) : new Date();
-                let validTo: Date = body.caValidTo? new Date(body.caValidTo) : null;
+                let validFrom: Date = body.validFrom? new Date(body.validFrom) : new Date();
+                let validTo: Date = body.validTo? new Date(body.validTo) : null;
                 let subject: CertificateSubject = {
-                    C: body.caCountry,
-                    ST: body.caState,
-                    L: body.caLocation,
-                    O: body.caOrganization,
-                    OU: body.caUnit,
-                    CN: body.caCommonName
+                    C: body.country,
+                    ST: body.state,
+                    L: body.location,
+                    O: body.organization,
+                    OU: body.unit,
+                    CN: body.commonName
                 };
                 let errString = '';
 
@@ -446,33 +449,33 @@ export class WebServer {
             try {
                 logger.debug(request.body);
                 let body = typeof request.body == 'string'? JSON.parse(request.body) : request.body;
-                let validFrom: Date = body.intValidFrom? new Date(body.intValidFrom) : new Date();
-                let validTo: Date = body.intValidTo? new Date(body.intValidTo) : null;
+                let validFrom: Date = body.validFrom? new Date(body.validFrom) : new Date();
+                let validTo: Date = body.validTo? new Date(body.validTo) : null;
                 let subject: CertificateSubject = {
-                    C: body.intCountry,
-                    ST: body.intState,
-                    L: body.intLocation,
-                    O: body.intOrganization,
-                    OU: body.intUnit,
-                    CN: body.intCommonName
+                    C: body.country,
+                    ST: body.state,
+                    L: body.location,
+                    O: body.organization,
+                    OU: body.unit,
+                    CN: body.commonName
                 };
                 let errString = '';
 
                 if (!subject.CN) errString += 'Common name is required\n';
                 if (!validTo) errString += 'Valid to is required\n';
-                if (!body.intSigner) errString += 'Signing certificate is required';
+                if (!body.signer) errString += 'Signing certificate is required';
                 if (errString) {
-                    return response.status(400).json({ message: errString })
+                    return response.status(400).json({ error: errString })
                 }
 // TODO Certificate creation names should not be specific to the type of certificate ie use signer not intSigner
-                const cRow = this._certificates.findOne({ $loki: parseInt(body.intSigner) });
+                const cRow = this._certificates.findOne({ $loki: parseInt(body.signer) });
                 const kRow = this._privateKeys.findOne({ pairSerial: cRow.serialNumber });
 
                 if (!cRow) {
-                    return response.status(404).json({ message: 'Could not find signing certificate'});
+                    return response.status(404).json({ error: 'Could not find signing certificate'});
                 }
                 if (!kRow) {
-                    return response.status(404).json({ message: 'Could not find signing certificate\'s private key'});
+                    return response.status(404).json({ error: 'Could not find signing certificate\'s private key'});
                 }
 
                 const c = await this._pkiCertFromPem(cRow);
@@ -538,29 +541,30 @@ export class WebServer {
             try {
                 logger.debug(request.body);
                 let body = typeof request.body == 'string'? JSON.parse(request.body) : request.body;
-                let validFrom: Date = body.leafValidFrom? new Date(body.leafValidFrom) : new Date();
-                let validTo: Date = body.leafValidTo? new Date(body.leafValidTo) : null;
+                let validFrom: Date = body.validFrom? new Date(body.validFrom) : new Date();
+                let validTo: Date = body.validTo? new Date(body.validTo) : null;
                 let subject: CertificateSubject = {
-                    C: body.leafCountry,
-                    ST: body.leafState,
-                    L: body.leafLocation,
-                    O: body.leafOrganization,
-                    OU: body.leafUnit,
-                    CN: body.leafCommonName
+                    C: body.country,
+                    ST: body.state,
+                    L: body.location,
+                    O: body.organization,
+                    OU: body.unit,
+                    CN: body.commonName
                 };
                 let errString = '';
 
                 if (!subject.CN) errString += 'Common name is required\n';
                 if (!validTo) errString += 'Valid to is required\n';
+                if (!body.signer) errString += 'Signing certificate is required\n';
                 if (errString) {
-                    return response.status(400).json({ message: errString })
+                    return response.status(400).json({ error: errString })
                 }
 
-                const cRow = this._certificates.findOne({ $loki: parseInt(body.leafSigner) });
+                const cRow = this._certificates.findOne({ $loki: parseInt(body.signer) });
                 const kRow = this._privateKeys.findOne({ pairSerial: cRow.serialNumber });
 
                 if (!cRow || !kRow) {
-                    return response.status(500).json({ message: 'Unexpected database corruption - rows missing'});
+                    return response.status(500).json({ error: 'Unexpected database corruption - rows missing'});
                 }
 
                 const c = pki.certificateFromPem(fs.readFileSync(path.join(this._certificatesPath, WebServer._getCertificateFilenameFromRow(cRow)), { encoding: 'utf8' }));
@@ -631,7 +635,7 @@ export class WebServer {
         });
         this._app.get('/api/certName', async(request, response) => {
             try {
-                let c = this._resolveCertificateQuery(request.query);
+                let c = this._resolveCertificateQuery(request.query as QueryType);
                 response.status(200).json({ 'name': c.name });
             }
             catch (err) {
@@ -666,7 +670,7 @@ export class WebServer {
         });
         this._app.get('/api/getCertificatePem', async (request, response) => {
             try {
-                let c = this._resolveCertificateQuery(request.query);
+                let c = this._resolveCertificateQuery(request.query as QueryType);
 
                 response.download(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(c)), c.name + '.pem', (err) => {
                     if (err) {
@@ -679,23 +683,26 @@ export class WebServer {
                 return response.status(err.status?? 500).json({ error: err.message });
             }
         });
-        this._app.post('/api/uploadCert', async (request, response) => {
+        this._app.post('/api/uploadCert', async (request: any, response) => {
+            if (request.headers['content-type'] != 'text/plain') {
+                return response.status(400).json({ error: 'Content-Encoding must be text/plain' });
+            }
             if (!(request.body as string).includes('\n')) {
-                return response.status(400).send('Certificate must be in standard 64 byte line length format - try --data-binary with curl');
+                return response.status(400).json({ error: 'Certificate must be in standard 64 byte line length format - try --data-binary with curl' });
             }
             try {
                 await writeFile(path.join(this._workPath, 'upload.pem'), request.body, { encoding: 'utf8' });
                 let result: OperationResultEx2 = await this._tryAddCertificate(this._getWorkDir('upload.pem'));
                 this._broadcast(result);
-                return response.status(200).json({ message: `Certificate ${result.name} added`, types: result.types.map((t) => CertTypes[t]).join(';') });
+                return response.status(200).json({ message: `Certificate ${result.name} added`, type: result.types.map((t) => CertTypes[t]).join(';') });
             }
             catch (err) {
-                response.status(500).json({ error: err.message });
+                response.status(err.status?? 500).json({ error: err.message });
             }
         });
         this._app.delete('/api/deleteCert', async (request, response) => {
             try {
-                let c = this._resolveCertificateQuery(request.query);
+                let c = this._resolveCertificateQuery(request.query as QueryType);
                 let result: OperationResultEx2 = await this._tryDeleteCert(c);
                 this._broadcast(result);
                 return response.status(200).json({ message: `Certificate ${result.name} deleted` , types: result.types.map((t) => CertTypes[t]).join(';') });
@@ -715,8 +722,9 @@ export class WebServer {
         });
         this._app.post('/api/uploadKey', async (request, response) => {
             try {
-                if (typeof request.body != 'string') {
-                    return response.status(400).send('Content type must be text/plain');
+                // if (typeof request.body != 'string') {
+                if (request.headers['content-type'] != 'text/plain') {
+                        return response.status(400).send('Content type must be text/plain');
                 }
                 if (!(request.body as string).includes('\n')) {
                     return response.status(400).send('Key must be in standard 64 byte line length format - try --data-binary with curl');
@@ -727,7 +735,7 @@ export class WebServer {
                 return response.status(200).json({ message: `Key ${result.name} added`, type: result.types.map((t) => CertTypes[t]).join(';')});
             }
             catch (err) {
-                response.status(500).send(err.message);
+                response.status(500).json({ error: err.message });
             }
         });
         this._app.delete('/api/deleteKey', async (request, response) => {
@@ -758,7 +766,7 @@ export class WebServer {
         });
         this._app.get('/api/chaindownload', async (request, response) => {
             try {
-                let c = this._resolveCertificateQuery(request.query);
+                let c = this._resolveCertificateQuery(request.query as QueryType);
                 let filename = await this._getChain(c);
                 response.download(filename, `${c.name}_full_chain.pem`, async (err) => {
                     if (err) {
@@ -1113,6 +1121,7 @@ export class WebServer {
                     deleted: [],
                 };
 
+                result.types.push(CertTypes.key);
                 let k: pki.rsa.PrivateKey;
                 let kpem = await readFile(filename, { encoding: 'utf8' });
                 let msg = pem.decode(kpem)[0];
@@ -1340,16 +1349,22 @@ export class WebServer {
             });
         });
     }
-
-    private _resolveCertificateQuery(query: any): CertificateRow & LokiObj {
+    /**
+     * 
+     * @param query Either { name: \<string> } or { id: \<string> }
+     * @returns Array of CertificateRow objects that match the query
+     */
+    private _resolveCertificateQuery(query: QueryType): CertificateRow & LokiObj {
         let c: (CertificateRow & LokiObj)[];
-        let selector: any;
+        // let selector: any;
 
-        if (query.name && query.id) throw new CertError(422, 'Name and id are mutually exclusive');
-        if (!query.name && !query.id) throw new CertError(400, 'Name or id must be specified');
+        if ('name' in query && 'id' in query) throw new CertError(422, 'Name and id are mutually exclusive');
+        // if (query.name && query.id) throw new CertError(422, 'Name and id are mutually exclusive');
+        if (!('name' in query) && !('id' in query)) throw new CertError(400, 'Name or id must be specified');
         
-        if (query.name) selector = { name: query.name as string };
-        else if (query.id) selector = { $loki: parseInt(query.id as string)};
+        let selector = ('name' in query)? { name: query.name as string } : { $loki: parseInt(query.id as string)};
+        // if (query.name) selector = { name: query.name as string };
+        // else if (query.id) selector = { $loki: parseInt(query.id as string)};
 
         c = this._certificates.find(selector);
 

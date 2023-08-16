@@ -301,15 +301,15 @@ class WebServer {
                 try {
                     logger.debug(request.body);
                     let body = typeof request.body == 'string' ? JSON.parse(request.body) : request.body;
-                    let validFrom = body.caValidFrom ? new Date(body.caValidFrom) : new Date();
-                    let validTo = body.caValidTo ? new Date(body.caValidTo) : null;
+                    let validFrom = body.validFrom ? new Date(body.validFrom) : new Date();
+                    let validTo = body.validTo ? new Date(body.validTo) : null;
                     let subject = {
-                        C: body.caCountry,
-                        ST: body.caState,
-                        L: body.caLocation,
-                        O: body.caOrganization,
-                        OU: body.caUnit,
-                        CN: body.caCommonName
+                        C: body.country,
+                        ST: body.state,
+                        L: body.location,
+                        O: body.organization,
+                        OU: body.unit,
+                        CN: body.commonName
                     };
                     let errString = '';
                     if (!subject.CN)
@@ -359,34 +359,34 @@ class WebServer {
                 try {
                     logger.debug(request.body);
                     let body = typeof request.body == 'string' ? JSON.parse(request.body) : request.body;
-                    let validFrom = body.intValidFrom ? new Date(body.intValidFrom) : new Date();
-                    let validTo = body.intValidTo ? new Date(body.intValidTo) : null;
+                    let validFrom = body.validFrom ? new Date(body.validFrom) : new Date();
+                    let validTo = body.validTo ? new Date(body.validTo) : null;
                     let subject = {
-                        C: body.intCountry,
-                        ST: body.intState,
-                        L: body.intLocation,
-                        O: body.intOrganization,
-                        OU: body.intUnit,
-                        CN: body.intCommonName
+                        C: body.country,
+                        ST: body.state,
+                        L: body.location,
+                        O: body.organization,
+                        OU: body.unit,
+                        CN: body.commonName
                     };
                     let errString = '';
                     if (!subject.CN)
                         errString += 'Common name is required\n';
                     if (!validTo)
                         errString += 'Valid to is required\n';
-                    if (!body.intSigner)
+                    if (!body.signer)
                         errString += 'Signing certificate is required';
                     if (errString) {
-                        return response.status(400).json({ message: errString });
+                        return response.status(400).json({ error: errString });
                     }
                     // TODO Certificate creation names should not be specific to the type of certificate ie use signer not intSigner
-                    const cRow = this._certificates.findOne({ $loki: parseInt(body.intSigner) });
+                    const cRow = this._certificates.findOne({ $loki: parseInt(body.signer) });
                     const kRow = this._privateKeys.findOne({ pairSerial: cRow.serialNumber });
                     if (!cRow) {
-                        return response.status(404).json({ message: 'Could not find signing certificate' });
+                        return response.status(404).json({ error: 'Could not find signing certificate' });
                     }
                     if (!kRow) {
-                        return response.status(404).json({ message: 'Could not find signing certificate\'s private key' });
+                        return response.status(404).json({ error: 'Could not find signing certificate\'s private key' });
                     }
                     const c = yield this._pkiCertFromPem(cRow);
                     // const c = pki.certificateFromPem(fs.readFileSync(path.join(this._certificatesPath, WebServer._getCertificateFilenameFromRow(cRow)), { encoding: 'utf8' }));
@@ -446,28 +446,30 @@ class WebServer {
                 try {
                     logger.debug(request.body);
                     let body = typeof request.body == 'string' ? JSON.parse(request.body) : request.body;
-                    let validFrom = body.leafValidFrom ? new Date(body.leafValidFrom) : new Date();
-                    let validTo = body.leafValidTo ? new Date(body.leafValidTo) : null;
+                    let validFrom = body.validFrom ? new Date(body.validFrom) : new Date();
+                    let validTo = body.validTo ? new Date(body.validTo) : null;
                     let subject = {
-                        C: body.leafCountry,
-                        ST: body.leafState,
-                        L: body.leafLocation,
-                        O: body.leafOrganization,
-                        OU: body.leafUnit,
-                        CN: body.leafCommonName
+                        C: body.country,
+                        ST: body.state,
+                        L: body.location,
+                        O: body.organization,
+                        OU: body.unit,
+                        CN: body.commonName
                     };
                     let errString = '';
                     if (!subject.CN)
                         errString += 'Common name is required\n';
                     if (!validTo)
                         errString += 'Valid to is required\n';
+                    if (!body.signer)
+                        errString += 'Signing certificate is required\n';
                     if (errString) {
-                        return response.status(400).json({ message: errString });
+                        return response.status(400).json({ error: errString });
                     }
-                    const cRow = this._certificates.findOne({ $loki: parseInt(body.leafSigner) });
+                    const cRow = this._certificates.findOne({ $loki: parseInt(body.signer) });
                     const kRow = this._privateKeys.findOne({ pairSerial: cRow.serialNumber });
                     if (!cRow || !kRow) {
-                        return response.status(500).json({ message: 'Unexpected database corruption - rows missing' });
+                        return response.status(500).json({ error: 'Unexpected database corruption - rows missing' });
                     }
                     const c = node_forge_1.pki.certificateFromPem(fs_1.default.readFileSync(path_1.default.join(this._certificatesPath, WebServer._getCertificateFilenameFromRow(cRow)), { encoding: 'utf8' }));
                     let k;
@@ -584,21 +586,25 @@ class WebServer {
                 }
             }));
             this._app.post('/api/uploadCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
+                var _e;
+                if (request.headers['content-type'] != 'text/plain') {
+                    return response.status(400).json({ error: 'Content-Encoding must be text/plain' });
+                }
                 if (!request.body.includes('\n')) {
-                    return response.status(400).send('Certificate must be in standard 64 byte line length format - try --data-binary with curl');
+                    return response.status(400).json({ error: 'Certificate must be in standard 64 byte line length format - try --data-binary with curl' });
                 }
                 try {
                     yield (0, promises_1.writeFile)(path_1.default.join(this._workPath, 'upload.pem'), request.body, { encoding: 'utf8' });
                     let result = yield this._tryAddCertificate(this._getWorkDir('upload.pem'));
                     this._broadcast(result);
-                    return response.status(200).json({ message: `Certificate ${result.name} added`, types: result.types.map((t) => CertTypes[t]).join(';') });
+                    return response.status(200).json({ message: `Certificate ${result.name} added`, type: result.types.map((t) => CertTypes[t]).join(';') });
                 }
                 catch (err) {
-                    response.status(500).json({ error: err.message });
+                    response.status((_e = err.status) !== null && _e !== void 0 ? _e : 500).json({ error: err.message });
                 }
             }));
             this._app.delete('/api/deleteCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _e;
+                var _f;
                 try {
                     let c = this._resolveCertificateQuery(request.query);
                     let result = yield this._tryDeleteCert(c);
@@ -606,22 +612,23 @@ class WebServer {
                     return response.status(200).json({ message: `Certificate ${result.name} deleted`, types: result.types.map((t) => CertTypes[t]).join(';') });
                 }
                 catch (err) {
-                    return response.status((_e = err.status) !== null && _e !== void 0 ? _e : 500).json(JSON.stringify({ error: err.message }));
+                    return response.status((_f = err.status) !== null && _f !== void 0 ? _f : 500).json(JSON.stringify({ error: err.message }));
                 }
             }));
             this._app.get('/api/keyname', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _f;
+                var _g;
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     response.status(200).json({ 'name': k.name });
                 }
                 catch (err) {
-                    response.status((_f = err.status) !== null && _f !== void 0 ? _f : 500).json({ error: err.message });
+                    response.status((_g = err.status) !== null && _g !== void 0 ? _g : 500).json({ error: err.message });
                 }
             }));
             this._app.post('/api/uploadKey', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
-                    if (typeof request.body != 'string') {
+                    // if (typeof request.body != 'string') {
+                    if (request.headers['content-type'] != 'text/plain') {
                         return response.status(400).send('Content type must be text/plain');
                     }
                     if (!request.body.includes('\n')) {
@@ -633,11 +640,11 @@ class WebServer {
                     return response.status(200).json({ message: `Key ${result.name} added`, type: result.types.map((t) => CertTypes[t]).join(';') });
                 }
                 catch (err) {
-                    response.status(500).send(err.message);
+                    response.status(500).json({ error: err.message });
                 }
             }));
             this._app.delete('/api/deleteKey', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _g;
+                var _h;
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     let result = yield this._tryDeleteKey(k);
@@ -645,11 +652,11 @@ class WebServer {
                     return response.status(200).json({ message: `Key ${result.name} deleted`, types: result.types.map((t) => CertTypes[t]).join(';') });
                 }
                 catch (err) {
-                    return response.status((_g = err.status) !== null && _g !== void 0 ? _g : 500).json({ error: err.message });
+                    return response.status((_h = err.status) !== null && _h !== void 0 ? _h : 500).json({ error: err.message });
                 }
             }));
             this._app.get('/api/getKeyPem', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _h;
+                var _j;
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     response.download(this._getKeysDir(WebServer._getKeyFilenameFromRow(k)), k.name + '.pem', (err) => {
@@ -660,11 +667,11 @@ class WebServer {
                 }
                 catch (err) {
                     logger.error('Key download failed: ', err.message);
-                    return response.status((_h = err.status) !== null && _h !== void 0 ? _h : 500).json({ error: err.message });
+                    return response.status((_j = err.status) !== null && _j !== void 0 ? _j : 500).json({ error: err.message });
                 }
             }));
             this._app.get('/api/chaindownload', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _j;
+                var _k;
                 try {
                     let c = this._resolveCertificateQuery(request.query);
                     let filename = yield this._getChain(c);
@@ -677,7 +684,7 @@ class WebServer {
                 }
                 catch (err) {
                     logger.error('Chain download failed: ' + err.message);
-                    return response.status((_j = err.status) !== null && _j !== void 0 ? _j : 500).json({ error: err.message });
+                    return response.status((_k = err.status) !== null && _k !== void 0 ? _k : 500).json({ error: err.message });
                 }
             }));
             let server;
@@ -989,6 +996,7 @@ class WebServer {
                         updated: [],
                         deleted: [],
                     };
+                    result.types.push(CertTypes.key);
                     let k;
                     let kpem = yield (0, promises_1.readFile)(filename, { encoding: 'utf8' });
                     let msg = node_forge_1.pem.decode(kpem)[0];
@@ -1198,17 +1206,22 @@ class WebServer {
             });
         });
     }
+    /**
+     *
+     * @param query Either { name: \<string> } or { id: \<string> }
+     * @returns Array of CertificateRow objects that match the query
+     */
     _resolveCertificateQuery(query) {
         let c;
-        let selector;
-        if (query.name && query.id)
+        // let selector: any;
+        if ('name' in query && 'id' in query)
             throw new CertError(422, 'Name and id are mutually exclusive');
-        if (!query.name && !query.id)
+        // if (query.name && query.id) throw new CertError(422, 'Name and id are mutually exclusive');
+        if (!('name' in query) && !('id' in query))
             throw new CertError(400, 'Name or id must be specified');
-        if (query.name)
-            selector = { name: query.name };
-        else if (query.id)
-            selector = { $loki: parseInt(query.id) };
+        let selector = ('name' in query) ? { name: query.name } : { $loki: parseInt(query.id) };
+        // if (query.name) selector = { name: query.name as string };
+        // else if (query.id) selector = { $loki: parseInt(query.id as string)};
         c = this._certificates.find(selector);
         if (c.length == 0) {
             throw new CertError(404, `No certificate for ${JSON.stringify(query)} found`);

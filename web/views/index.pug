@@ -771,24 +771,24 @@ block layout-content
    form#newIntermediateForm(action="/createIntermediateCert", method="post", encType="application/x-www-form-urlencoded")
     fieldset
       label.modalLabel(for="Password") Password (if key is encrypted):
-      input(type='password' name='intPassword' id='intPassword' value='' class='text ui-widget-content ui-corner-all')
+      input(type='password' name='password' id='intPassword' value='' class='text ui-widget-content ui-corner-all')
       label.modalLabel(for='Country') Country: 
-      input(type='text' name='intCountry' id='intermediateC' value=C class='text ui-widget-content ui-corner-all')
+      input(type='text' name='country' id='intermediateC' value=C class='text ui-widget-content ui-corner-all')
       label.modalLabel(for='State' styles { float: left; }) State:
-      input(type='text' name='intState' id='intermediateST' value=ST class='text ui-widget-content ui-corner-all')
+      input(type='text' name='state' id='intermediateST' value=ST class='text ui-widget-content ui-corner-all')
       label.modalLabel(for='Location') Location:
-      input(type='text' name='intLocation' id='intermediateL' value=L class='text ui-widget-content ui-corner-all')
+      input(type='text' name='location' id='intermediateL' value=L class='text ui-widget-content ui-corner-all')
       label.modalLabel(for='Organization') Organization:
-      input(type='text' name='intOrganization' id='intermediateO' value=O class='text ui-widget-content ui-corner-all')
+      input(type='text' name='organization' id='intermediateO' value=O class='text ui-widget-content ui-corner-all')
       label.modalLabel(for='Unit') Unit:
-      input(type='text' name='intUnit' id='intermediateOU' value=OU class='text ui-widget-content ui-corner-all')
+      input(type='text' name='unit' id='intermediateOU' value=OU class='text ui-widget-content ui-corner-all')
       label.modalLabel(for='Common Name') Common Name:
-      input(type='text' name='intCommonName' id='intermediateCN' value='' class='text ui-widget-content ui-corner-all')
+      input(type='text' name='commonName' id='intermediateCN' value='' class='text ui-widget-content ui-corner-all')
       label.modalLabel(for='Valid From') Valid from:
-      input#IntermediateValidFrom(type='text' name='intValidFrom')
+      input#IntermediateValidFrom(type='text' name='validFrom')
       label.modalLabel(for='Valid To') Valid to:
-      input#IntermediateValidTo(type='text' name='intValidTo')
-      input#intermediateSigner(type='text' name='intSigner' value='' class='hidden')
+      input#IntermediateValidTo(type='text' name='validTo')
+      input#intermediateSigner(type='text' name='signer' value='' class='hidden')
       div.intButtons
         input.button2#generateIntermediateReset(type="reset", value="Reset" title="Reset")
         input.button2#generateIntermediateButton.SubmitButton(type="submit" title="submit", value="Generate")
@@ -796,19 +796,19 @@ block layout-content
    form#newLeafForm(action="/createLeafCert", method="post", encType="application/x-www-form-urlencoded")
     fieldset
       label.modalLabel(for="Password") Password (if key is encrypted):
-      input(type='password' name='leafPassword' id='leafPassword' value='' class='text ui-widget-content ui-corner-all')
+      input(type='password' name='password' id='leafPassword' value='' class='text ui-widget-content ui-corner-all')
       label.modalLabel(for='Country') Country: 
-      input(type='text' name='leafCountry' id='leafC' value=C class='text ui-widget-content ui-corner-all')
+      input(type='text' name='country' id='leafC' value=C class='text ui-widget-content ui-corner-all')
       label.modalLabel(for='State' styles { float: left; }) State:
-      input(type='text' name='leafState' title='State' id='leafST' value=ST class='text ui-widget-content ui-corner-all')
+      input(type='text' name='state' title='State' id='leafST' value=ST class='text ui-widget-content ui-corner-all')
       label.modalLabel(for='Location') Location:
-      input(type='text' name='leafLocation' id='leafL' value=L class='text ui-widget-content ui-corner-all')
+      input(type='text' name='location' id='leafL' value=L class='text ui-widget-content ui-corner-all')
       label.modalLabel(for='Organization') Organization:
-      input(type='text' name='leafOrganization' id='leafO' value=O class='text ui-widget-content ui-corner-all')
+      input(type='text' name='organization' id='leafO' value=O class='text ui-widget-content ui-corner-all')
       label.modalLabel(for='Unit') Unit:
-      input(type='text' name='leafUnit' id='leafOU' value=OU class='text ui-widget-content ui-corner-all')
+      input(type='text' name='unit' id='leafOU' value=OU class='text ui-widget-content ui-corner-all')
       label.modalLabel(for='Common Name') Common Name:
-      input(type='text' name='leafCommonName' id='leafCN' value='' class='text ui-widget-content ui-corner-all')
+      input(type='text' name='commonName' id='leafCN' value='' class='text ui-widget-content ui-corner-all')
       label.modalLabel(for='SANs') SANs
       div#SANList
       div#SANInput
@@ -818,10 +818,10 @@ block layout-content
         input.SANValue(type='text')
         input.SANEnter(name='SanEnter' type='button' value='✔' onClick='AddSAN()')
       label.modalLabel(for='Valid From') Valid from:
-      input#LeafValidFrom(type='text' name='leafValidFrom')
+      input#LeafValidFrom(type='text' name='validFrom')
       label.modalLabel(for='Valid To') Valid to:
-      input#LeafValidTo(type='text' name='leafValidTo')
-      input#leafSigner(type='text' name='leafSigner' value='' class='hidden')
+      input#LeafValidTo(type='text' name='validTo')
+      input#leafSigner(type='text' name='signer' value='' class='hidden')
       div.intButtons
         //- input.button2#generateLeafReset(type="reset", value="Reset" title="Reset")
         input.button2#generateLeafReset(type="button", value="Reset" title="Reset" onClick="resetLeafForm()")
@@ -858,42 +858,42 @@ block layout-content
         span.SubjectTitle
           | Country:
         span.SubjectValue 
-          input(type="text", name="caCountry" value=C title="country")
+          input(type="text", name="country" value=C title="country")
       .State
         span.SubjectTitle
           | State:
         span.SubjectValue 
-          input(type="text", name="caState" value=ST)
+          input(type="text", name="state" value=ST)
       .Location
         span.SubjectTitle
           | Location:
         span.SubjectValue 
-          input(type="text", name="caLocation" value=L)
+          input(type="text", name="location" value=L)
       .Organization 
         span.SubjectTitle
           | Organization 
         span.SubjectValue 
-          input(type="text", name="caOrganization" value=O)
+          input(type="text", name="organization" value=O)
       .Unit 
         span.SubjectTitle
           | Unit: 
         span.SubjectValue 
-          input(type="text", name="caUnit" value=OU)
+          input(type="text", name="unit" value=OU)
       .CommonName 
         span.SubjectTitle
           | Common Name: 
         span.SubjectValue 
-          input(type="text", name="caCommonName" title="Common Name")
+          input(type="text", name="commonName" title="Common Name")
       .StartDate 
         span.SubjectTitle 
           | Valid from:
         span.SubjectValue 
-          input#CAValidFrom(type="text", name="caValidFrom")
+          input#CAValidFrom(type="text", name="validFrom")
       .EndDate 
         span.SubjectTitle 
           | Valid to:
         span.SubjectValue 
-          input#CAValidTo(type="text", name="caValidTo")
+          input#CAValidTo(type="text", name="validTo")
       div.SubmitButton
         input.button2#generateCAReset(type="reset", value="Reset" title="Reset")
         input.button2#generateCAButton.SubmitButton(type="submit" title="submit", value="Generate")

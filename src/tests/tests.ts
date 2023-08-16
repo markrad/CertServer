@@ -55,38 +55,42 @@ const config = `certServer:
 let then = new Date();
 then.setFullYear(then.getFullYear() + 1);
 const newCA = {
-    caCountry: 'someCountry',
-    caState: 'someState',
-    caLocation: 'someLocation',
-    caOrganization: 'someOrg',
-    caUnit: 'someUnit',
-    caCommonName: 'someName',
-    caValidFrom: new Date().toISOString(),
-    caValidTo: then.toISOString(),
+    country: 'someCountry',
+    state: 'someState',
+    location: 'someLocation',
+    organization: 'someOrg',
+    unit: 'someUnit',
+    commonName: 'someName',
+    validFrom: new Date().toISOString(),
+    validTo: then.toISOString(),
 }
 
 var newInt = {
-    intCountry: 'intCountry',
-    intState: 'intState',
-    intLocation: 'intLocation',
-    intOrganization: 'intOrg',
-    intUnit: 'intUnit',
-    intCommonName: 'intName',
-    intValidFrom: new Date().toISOString(),
-    intValidTo: then.toISOString(),
-    intSigner: '1',
+    country: 'intCountry',
+    state: 'intState',
+    location: 'intLocation',
+    organization: 'intOrg',
+    unit: 'intUnit',
+    commonName: 'intName',
+    validFrom: new Date().toISOString(),
+    validTo: then.toISOString(),
+    signer: '1',
 }
 
 var newLeaf = {
-    leafCountry: 'leafCountry',
-    leafState: 'leafState',
-    leafLocation: 'leafLocation',
-    leafOrganization: 'leafOrg',
-    leafUnit: 'leafUnit',
-    leafCommonName: 'leafName',
-    leafValidFrom: new Date().toISOString(),
-    leafValidTo: then.toISOString(),
-    leafSigner: '2',
+    country: 'leafCountry',
+    state: 'leafState',
+    location: 'leafLocation',
+    organization: 'leafOrg',
+    unit: 'leafUnit',
+    commonName: 'leafName',
+    validFrom: new Date().toISOString(),
+    validTo: then.toISOString(),
+    signer: '2',
+    SANArray: [
+        "DNS: leafy.com",
+        "IP: 55.55.55.55",
+    ]
 }
 
 let stepNo = 0;
@@ -145,7 +149,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
 
         step = _step('generate ca');
         res = await httpRequest('post', url + '/api/createcacert', JSON.stringify(newCA));
-        assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
+        assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode} ${res.body.error}`);
         await ew.EventWait();
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift() as string);
@@ -156,7 +160,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
 
         step = _step('generate intermediate');
         res = await httpRequest('post', url + '/api/createIntermediateCert', JSON.stringify(newInt));
-        assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
+        assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body.error}`);
         await ew.EventWait();
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift() as string);
@@ -296,8 +300,8 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
 
         step = _step('Upload root certificate');
         let cert = fs.readFileSync(path.join(testPath, 'someName.pem'), { encoding: 'utf8' });
-        res = await httpRequest('post', url + '/api/uploadcert', cert);
-        assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
+        res = await httpRequest('post', url + '/api/uploadcert', cert, 'text/plain');
+        assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode} ${res.body.error}`);
         await ew.EventWait();
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift() as string);
@@ -320,7 +324,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
 
         step = _step('Upload intermediate key');
         let key = fs.readFileSync(path.join(testPath, 'intName_key.pem'), { encoding: 'utf8' });
-        res = await httpRequest('post', url + '/api/uploadKey', key);
+        res = await httpRequest('post', url + '/api/uploadKey', key, 'text/plain');
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         await ew.EventWait();
         ew.EventReset();
@@ -387,7 +391,7 @@ function _step(msg: string): string {
     return msg;
 }
 
-async function httpRequest(method: 'get' | 'post' | 'delete' | 'head', url: URL | string, body: string = null): Promise<response> {
+async function httpRequest(method: 'get' | 'post' | 'delete' | 'head', url: URL | string, body: string = null, contentType: string = 'application/json'): Promise<response> {
     return new Promise<response>((resolve, reject) => {
         if (!['get', 'post', 'head', 'delete'].includes(method)) {
             reject(new Error(`Invalid method: ${method}`));
@@ -415,7 +419,7 @@ async function httpRequest(method: 'get' | 'post' | 'delete' | 'head', url: URL 
         };
 
         if (body) {
-            options.headers = {'Content-Length': Buffer.byteLength(body), 'Content-Type': 'application/json'};
+            options.headers = { 'Content-Length': Buffer.byteLength(body), 'Content-Type': contentType };
         }
 
         const clientRequest = http.request(url, { method: method.toUpperCase(), headers: options.headers }, incomingMessage => {

@@ -45,36 +45,40 @@ const config = `certServer:
 let then = new Date();
 then.setFullYear(then.getFullYear() + 1);
 const newCA = {
-    caCountry: 'someCountry',
-    caState: 'someState',
-    caLocation: 'someLocation',
-    caOrganization: 'someOrg',
-    caUnit: 'someUnit',
-    caCommonName: 'someName',
-    caValidFrom: new Date().toISOString(),
-    caValidTo: then.toISOString(),
+    country: 'someCountry',
+    state: 'someState',
+    location: 'someLocation',
+    organization: 'someOrg',
+    unit: 'someUnit',
+    commonName: 'someName',
+    validFrom: new Date().toISOString(),
+    validTo: then.toISOString(),
 };
 var newInt = {
-    intCountry: 'intCountry',
-    intState: 'intState',
-    intLocation: 'intLocation',
-    intOrganization: 'intOrg',
-    intUnit: 'intUnit',
-    intCommonName: 'intName',
-    intValidFrom: new Date().toISOString(),
-    intValidTo: then.toISOString(),
-    intSigner: '1',
+    country: 'intCountry',
+    state: 'intState',
+    location: 'intLocation',
+    organization: 'intOrg',
+    unit: 'intUnit',
+    commonName: 'intName',
+    validFrom: new Date().toISOString(),
+    validTo: then.toISOString(),
+    signer: '1',
 };
 var newLeaf = {
-    leafCountry: 'leafCountry',
-    leafState: 'leafState',
-    leafLocation: 'leafLocation',
-    leafOrganization: 'leafOrg',
-    leafUnit: 'leafUnit',
-    leafCommonName: 'leafName',
-    leafValidFrom: new Date().toISOString(),
-    leafValidTo: then.toISOString(),
-    leafSigner: '2',
+    country: 'leafCountry',
+    state: 'leafState',
+    location: 'leafLocation',
+    organization: 'leafOrg',
+    unit: 'leafUnit',
+    commonName: 'leafName',
+    validFrom: new Date().toISOString(),
+    validTo: then.toISOString(),
+    signer: '2',
+    SANArray: [
+        "DNS: leafy.com",
+        "IP: 55.55.55.55",
+    ]
 };
 let stepNo = 0;
 const types = ['root', 'intermediate', 'leaf', 'key'];
@@ -123,7 +127,7 @@ const types = ['root', 'intermediate', 'leaf', 'key'];
         }
         step = _step('generate ca');
         res = yield httpRequest('post', url + '/api/createcacert', JSON.stringify(newCA));
-        node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
+        node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode} ${res.body.error}`);
         yield ew.EventWait();
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
@@ -133,7 +137,7 @@ const types = ['root', 'intermediate', 'leaf', 'key'];
         console.log('passed');
         step = _step('generate intermediate');
         res = yield httpRequest('post', url + '/api/createIntermediateCert', JSON.stringify(newInt));
-        node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
+        node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body.error}`);
         yield ew.EventWait();
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
@@ -258,8 +262,8 @@ const types = ['root', 'intermediate', 'leaf', 'key'];
         console.log('passed');
         step = _step('Upload root certificate');
         let cert = fs_1.default.readFileSync(path_1.default.join(testPath, 'someName.pem'), { encoding: 'utf8' });
-        res = yield httpRequest('post', url + '/api/uploadcert', cert);
-        node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
+        res = yield httpRequest('post', url + '/api/uploadcert', cert, 'text/plain');
+        node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode} ${res.body.error}`);
         yield ew.EventWait();
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
@@ -280,7 +284,7 @@ const types = ['root', 'intermediate', 'leaf', 'key'];
         console.log('passed');
         step = _step('Upload intermediate key');
         let key = fs_1.default.readFileSync(path_1.default.join(testPath, 'intName_key.pem'), { encoding: 'utf8' });
-        res = yield httpRequest('post', url + '/api/uploadKey', key);
+        res = yield httpRequest('post', url + '/api/uploadKey', key, 'text/plain');
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         yield ew.EventWait();
         ew.EventReset();
@@ -335,7 +339,7 @@ function _step(msg) {
     console.log(`\nStep: ${++stepNo}: ${msg}`);
     return msg;
 }
-function httpRequest(method, url, body = null) {
+function httpRequest(method, url, body = null, contentType = 'application/json') {
     return __awaiter(this, void 0, void 0, function* () {
         return new Promise((resolve, reject) => {
             if (!['get', 'post', 'head', 'delete'].includes(method)) {
@@ -359,7 +363,7 @@ function httpRequest(method, url, body = null) {
                 headers: {},
             };
             if (body) {
-                options.headers = { 'Content-Length': Buffer.byteLength(body), 'Content-Type': 'application/json' };
+                options.headers = { 'Content-Length': Buffer.byteLength(body), 'Content-Type': contentType };
             }
             const clientRequest = http_1.default.request(url, { method: method.toUpperCase(), headers: options.headers }, incomingMessage => {
                 // Response object.
