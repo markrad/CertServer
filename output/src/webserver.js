@@ -184,8 +184,8 @@ class WebServer {
             // this._app.use('/certificates', Express.static(this._certificatesPath));
             // this._app.use('/keys', Express.static(this._privatekeysPath));
             this._app.use((0, express_fileupload_1.default)());
-            this._app.use((req, _res, next) => {
-                logger.debug(`${req.method} ${req.url}`);
+            this._app.use((request, _response, next) => {
+                logger.debug(`${request.method} ${request.url}`);
                 next();
             });
             this._app.get('/', (_request, response) => {
@@ -211,26 +211,26 @@ class WebServer {
                 request.url = '/api/createLeafCert';
                 next();
             }));
-            this._app.post('/uploadCert', ((req, res) => {
+            this._app.post('/uploadCert', ((request, response) => {
                 // FUTURE Allow multiple files to be submitted
                 // FUTURE: Allow chain style files to be submitted
                 // FUTURE: Allow der and pfx files to be submitted
-                if (!req.files || Object.keys(req.files).length == 0) {
-                    return res.status(400).json({ error: 'No file selected' });
+                if (!request.files || Object.keys(request.files).length == 0) {
+                    return response.status(400).json({ error: 'No file selected' });
                 }
-                let certfile = req.files.certFile;
+                let certfile = request.files.certFile;
                 let tempName = path_1.default.join(this._workPath, certfile.name);
                 certfile.mv(tempName, (err) => __awaiter(this, void 0, void 0, function* () {
                     var _a;
                     if (err)
-                        return res.status(500).json({ error: err.message });
+                        return response.status(500).json({ error: err.message });
                     try {
                         let result = yield this._tryAddCertificate(tempName);
                         this._broadcast(result);
-                        return res.status(200).json({ message: `Certificate ${result.name} added`, types: result.types.map((t) => CertTypes[t]).join(';') });
+                        return response.status(200).json({ message: `Certificate ${result.name} added`, types: result.types.map((t) => CertTypes[t]).join(';') });
                     }
                     catch (err) {
-                        return res.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).json({ error: err.message });
+                        return response.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).json({ error: err.message });
                     }
                 }));
             }));
@@ -253,23 +253,23 @@ class WebServer {
                     response.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).json({ error: err.message });
                 }
             }));
-            this._app.post('/uploadKey', ((request, res) => {
+            this._app.post('/uploadKey', ((request, response) => {
                 if (!request.files || Object.keys(request.files).length == 0) {
-                    return res.status(400).json({ error: 'No file selected' });
+                    return response.status(400).json({ error: 'No file selected' });
                 }
                 let keyFile = request.files.keyFile;
                 let tempName = path_1.default.join(this._workPath, keyFile.name);
                 keyFile.mv(tempName, (err) => __awaiter(this, void 0, void 0, function* () {
                     var _a;
                     if (err)
-                        return res.status(500).send(err);
+                        return response.status(500).send(err);
                     try {
                         let result = yield this._tryAddKey(tempName, request.query.password);
                         this._broadcast(result);
-                        return res.status(200).json({ message: `Key ${result.name} added`, types: result.types.map((t) => CertTypes[t]).join(';') });
+                        return response.status(200).json({ message: `Key ${result.name} added`, types: result.types.map((t) => CertTypes[t]).join(';') });
                     }
                     catch (err) {
-                        return res.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).send(err.message);
+                        return response.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).send(err.message);
                     }
                 }));
             }));
