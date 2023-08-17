@@ -26,6 +26,8 @@ There is a sample config file [here](./config_sample.yml). This are the settings
 certServer:
   root: "./data"
   port: 4141
+  certificate: null,
+  key: null,
   subject:
     C: USA,
     ST: Washington,
@@ -37,8 +39,10 @@ certServer:
 - **certServer:** 
 This is required  
   -  **root:** 
-This specifies the root directory that the server will use to save certificates, private keys, and its database. Defaults to *./root*  
-  - **port:** The port the webserver will listen on. Defaults to *4141*.  
+This specifies the root directory that the server will use to save certificates, private keys, and its database. Defaults to *./data*  
+  - **port:** The port the webserver will listen on. Defaults to *4141*. 
+  - **certificate:** When specified with a matching key, it will run the server in SSL mode.
+  - **key:** Key for certificate above.
   - **subject:** If you want subject defaults, this is required  
     + **C:** Default for subject country  
     + **ST:** Default for subject state  
