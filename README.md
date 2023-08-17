@@ -6,11 +6,11 @@ This is a simple website that is designed to help manage certificates and privat
 ## Justification
 Typically, my job will require me to generate certificates for various purposes, self-signed certificate authorities, intermediates, and leaf certificates. Many of these are for X.509 authentication on test systems, as in, I don't care if you break into it because there is nothing useful.
 
-The problem I would run into was tracking where these various certificates over a multitude of different desktops and, often I would end up using OpenSSL to regenerate them. I don't know about you, but I have to look up the OpenSSL arguments every time I need to do this.
+The problem I would run into was tracking various certificates over a multitude of different machines for different purposes. Often I would end up using OpenSSL to regenerate them. I don't know about you, but I have to look up the OpenSSL arguments every time I need to do this.
 ## Usage
-My solution to this was this simple website. One can create a root certifcate, from that create a chain of intermediate certifcates, and finally a leaf certificate. Once they have all been created, one can download the leaf certificate's private key and the full certificate chain from the leaf up.
+My solution to this is this simple web application. You can create a root certifcate, from that create a chain of intermediate certifcates, and finally a leaf certificate. Once they have all been created, you can download the leaf certificate's private key and the full certificate chain from the leaf up.
 
-In my case, these certificates are typically used for X.509 authentication with Azure Device Provisioning Service and Azure IoT hub. These have been tested and work as expected. Also tested is generating a root and intermediate for use in an nested IoT Edge parent/child relationship. These also replace the Edge quick start certificates too.
+In my case, these certificates are typically used for X.509 authentication with an Azure Device Provisioning Service or an Azure IoT hub. These have been tested and work as expected. Also tested is generating a root and intermediate for use in an nested IoT Edge parent/child relationships. These also replace the Edge quick start certificates too.
 
 You can also generate a root and a leaf and use it for protecting a website with TLS. The common name will need to match the fully qualified domain name of the server for this to work. Subject alternative names can also be added by IP or alternative DNS name.
 
@@ -20,7 +20,7 @@ The webpage itself is fairly crude. I am not a web or even UI person.
 ## Running the Server
 Once you have cloned this GitHub repository, the main script takes just one optional argument which is the path to a configuration file. This is expected to be in yaml format and it will need to have an extension of yml, due to a limitation of the yaml parsing library I used. You start it thus:
 `node output/index.js ./config.yml`  
-There is a sample config file [here](./config_sample.yml). This is the setting that will be used if no config.yml is passed. It looks like this:
+There is a sample config file [here](./config_sample.yml). This are the settings that will be used if no config.yml is passed. It looks like this:
 ### The Default config File
 ```yaml
 certServer:
@@ -34,17 +34,17 @@ certServer:
     OU: None
 ``` 
 ### Config file options
-**certServer:** 
+- **certServer:** 
 This is required  
->**root:** 
+  -  **root:** 
 This specifies the root directory that the server will use to save certificates, private keys, and its database. Defaults to *./root*  
->**port:** The port the webserver will listen on. Defaults to *4141*.  
->**subject:** If you want subject defaults, this is required  
->>>**C:** Default for subject country  
->>>**ST:** Default for subject state  
->>>**L:** Default for subject location (city)  
->>>**O:** Default for subject organization  
->>>**OU:** Default for subject organizational unit  
+  - **port:** The port the webserver will listen on. Defaults to *4141*.  
+  - **subject:** If you want subject defaults, this is required  
+    + **C:** Default for subject country  
+    + **ST:** Default for subject state  
+    + **L:** Default for subject location (city)  
+    + **O:** Default for subject organization  
+    + **OU:** Default for subject organizational unit  
 ## Running in a Docker Container
 A [dockerfile](./docker/dockerfile) is provided that will build an image to run the server in Linux Alpine and a [docker-compose](./docker/docker-compose.yml) file that show how you might run it using mounted volumes for the data and the config. It is recommended that you mount the directory that you specified as the root directory in the config and the directory that contains the config file itself.
 
@@ -52,6 +52,7 @@ The easier option is to pull the image from the ghcr repository. You can do this
 ```
 docker pull ghcr.io/markrad/certserver:1.2.3
 ```
+Go to [the packages](https://github.com/markrad/CertServer/pkgs/container/certserver) page to see available versions.
 Currently all images will have a verion number. There is no latest. Once you have the image you can either use the docker compose file mentioned above, or run it with:
 ```
 docker run \
