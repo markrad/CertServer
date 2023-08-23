@@ -269,8 +269,6 @@ export class WebServer {
         this._app.use('/icons', Express.static(path.join(__dirname, '../../web/icons')));
         this._app.use('/files', Express.static(path.join(__dirname, '../../web/files')));
         this._app.use('/images', Express.static(path.join(__dirname, '../../web/images')));
-        // this._app.use('/certificates', Express.static(this._certificatesPath));
-        // this._app.use('/keys', Express.static(this._privatekeysPath));
         this._app.use(FileUpload());
         this._app.use((request, _response, next) => {
             logger.debug(`${request.method} ${request.url}`);

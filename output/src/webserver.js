@@ -181,8 +181,6 @@ class WebServer {
             this._app.use('/icons', express_1.default.static(path_1.default.join(__dirname, '../../web/icons')));
             this._app.use('/files', express_1.default.static(path_1.default.join(__dirname, '../../web/files')));
             this._app.use('/images', express_1.default.static(path_1.default.join(__dirname, '../../web/images')));
-            // this._app.use('/certificates', Express.static(this._certificatesPath));
-            // this._app.use('/keys', Express.static(this._privatekeysPath));
             this._app.use((0, express_fileupload_1.default)());
             this._app.use((request, _response, next) => {
                 logger.debug(`${request.method} ${request.url}`);
