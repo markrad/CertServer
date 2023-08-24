@@ -556,12 +556,12 @@ class WebServer {
                 else {
                     let retVal = {};
                     if (type != CertTypes.key) {
-                        retVal['files'] = this._certificates.chain().find({ type: type }).simplesort('name').data().map((entry) => {
+                        retVal['files'] = this._certificates.chain().find({ type: type }).sort((l, r) => l.name.localeCompare(r.name)).data().map((entry) => {
                             return { name: entry.name, type: CertTypes[type].toString(), id: entry.$loki };
                         });
                     }
                     else {
-                        retVal['files'] = this._privateKeys.chain().find().simplesort('name').data().map((entry) => {
+                        retVal['files'] = this._privateKeys.chain().find().sort((l, r) => l.name.localeCompare(r.name)).data().map((entry) => {
                             return { name: entry.name, type: CertTypes[type].toString(), id: entry.$loki };
                         });
                     }
@@ -1143,8 +1143,10 @@ class WebServer {
                         }
                     }
                     catch (err) {
-                        // TODO Make sure the error actually is from verify
-                        logger.debug(`Verify error? ${err.message}`);
+                        // TODO Handle other errors than verify error
+                        if (!err.actualIssuer || !err.expectedIssuer) {
+                            logger.debug(`Possible error: ${err.message}`);
+                        }
                         // verify should return false but apparently throws an exception - do nothing
                     }
                 }
