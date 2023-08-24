@@ -29,6 +29,15 @@
             "type": "node"
         },
         {
+            "type": "bashdb",
+            "request": "launch",
+            "name": "Launch build script",
+            "cwd": "${workspaceFolder}/build",
+            "program": "${workspaceFolder}/build/build.sh",
+            "terminalKind": "integrated",
+            "args": [ "--patch" ]
+        },
+        {
             "name": "Launch Test",
             "program": "${workspaceFolder}/output/test.js",
             "request": "launch",
