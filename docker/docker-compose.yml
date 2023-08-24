@@ -3,9 +3,9 @@ services:
   certserver:
     container_name: certserver 
     restart: unless-stopped
-    image: certserver:1.2.4
+    image: certserver:1.2.5
     volumes:
       - /home/markrad/source/CertServer/docker/sampledirs/config:/config
       - /home/markrad/source/CertServer/docker/sampledirs/data:/data
     ports:
-      - "4142:4141"
+      - "41.2.5141"
