@@ -128,13 +128,13 @@ sed -i "s/${version}/${newver}/" ../docker/dockerfile
 sed -i "s/${version}/${newver}/" ../docker/docker-compose.yml
 sed -i "3,3 s/${version}/${newver}/" ../package.json
 
-echo Finished
-
 git add --verbose ../docker/dockerfile ../docker/docker-compose.yml ../package.json && \
 git commit -m ":bookmark: Bump version to $newver" && \
 git push && \
 git tag v$newver && \
 git push origin v$newver
+
+echo Finished
 
 # if ! docker buildx build --platform linux/arm/v7,linux/amd64 --tag $repo/nodedaemon:$newver /home/markrad/source/nodedaemon/build --push
 # then
