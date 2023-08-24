@@ -190,6 +190,12 @@ block layout-content
       let line = $('.certLine#c' + id);
       let details = line.find('.certDetails');
       let arrow = line.find('.certArrow');
+      //- $('.certValueKey').each(() => $(this).removeClass('certValueKey'));
+      //- $('.certValueSigner').each(() => $(this).removeClass('certValueSigner'));
+      //- $('.certValueSigned').each(() => $(this).removeClass('certValueSigned'));
+      $('.certValueKey').removeClass('certValueKey');
+      $('.certValueSigner').removeClass('certValueSigner');
+      $('.certValueSigned').removeClass('certValueSigned');
       if (details.is(':hidden') == false) {
         details.slideUp(400, () => {
           details['0'].innerText = '';
@@ -224,8 +230,12 @@ block layout-content
               t.hide();
             }
           });
-          
+
           details.slideDown(500);
+
+          $(`#k${result.keyId}`).find('.certValue').addClass('certValueKey');
+          $(`#c${result.signerId}`).find('.certValue').addClass('certValueSigner');
+          result.signed.forEach((s) => $(`#c${s}`).find('.certValue').addClass('certValueSigned'));
 
           //- console.log('success');
         }

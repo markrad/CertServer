@@ -85,6 +85,18 @@ span.certValue {
     word-wrap: break-word;
 }
 
+span.certValueKey {
+    background-color: palevioletred;
+}
+
+span.certValueSigner {
+    background-color: palegreen;
+}
+
+span.certValueSigned {
+    background-color: paleturquoise;
+}
+
 span.certButtons {
     text-align: right;
     display: block;

@@ -554,18 +554,18 @@ class WebServer {
                     response.status(404).json({ error: `Directory ${request.query.type} not found` });
                 }
                 else {
-                    let retVal = {};
+                    let retVal = [];
                     if (type != CertTypes.key) {
-                        retVal['files'] = this._certificates.chain().find({ type: type }).sort((l, r) => l.name.localeCompare(r.name)).data().map((entry) => {
+                        retVal = this._certificates.chain().find({ type: type }).sort((l, r) => l.name.localeCompare(r.name)).data().map((entry) => {
                             return { name: entry.name, type: CertTypes[type].toString(), id: entry.$loki };
                         });
                     }
                     else {
-                        retVal['files'] = this._privateKeys.chain().find().sort((l, r) => l.name.localeCompare(r.name)).data().map((entry) => {
+                        retVal = this._privateKeys.chain().find().sort((l, r) => l.name.localeCompare(r.name)).data().map((entry) => {
                             return { name: entry.name, type: CertTypes[type].toString(), id: entry.$loki };
                         });
                     }
-                    response.status(200).json(retVal);
+                    response.status(200).json({ files: retVal });
                 }
             });
             this._app.get('/api/getCertificatePem', (request, response) => __awaiter(this, void 0, void 0, function* () {
@@ -836,6 +836,7 @@ class WebServer {
                         // See if any existing certificates signed this one
                         let signer = yield this._findSigner(c);
                         if (signer != null) {
+                            // FUTURE Burn down the database by using $loki instead of potentially not unique serial number
                             signedBy = signer.serialNumber;
                         }
                     }
@@ -907,6 +908,7 @@ class WebServer {
             }
         }
         let k = this._privateKeys.findOne({ pairSerial: c.serialNumber });
+        let s = this._certificates.find({ signedBy: c.serialNumber }).map((r) => r.$loki);
         return {
             id: c.$loki,
             certType: CertTypes[c.type],
@@ -922,6 +924,7 @@ class WebServer {
             keyId: k ? k.$loki : null,
             fingerprint: c.fingerprint,
             fingerprint256: c.fingerprint256,
+            signed: s,
         };
     }
     _tryDeleteCert(c) {

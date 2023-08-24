@@ -85,6 +85,12 @@ type PrivateKeyRow = {
     encrypted: boolean,
 };
 
+type CertificateLine = {
+    name: string,
+    type: string,
+    id: number,
+}
+
 type CertificateBrief = {
     id: number,
     certType: string,
@@ -100,6 +106,7 @@ type CertificateBrief = {
     serialNumber: string,
     fingerprint: string,
     fingerprint256: string,
+    signed: number[],
 }
 
 type KeyBrief = {
@@ -652,18 +659,18 @@ export class WebServer {
                 response.status(404).json({ error: `Directory ${request.query.type} not found` });
             }
             else {
-                let retVal: any = {};
+                let retVal: CertificateLine[] = [];
                 if (type != CertTypes.key) {
-                    retVal['files'] = this._certificates.chain().find({ type: type }).sort((l, r) => l.name.localeCompare(r.name)).data().map((entry) => { 
+                    retVal = this._certificates.chain().find({ type: type }).sort((l, r) => l.name.localeCompare(r.name)).data().map((entry) => { 
                         return { name: entry.name, type: CertTypes[type].toString(), id: entry.$loki }; 
                     });
                 }
                 else {
-                    retVal['files'] = this._privateKeys.chain().find().sort((l, r) => l.name.localeCompare(r.name)).data().map((entry) => { 
+                    retVal = this._privateKeys.chain().find().sort((l, r) => l.name.localeCompare(r.name)).data().map((entry) => { 
                         return { name: entry.name, type: CertTypes[type].toString(), id: entry.$loki };
                     });
                 }
-                response.status(200).json(retVal);
+                response.status(200).json({ files: retVal });
             }
         });
         this._app.get('/api/getCertificatePem', async (request, response) => {
@@ -948,6 +955,7 @@ export class WebServer {
                     let signer = await this._findSigner(c);
 
                     if (signer != null) {
+                        // FUTURE Burn down the database by using $loki instead of potentially not unique serial number
                         signedBy = signer.serialNumber;
                     }
                 }
@@ -1026,6 +1034,7 @@ export class WebServer {
             }
         } 
         let k = this._privateKeys.findOne({ pairSerial: c.serialNumber });
+        let s: number[] = this._certificates.find({ signedBy: c.serialNumber }).map((r) => r.$loki);
         return { 
             id: c.$loki,
             certType: CertTypes[c.type],
@@ -1041,6 +1050,7 @@ export class WebServer {
             keyId: k? k.$loki : null,
             fingerprint: c.fingerprint,
             fingerprint256: c.fingerprint256,
+            signed: s,
          };
     }
 
