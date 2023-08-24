@@ -87,6 +87,7 @@ const types = ['root', 'intermediate', 'leaf', 'key'];
     let ws;
     let step = '';
     let msg;
+    let success = true;
     try {
         // Set up
         step = _step('set up');
@@ -309,6 +310,7 @@ const types = ['root', 'intermediate', 'leaf', 'key'];
     }
     catch (err) {
         console.log(`**** Failed in step ${step}: ${err.message}`);
+        success = false;
     }
     finally {
         step = _step('cleanup');
@@ -320,7 +322,7 @@ const types = ['root', 'intermediate', 'leaf', 'key'];
         fs_1.default.unlinkSync(path_1.default.join(testPath, 'testconfig.yml'));
         fs_1.default.rmSync(testPath, { recursive: true, force: true });
         step = _step('finish');
-        ws;
+        process.exit(success ? 0 : 4);
     }
 }))();
 function checkPacket(packet, name, added, updated, deleted) {

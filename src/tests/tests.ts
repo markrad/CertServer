@@ -101,6 +101,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
     let ws: WebSocket;
     let step = '';
     let msg: any;
+    let success: boolean = true;
     try {
         // Set up
         step = _step('set up');
@@ -353,6 +354,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
     }
     catch (err) {
         console.log(`**** Failed in step ${step}: ${err.message}`);
+        success = false;
     }
     finally {
         step = _step('cleanup');
@@ -367,7 +369,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         fs.unlinkSync(path.join(testPath, 'testconfig.yml'));
         fs.rmSync(testPath, { recursive: true, force: true });
         step = _step('finish');
-        ws
+        process.exit(success? 0 : 4);
     }
 })();
 
