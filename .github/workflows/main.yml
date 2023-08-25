@@ -40,7 +40,7 @@ jobs:
       id: meta
       uses: docker/metadata-action@v4
       with:
-        github-token: ${{ inputs.token }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}
         images: ghcr.io/${{ steps.string.outputs.lowercase }}
         tags: |
           # set latest tag for default branch
@@ -62,7 +62,7 @@ jobs:
         push: ${{ github.event_name != 'pull_request' }}
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
-        build-args: ${{ inputs.build-args }}      # - name: GHCR-Action
+        # build-args: ${{ inputs.build-args }}      # - name: GHCR-Action
       #   uses: KuhlTime/ghcr-action@v1
       #   with:
       #     token: ${{ secrets.GITHUB_TOKEN }}
