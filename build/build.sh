@@ -98,7 +98,6 @@ then
     parts[1]='0'
 fi
 newver=$(IFS="." ; echo "${parts[*]}")
-echo $sedver
 
 echo This will update the version from $version to $newver and push a new tag
 read -p "Do you wish to continue? [Yy] " response
@@ -108,9 +107,6 @@ then
     echo Exiting
     exit 4
 fi
-
-# echo Testing npm install
-# npm install --dry-run || { echo 'npm install failed' ; exit 1; }
 
 echo Running tests
 pwd
@@ -138,9 +134,3 @@ git tag v$newver && \
 git push origin v$newver
 
 echo Finished
-
-# if ! docker buildx build --platform linux/arm/v7,linux/amd64 --tag $repo/nodedaemon:$newver /home/markrad/source/nodedaemon/build --push
-# then
-#     echo Docker build and push failed
-#     help
-# fi
