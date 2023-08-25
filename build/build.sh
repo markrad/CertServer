@@ -131,7 +131,7 @@ sed -i "3,3 s/${version}/${newver}/" ../package.json
 git add --verbose ../docker/Dockerfile ../docker/docker-compose.yml ../package.json && \
 git commit -m ":bookmark: Bump version to v$newver" && \
 git push && \
-git tag $newver && \
+git tag v$newver && \
 git push origin v$newver
 
 echo Finished
