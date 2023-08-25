@@ -132,7 +132,7 @@ git add --verbose ../docker/Dockerfile ../docker/docker-compose.yml ../package.j
 git commit -m ":bookmark: Bump version to $newver" && \
 git push && \
 git tag $newver && \
-git push origin v$newver
+git push origin $newver
 
 echo Finished
 
