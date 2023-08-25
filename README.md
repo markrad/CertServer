@@ -52,17 +52,17 @@ This specifies the root directory that the server will use to save certificates,
 ## Running in a Docker Container
 A [dockerfile](./docker/dockerfile) is provided that will build an image to run the server in Linux Alpine and a [docker-compose](./docker/docker-compose.yml) file that show how you might run it using mounted volumes for the data and the config. It is recommended that you mount the directory that you specified as the root directory in the config and the directory that contains the config file itself.
 
-The easier option is to pull the image from the ghcr repository. You can do this with:
+The easier option is to pull the image from the ghcr repository. You can do this with latest or a specific version number (M.m.p such as 1.2.11):
 ```
-docker pull ghcr.io/markrad/certserver:1.2.3
+docker pull ghcr.io/markrad/certserver:latest
 ```
 Go to [the packages](https://github.com/markrad/CertServer/pkgs/container/certserver) page to see available versions.
-Currently all images will have a verion number. There is no latest. Once you have the image you can either use the docker compose file mentioned above, or run it with:
+Once you have the image you can either use the docker compose file mentioned above, or run it with:
 ```
 docker run \
  -p 4141:4141 \
  -v /some/path/config.yml:/config/config.yml 
- -v /some/path/data:/config/specified/config.yml
+ -v /some/path/data:/path/specified/in/config
 ```
 ## REST API
 
