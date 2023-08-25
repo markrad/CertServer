@@ -231,6 +231,7 @@ export class WebServer {
      */
     async start() {
         
+        logger.info(`CertServer starting - ${this._version}`);
         let getCollections: () => void = () => {
             if (null == (certificates = db.getCollection<CertificateRow>('certificates'))) {
                 certificates = db.addCollection<CertificateRow>('certificates', { });

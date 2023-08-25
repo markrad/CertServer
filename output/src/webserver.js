@@ -138,6 +138,7 @@ class WebServer {
      */
     start() {
         return __awaiter(this, void 0, void 0, function* () {
+            logger.info(`CertServer starting - ${this._version}`);
             let getCollections = () => {
                 if (null == (certificates = db.getCollection('certificates'))) {
                     certificates = db.addCollection('certificates', {});

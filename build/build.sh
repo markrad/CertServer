@@ -125,7 +125,7 @@ fi
 echo Updating
 
 sed -i "s/${version}/${newver}/" ../docker/Dockerfile
-sed -i "s/v${version}/:${newver}/" ../docker/docker-compose.yml
+sed -i "s/v${version}/v${newver}/" ../docker/docker-compose.yml
 sed -i "3,3 s/${version}/${newver}/" ../package.json
 
 git add --verbose ../docker/Dockerfile ../docker/docker-compose.yml ../package.json && \
