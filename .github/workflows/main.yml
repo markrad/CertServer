@@ -16,7 +16,53 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      - name: GHCR-Action
-        uses: KuhlTime/ghcr-action@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+        lfs: false # default
+        submodules: false # default
+
+    - name: Repository Variable to Lowercase
+      id: string
+      uses: ASzc/change-string-case-action@v1
+      with:
+        string: ${{ github.repository }}
+
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v1
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ inputs.token }}
+
+    - name: Docker meta
+      id: meta
+      uses: docker/metadata-action@v4
+      with:
+        github-token: ${{ inputs.token }}
+        images: ghcr.io/${{ steps.string.outputs.lowercase }}
+        tags: |
+          # set latest tag for default branch
+          type=raw,value=latest,enable={{is_default_branch}}
+          type=schedule
+          type=ref,event=branch
+          type=ref,event=tag
+          type=ref,event=pr
+          type=semver,pattern=v{{version}}
+          type=semver,pattern=v{{major}}.{{minor}}
+          type=semver,pattern=v{{major}}
+          type=sha
+
+    - name: Build and push
+      id: docker_build
+      uses: docker/build-push-action@v2
+      with:
+        context: ./docker
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: ${{ inputs.build-args }}      # - name: GHCR-Action
+      #   uses: KuhlTime/ghcr-action@v1
+      #   with:
+      #     token: ${{ secrets.GITHUB_TOKEN }}
