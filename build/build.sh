@@ -124,14 +124,14 @@ fi
 
 echo Updating
 
-sed -i "s/${version}/${newver}/" ../docker/dockerfile
-sed -i "s/${version}/${newver}/" ../docker/docker-compose.yml
+sed -i "s/${version}/${newver}/" ../docker/Dockerfile
+sed -i "s/:${version}/:${newver}/" ../docker/docker-compose.yml
 sed -i "3,3 s/${version}/${newver}/" ../package.json
 
-git add --verbose ../docker/dockerfile ../docker/docker-compose.yml ../package.json && \
+git add --verbose ../docker/Dockerfile ../docker/docker-compose.yml ../package.json && \
 git commit -m ":bookmark: Bump version to $newver" && \
 git push && \
-git tag v$newver && \
+git tag $newver && \
 git push origin v$newver
 
 echo Finished
