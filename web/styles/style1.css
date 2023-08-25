@@ -70,8 +70,11 @@ button#uploadButton {
 span.idLine {
     font-family: 'Courier New', Courier, monospace;
     font-size: smaller;
-    float: right;
+    font-weight: bolder;
+    color: darkviolet;
+    /* float: right; */
     cursor: pointer;
+    /* padding-left: 10%; */
 }
 
 span.certArrow {
@@ -86,7 +89,7 @@ span.certValue {
 }
 
 span.certValueKey {
-    background-color: palevioletred;
+    background-color: lightpink;
 }
 
 span.certValueSigner {
@@ -127,7 +130,7 @@ span.certPrivateKey {
 span.keyArrow {
     font-family:'Courier New', Courier, monospace;
     cursor: pointer;
-    padding-right: 10pt;
+    /* padding-right: 10pt; */
 }
 
 span.keyLine {
