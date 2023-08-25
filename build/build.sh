@@ -85,6 +85,8 @@ fi
 
 version=$(jq .version ../package.json | tr -d '"')
 IFS="." read -a parts <<< $version
+printf -v sedver '\.%s' "${parts[@]}"
+sedver=${sedver:2}
 parts[$field]=$((${parts[$field]}+1))
 
 if [ $field -lt 2 ]
@@ -96,6 +98,7 @@ then
     parts[1]='0'
 fi
 newver=$(IFS="." ; echo "${parts[*]}")
+echo $sedver
 
 echo This will update the version from $version to $newver and push a new tag
 read -p "Do you wish to continue? [Yy] " response
@@ -124,9 +127,9 @@ fi
 
 echo Updating
 
-sed -i "s/${version}/${newver}/" ../docker/Dockerfile
-sed -i "s/v${version}/${newver}/" ../docker/docker-compose.yml
-sed -i "3,3 s/${version}/${newver}/" ../package.json
+sed -i "s/${sedver}/${newver}/" ../docker/Dockerfile
+sed -i "s/${sedver}/${newver}/" ../docker/docker-compose.yml
+sed -i "3,3 s/${sedver}/${newver}/" ../package.json
 
 git add --verbose ../docker/Dockerfile ../docker/docker-compose.yml ../package.json && \
 git commit -m ":bookmark: Bump version to v$newver" && \
