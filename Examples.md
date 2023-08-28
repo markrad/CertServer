@@ -21,11 +21,12 @@ Sign a new intermediate CA certificate with CertTestRoot. Upload this to the DPS
 The process of creating the certificates is identical for both direct and indirect. The only difference is that you must check the _Enable IoT Edge on provisioned devices_ box. Once you have generated the device leaf certificate pair, add the certificate full chain and the key to the `/etc/aziot/config.toml` file as follows:
 ```toml
 [provisioning]
-source = "manual"
-iothub_hostname = "<fully qualified name of the IoT hub>"
-device_id = "<device id - must match the CN in the certificate>"
-[provisioning_authentication]
-method = "X509"
+source = "dps"
+global_endpoint = "https://global.azure-devices-provisioning.net/"
+id_scope = "<your DPS scope id>"
+[provisioning_attestation]
+method = "x509"
+registration_id = "<your device identity>"
 identity_pk = "file://</path/to/private_key>"               # Private key
 identity_cert = "file://</path/to/certificate_full_chain>"  # Leaf full chain
 ```
@@ -39,4 +40,48 @@ Root
     └── DPS indirect certificate (CA)
         └──	Intermediate certificate (CA)
             └──	Device certificate (leaf)
-``````
+```
+### IoT Hub
+#### X.509 CA Authentication
+Sign a new intermediate CA certificate with CertTestRoot. Upload the certificate to the IoT hub. Use this certificate to sign a leaf certificate with a CN that equals the device identity. Use the full chain leaf certificate and its private key for X.509 authentication with the IoT hub.
+#### Self-signed Certificate Authentication
+Sign a leaf certificate with literally any CA. It can also be self-signed but this tool does not have that facility. Copy the fingerprint and provide it when creating the device. Again, this certificate's CN must match the device identity.
+#### Self-signed Certificate Authentication with Edge
+Follow the instructions above to create the certificate and add the device with the fingerprint. Set up the config file as follows:
+```toml
+[provisioning]
+source = "manual"
+iothub_hostname = "<fully qualified name of the IoT hub>"
+device_id = "<device id - must match the CN in the certificate>"
+[provisioning_authentication]
+method = "X509"
+identity_pk = "file://</path/to/private_key>"               # Private key
+identity_cert = "file://</path/to/certificate_full_chain>"  # Leaf full chain
+```
+Edge devices do not support X.509 CA authentication.
+### Other Edge Miscellany
+Edge uses certificates in two other places. One set, if not provided, will be generated. These are known as quick start certificates. Generating you own has two advantages. First it will stop the warning being generated in the `iotedge check` output, and it will enable a nested Edge scenario.
+
+To set this up you will first need to sign a new CA intermediate certificate with CertTestRoot. Take that certificate's full chain and its private key and add it to the config.toml as 
+```toml
+[edge_ca]
+cert = "file://</path/to/certificate_full_chain>"  # Intermediate full chain
+pk = "file://</path/to/private_key>"               # Private key
+```
+This certificate will be used to sign a certificate with a CN that matches the hostname specified in the config. It is important that the hostname is resolvable by DNS in transparent gateway scenarios or the TLS negotiation will fail. 
+
+A downstream device that receives this certificate must trust the root of the chain which, in this example, will be the signer of CertTestRoot that was created at the very beginning. The Microsoft IoT device SDKs provide various mechanisms to accomplish that though simply adding it to the trusted root store will often work.
+
+In a nested Edge scenario, the edgeHub and edgeAgent containers will also need to trust that certificate. To do this, you need to add the root certificate to the Edge trust bundle. This file can contain multiple certificates concatenated together as required. Either create this file with the root in it or append the root to the end of an existing file. In the config.toml you specify:
+```toml
+trust_bundle_cert = "file//</your/trust/bundle>"
+```
+### Certificate Hierarchy for Above
+```
+Root
+└──	CertTestRoot (CA)
+    └── IoT Hub Root (CA)
+         ├─	Device X.509 (leaf)
+         ├─	Device self-signed (leaf)
+         └─ Intermediate certificate (CA) for Edge CA
+```
