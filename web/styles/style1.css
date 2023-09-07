@@ -72,20 +72,28 @@ span.idLine {
     font-size: smaller;
     font-weight: bolder;
     color: darkviolet;
-    /* float: right; */
+    /* float: left; */
     cursor: pointer;
     /* padding-left: 10%; */
+}
+
+span.idValue {
+    width: 5%;
 }
 
 span.certArrow {
     font-family: 'Courier New', Courier, monospace;
     cursor: pointer;
+    float: left;
+    padding-right: 5pt;
 }
 
 span.certValue {
     font-family: 'Courier New', Courier, monospace;
     cursor: pointer;
     word-wrap: break-word;
+    float: right;
+    width: 95%
 }
 
 span.certValueKey {
