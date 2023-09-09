@@ -266,7 +266,7 @@ block layout-content
           });
         }
         catch (err) {
-          reject({ error: err, message: 'Unknown error'});
+          reject({ error: err, message: 'Unknown error' });
         }       
       });
     }
@@ -470,7 +470,7 @@ block layout-content
             document.getElementById('uploadCertForm').reset();
             $.magnificPopup.open({
               items: {
-                src: `<div class="error-popup">${err}: ${xhr.responseText}</div>`,
+                src: `<div class="error-popup">${err}: ${JSON.parse(xhr.responseText).error}</div>`,
                 type: 'inline'
               }
             });
@@ -513,7 +513,7 @@ block layout-content
             document.getElementById('uploadKeyForm').reset();
             $.magnificPopup.open({
               items: {
-                src: `<div class="error-popup">${err}: ${xhr.responseText}</div>`,
+                src: `<div class="error-popup">${err}: ${JSON.parse(xhr.responseText).error}</div>`,
                 type: 'inline'
               }
             });
@@ -739,7 +739,7 @@ block layout-content
           let outmsg = JSON.parse(xhr.responseText);
           $.magnificPopup.open({
             items: {
-              src: `<div class="error-popup">${err}: ${outmsg.message}</div>`,
+              src: `<div class="error-popup">${err}: ${outmsg.error}</div>`,
               type: 'inline'
             }
           });
@@ -753,7 +753,7 @@ block layout-content
           let outmsg = JSON.parse(xhr.responseText);
           $.magnificPopup.open({
             items: {
-              src: `<div class="error-popup">${err}: ${outmsg.message}</div>`,
+              src: `<div class="error-popup">${err}: ${outmsg.error}</div>`,
               type: 'inline'
             }
           });
@@ -767,7 +767,7 @@ block layout-content
           let outmsg = JSON.parse(xhr.responseText);
           $.magnificPopup.open({
             items: {
-              src: `<div class="error-popup">${err}: ${outmsg.message}</div>`,
+              src: `<div class="error-popup">${err}: ${outmsg.error}</div>`,
               type: 'inline'
             }
           });
