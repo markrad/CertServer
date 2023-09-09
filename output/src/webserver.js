@@ -315,6 +315,7 @@ class WebServer {
                         errString += 'Common name is required\n';
                     if (!validTo)
                         errString += 'Valid to is required\n';
+                    errString += WebServer._isValidRNASequence([body.country, body.state, body.location, body.unit, body.commonName]);
                     if (errString) {
                         return response.status(400).json({ error: errString });
                     }
@@ -375,6 +376,7 @@ class WebServer {
                         errString += 'Valid to is required\n';
                     if (!body.signer)
                         errString += 'Signing certificate is required';
+                    errString += WebServer._isValidRNASequence([body.country, body.state, body.location, body.unit, body.commonName]);
                     if (errString) {
                         return response.status(400).json({ error: errString });
                     }
@@ -462,12 +464,7 @@ class WebServer {
                         errString += 'Valid to is required\n';
                     if (!body.signer)
                         errString += 'Signing certificate is required\n';
-                    for (let r in [body.country, body.state, body.location, body.unit, body.commonName]) {
-                        if (!/^[a-z A-Z 0-9'\=\(\)\+\,\-\.\/\:\?]*$/.test(r)) {
-                            errString += 'Subject contains an invalid character\n';
-                            break;
-                        }
-                    }
+                    errString += WebServer._isValidRNASequence([body.country, body.state, body.location, body.unit, body.commonName]);
                     if (errString) {
                         return response.status(400).json({ error: errString });
                     }
@@ -1273,6 +1270,14 @@ class WebServer {
                 }
             }));
         });
+    }
+    static _isValidRNASequence(rnas) {
+        for (let r in rnas) {
+            if (!/^[a-z A-Z 0-9'\=\(\)\+\,\-\.\/\:\?]*$/.test(rnas[r])) {
+                return 'Subject contains an invalid character\n';
+            }
+        }
+        return '';
     }
     static _isSignedBy(cert, keyn, keye) {
         let publicKey = node_forge_1.pki.setRsaPublicKey(keyn, keye);

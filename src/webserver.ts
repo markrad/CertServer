@@ -407,6 +407,7 @@ export class WebServer {
 
                 if (!subject.CN) errString += 'Common name is required\n';
                 if (!validTo) errString += 'Valid to is required\n';
+                errString += WebServer._isValidRNASequence([ body.country, body.state, body.location, body.unit, body.commonName ]);
                 if (errString) {
                     return response.status(400).json({ error: errString })
                 }
@@ -470,6 +471,7 @@ export class WebServer {
                 if (!subject.CN) errString += 'Common name is required\n';
                 if (!validTo) errString += 'Valid to is required\n';
                 if (!body.signer) errString += 'Signing certificate is required';
+                errString += WebServer._isValidRNASequence([ body.country, body.state, body.location, body.unit, body.commonName ]);
                 if (errString) {
                     return response.status(400).json({ error: errString })
                 }
@@ -562,12 +564,7 @@ export class WebServer {
                 if (!subject.CN) errString += 'Common name is required\n';
                 if (!validTo) errString += 'Valid to is required\n';
                 if (!body.signer) errString += 'Signing certificate is required\n';
-                for (let r in [ body.country, body.state, body.location, body.unit, body.commonName]) {
-                    if (!/^[a-z A-Z 0-9'\=\(\)\+\,\-\.\/\:\?]*$/.test(r)) {
-                        errString += 'Subject contains an invalid character\n';
-                        break;
-                    }
-                }
+                errString += WebServer._isValidRNASequence([ body.country, body.state, body.location, body.unit, body.commonName ]);
                 if (errString) {
                     return response.status(400).json({ error: errString })
                 }
@@ -1427,6 +1424,15 @@ export class WebServer {
                 reject(err);
             }
         });
+    }
+
+    private static _isValidRNASequence(rnas: string[]): string {
+        for (let r in rnas) {
+            if (!/^[a-z A-Z 0-9'\=\(\)\+\,\-\.\/\:\?]*$/.test(rnas[r])) {
+                return 'Subject contains an invalid character\n';
+            }
+        }
+        return '';
     }
 
     private static _isSignedBy(cert: pki.Certificate, keyn: jsbn.BigInteger, keye: jsbn.BigInteger): boolean {
