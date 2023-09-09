@@ -462,6 +462,12 @@ class WebServer {
                         errString += 'Valid to is required\n';
                     if (!body.signer)
                         errString += 'Signing certificate is required\n';
+                    for (let r in [body.country, body.state, body.location, body.unit, body.commonName]) {
+                        if (!/^[a-z A-Z 0-9'\=\(\)\+\,\-\.\/\:\?]*$/.test(r)) {
+                            errString += 'Subject contains an invalid character\n';
+                            break;
+                        }
+                    }
                     if (errString) {
                         return response.status(400).json({ error: errString });
                     }
