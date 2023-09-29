@@ -24,6 +24,12 @@ field=99
 # hadrepo=0
 # repo="rr-frigate.lan"
 
+if [[ -n $(git status -s) ]]
+then
+    echo Cannot run build with outstanding changes to be committed
+    exit 4
+fi
+
 if [ $# -eq 0 ]
 then
     field=2
