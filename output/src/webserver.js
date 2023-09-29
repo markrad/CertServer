@@ -923,7 +923,7 @@ class WebServer {
             validTo: c.notAfter,
             serialNumber: c.serialNumber == null ? '' : c.serialNumber.match(/.{1,2}/g).join(':'),
             signer: c2 ? c2.name : null,
-            signerId: c2.$loki,
+            signerId: c2 ? c2.$loki : null,
             keyPresent: k != null ? 'yes' : 'no',
             keyId: k ? k.$loki : null,
             fingerprint: c.fingerprint,
@@ -963,7 +963,7 @@ class WebServer {
                     }
                     this._certificates.chain().find({ signedBy: c.serialNumber }).update((cert) => {
                         if (c.$loki != cert.$loki) {
-                            c.signedBy = null;
+                            cert.signedBy = null;
                             result.types.push(cert.type);
                             result.updated.push({ type: cert.type, id: cert.$loki });
                         }
