@@ -82,6 +82,8 @@ type PrivateKeyRow = {
     n: jsbn.BigInteger,
     e: jsbn.BigInteger,
     pairSerial: string,
+    pairId: number,
+    pairCN: string,
     encrypted: boolean,
 };
 
@@ -645,7 +647,7 @@ export class WebServer {
         this._app.get('/api/certName', async(request, response) => {
             try {
                 let c = this._resolveCertificateQuery(request.query as QueryType);
-                response.status(200).json({ 'name': c.name });
+                response.status(200).json({ 'name': c.subject.CN });
             }
             catch (err) {
                 response.status(err.status ?? 500).json({ error: err.message });
@@ -666,12 +668,12 @@ export class WebServer {
                 let retVal: CertificateLine[] = [];
                 if (type != CertTypes.key) {
                     retVal = this._certificates.chain().find({ type: type }).sort((l, r) => l.name.localeCompare(r.name)).data().map((entry) => { 
-                        return { name: entry.name, type: CertTypes[type].toString(), id: entry.$loki }; 
+                        return { name: entry.subject.CN, type: CertTypes[type].toString(), id: entry.$loki }; 
                     });
                 }
                 else {
                     retVal = this._privateKeys.chain().find().sort((l, r) => l.name.localeCompare(r.name)).data().map((entry) => { 
-                        return { name: entry.name, type: CertTypes[type].toString(), id: entry.$loki };
+                        return { name: (entry.pairCN? entry.pairCN + '_key' : entry.name), type: CertTypes[type].toString(), id: entry.$loki };
                     });
                 }
                 response.status(200).json({ files: retVal });
@@ -723,7 +725,7 @@ export class WebServer {
         this._app.get('/api/keyname', async(request, response) => {
             try {
                 let k = this._resolveKeyQuery(request.query);
-                response.status(200).json({ 'name': k.name });
+                response.status(200).json({ 'name': (k.pairCN? k.pairCN + '_key' : k.name) });
             }
             catch (err) {
                 response.status(err.status ?? 500).json({ error: err.message });
@@ -741,6 +743,7 @@ export class WebServer {
                 await writeFile(this._getWorkDir('upload.key'), request.body, { encoding: 'utf8' });
                 let result: OperationResultEx2 = await this._tryAddKey(this._getWorkDir('upload.key'), request.query.password as string);
                 this._broadcast(result);
+                // TODO: I don't think type is used any longer
                 return response.status(200).json({ message: `Key ${result.name} added`, type: result.types.map((t) => CertTypes[t]).join(';')});
             }
             catch (err) {
@@ -837,8 +840,10 @@ export class WebServer {
                             r.serialNumber = null;
                             logger.warn(`Removed signedBy from ${r.name}`);
                         });
-                        this._privateKeys.chain().find({ pairSerial: row.serialNumber }).update((k) => {
+                        this._privateKeys.chain().find({ pairId: row.$loki }).update((k) => {
                             k.pairSerial = null;
+                            k.pairCN = null;
+                            k.pairId = null;
                             logger.warn(`Removed relationship to private key from ${k.name}`);
                         });
                     }
@@ -906,6 +911,8 @@ export class WebServer {
                     if (err) reject(err);
                     else resolve();
                 });
+
+                await this._databaseFixUp();
             }
             catch (err) {
                 reject(err);
@@ -1150,7 +1157,7 @@ export class WebServer {
                     k = pki.privateKeyFromPem(kpem);
                 }
 
-                let krow: PrivateKeyRow = { e: k.e, n: k.n, pairSerial: null, name: null, type: CertTypes.key, encrypted: encrypted };
+                let krow: PrivateKeyRow = { e: k.e, n: k.n, pairSerial: null, pairId: null, pairCN: null, name: null, type: CertTypes.key, encrypted: encrypted };
                 let keys = this._privateKeys.find();
                 let publicKey = pki.setRsaPublicKey(k.n, k.e);
 
@@ -1163,13 +1170,17 @@ export class WebServer {
                 
                 // See if this is the key pair for a certificate
                 let certs = this._certificates.find();
-                let newfile = 'unknown_key_';
+                let newfile: string;
 
-                for (let i = 0; i < certs.length; i++) {
+                // TODO: Remove pairSerial when pairId has replaced its usage
+
+                for (let i in certs) {
                     // if (WebServer._isSignedBy(await this._cache.getCertificate(WebServer._getCertificateFilenameFromRow(certs[i])), k.n, k.e)) {
                     if (WebServer._isSignedBy(await this._pkiCertFromPem(certs[i]), k.n, k.e)) {
                     // if (WebServer._isSignedBy(pki.certificateFromPem(await readFile(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(certs[i])), { encoding: 'utf8' })),  k.n, k.e)) {
                         krow.pairSerial = certs[i].serialNumber;
+                        krow.pairId = certs[i].$loki;
+                        krow.pairCN = certs[i].subject.CN;
                         result.types.push(certs[i].type);
                         result.updated.push({ type: certs[i].type, id: certs[i].$loki });
                         newfile = certs[i].name + '_key';
@@ -1203,9 +1214,9 @@ export class WebServer {
     }
 
     private _getKeyBrief(r: PrivateKeyRow & LokiObj): KeyBrief {
-        return {
+        return { 
             id: r.$loki,
-            name: r.name,
+            name: r.pairId == null? r.name : r.pairCN + '_key',
             certPair: (r.pairSerial == null)? 'Not present' : r.name.substring(0, r.name.length -4),
             encrypted: r.encrypted,
         }
@@ -1424,6 +1435,41 @@ export class WebServer {
                 reject(err);
             }
         });
+    }
+
+    private async _databaseFixUp(): Promise<void> {
+        let keys = this._privateKeys.chain().find({ pairCN: undefined });
+
+        if (keys.count() > 0) {
+            logger.info('Fix up required to keys table');
+            keys.update((key) => {
+                if (key.pairSerial == null) {
+                    logger.info(`Updating key id ${key.$loki} - no matching certificate found`);
+                    key.pairCN = null;
+                    key.pairId = null;
+                }
+                else {
+                    let c = this._certificates.findOne({ serialNumber: key.pairSerial });
+
+                    if (!c) {
+                        logger.info(`Unable to find certificate with serial number ${c.serialNumber.match(/.{1,2}/g).join(':')} - set to none`);
+                        key.pairSerial = null;
+                        key.pairCN = null;
+                        key.pairId = null;
+                    }
+                    else {
+                        logger.info(`Adding pair information from ${c.subject.CN}`);
+                        key.pairCN = c.subject.CN;
+                        key.pairId = c.$loki;
+                    }
+                }
+            });
+        }
+        
+        else {
+            logger.info('No database fix up is required.');
+            return;
+        }
     }
 
     private static _isValidRNASequence(rnas: string[]): string {
