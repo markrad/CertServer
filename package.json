@@ -4,7 +4,7 @@
   "description": "Manages creation and storage of certificates for local use",
   "main": "index.js",
   "scripts": {
-    "test": "node ./output/tests/tests.js"
+    "test": "node ./output/src/tests/tests.js"
   },
   "author": "Mark Radbourne",
   "license": "MIT",
