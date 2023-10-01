@@ -68,7 +68,8 @@ type CertificateRow = {
     fingerprint256: string,
     publicKey: any, 
     privateKey: string,
-    signedBy: string;
+    signedBy: string,
+    signedById: number,
     issuer: CertificateSubject,
     subject: CertificateSubject,
     notBefore: Date,
@@ -121,6 +122,23 @@ type KeyBrief = {
 type OperationResultItem = {
     type: CertTypes,
     id: number
+}
+
+type GenerateCertRequest = {
+    country: string,
+    state: string,
+    location: string,
+    organization: string,
+    unit: string,
+    commonName: string,
+    validFrom: string,
+    validTo: string,
+}
+
+type GenerateChildCertRequest = GenerateCertRequest & {
+    password: string,
+    signer: string,
+    SANArray?: string[],
 }
 
 /**
@@ -394,7 +412,7 @@ export class WebServer {
         this._app.post('/api/createCaCert', async (request, response) => {
             try {
                 logger.debug(request.body);
-                let body = typeof request.body == 'string'? JSON.parse(request.body) : request.body;
+                let body: GenerateCertRequest = typeof request.body == 'string'? JSON.parse(request.body) : request.body;
                 let validFrom: Date = body.validFrom? new Date(body.validFrom) : new Date();
                 let validTo: Date = body.validTo? new Date(body.validTo) : null;
                 let subject: CertificateSubject = {
@@ -457,7 +475,7 @@ export class WebServer {
         this._app.post('/api/createIntermediateCert', async (request, response) => {
             try {
                 logger.debug(request.body);
-                let body = typeof request.body == 'string'? JSON.parse(request.body) : request.body;
+                let body: GenerateChildCertRequest = typeof request.body == 'string'? JSON.parse(request.body) : request.body;
                 let validFrom: Date = body.validFrom? new Date(body.validFrom) : new Date();
                 let validTo: Date = body.validTo? new Date(body.validTo) : null;
                 let subject: CertificateSubject = {
@@ -477,9 +495,8 @@ export class WebServer {
                 if (errString) {
                     return response.status(400).json({ error: errString })
                 }
-// TODO Certificate creation names should not be specific to the type of certificate ie use signer not intSigner
                 const cRow = this._certificates.findOne({ $loki: parseInt(body.signer) });
-                const kRow = this._privateKeys.findOne({ pairSerial: cRow.serialNumber });
+                const kRow = this._privateKeys.findOne({ pairId: cRow.$loki });
 
                 if (!cRow) {
                     return response.status(404).json({ error: 'Could not find signing certificate'});
@@ -493,8 +510,8 @@ export class WebServer {
                 let k: pki.PrivateKey;
 
                 if (c) {
-                    if (body.intPassword) {
-                        k = pki.decryptRsaPrivateKey(await readFile(path.join(this._privatekeysPath, WebServer._getKeyFilenameFromRow(kRow)), { encoding: 'utf8' }), body.intPassword);
+                    if (body.password) {
+                        k = pki.decryptRsaPrivateKey(await readFile(path.join(this._privatekeysPath, WebServer._getKeyFilenameFromRow(kRow)), { encoding: 'utf8' }), body.password);
                     }
                     else {
                         k = pki.privateKeyFromPem(await readFile(path.join(this._privatekeysPath, WebServer._getKeyFilenameFromRow(kRow)), { encoding: 'utf8' }));
@@ -550,7 +567,7 @@ export class WebServer {
         this._app.post('/api/createLeafCert', async (request, response) => {
             try {
                 logger.debug(request.body);
-                let body = typeof request.body == 'string'? JSON.parse(request.body) : request.body;
+                let body: GenerateChildCertRequest = typeof request.body == 'string'? JSON.parse(request.body) : request.body;
                 let validFrom: Date = body.validFrom? new Date(body.validFrom) : new Date();
                 let validTo: Date = body.validTo? new Date(body.validTo) : null;
                 let subject: CertificateSubject = {
@@ -572,7 +589,7 @@ export class WebServer {
                 }
 
                 const cRow = this._certificates.findOne({ $loki: parseInt(body.signer) });
-                const kRow = this._privateKeys.findOne({ pairSerial: cRow.serialNumber });
+                const kRow = this._privateKeys.findOne({ pairId: cRow.$loki });
 
                 if (!cRow || !kRow) {
                     return response.status(500).json({ error: 'Unexpected database corruption - rows missing'});
@@ -582,8 +599,8 @@ export class WebServer {
                 let k: pki.PrivateKey;
 
                 if (c) {
-                    if (body.leafPassword) {
-                        k = pki.decryptRsaPrivateKey(fs.readFileSync(path.join(this._privatekeysPath, WebServer._getKeyFilenameFromRow(kRow)), { encoding: 'utf8' }), body.leafPassword);
+                    if (body.password) {
+                        k = pki.decryptRsaPrivateKey(fs.readFileSync(path.join(this._privatekeysPath, WebServer._getKeyFilenameFromRow(kRow)), { encoding: 'utf8' }), body.password);
                     }
                     else {
                         k = pki.privateKeyFromPem(fs.readFileSync(path.join(this._privatekeysPath, WebServer._getKeyFilenameFromRow(kRow)), { encoding: 'utf8' }));
@@ -594,6 +611,7 @@ export class WebServer {
                 const attributes = WebServer._setAttributes(subject);
                 let sal:ExtensionSubjectAltNameOptions = { domains: [ subject.CN ] };
                 if (body.SANArray != undefined) {
+                    // Add alternate subject names or IPs
                     let SANArray = Array.isArray(body.SANArray)? body.SANArray : [ body.SANArray ];
                     let domains = SANArray.filter((entry: string) => entry.startsWith('DNS:')).map((entry: string) => entry.split(' ')[1]);
                     let ips = SANArray.filter((entry: string) => entry.startsWith('IP:')).map((entry: string) => entry.split(' ')[1]);
@@ -940,10 +958,13 @@ export class WebServer {
                 let result: OperationResultEx2 = { name: '', types: [], added: [], updated: [], deleted: [] };
                 let c: pki.Certificate = pki.certificateFromPem(pemString);
                 let signedBy: string = null;
+                let signedById: number = null;
                 let havePrivateKey: boolean = false;
 
                 // See if we already have this certificate
-                if (this._certificates.findOne({ serialNumber: c.serialNumber }) != null) {
+                let fingerprint256 = new crypto.X509Certificate(pemString).fingerprint256;
+
+                if (this._certificates.findOne({ fingerprint256: fingerprint256 }) != null) {
                     throw new CertError(409, `${path.basename(filename)} serial number ${c.serialNumber} is a duplicate - ignored`);
                 }
 
@@ -951,6 +972,7 @@ export class WebServer {
                 if (c.isIssuer(c)) {
                     result.types.push(CertTypes.root);
                     signedBy = c.serialNumber;
+                    signedById = -1;
                 }
                 else {
                     let bc: any = c.getExtension('basicConstraints');
@@ -966,8 +988,8 @@ export class WebServer {
                     let signer = await this._findSigner(c);
 
                     if (signer != null) {
-                        // FUTURE Burn down the database by using $loki instead of potentially not unique serial number
                         signedBy = signer.serialNumber;
+                        signedById = signer.$loki;
                     }
                 }
                 
@@ -983,23 +1005,6 @@ export class WebServer {
                 let name = WebServer._sanitizeName(c.subject.getField('CN').value);
                 result.name = name;
 
-                // See if we have a private key for this certificate
-                let keys: (PrivateKeyRow & LokiObj)[] = this._privateKeys.chain().find({ pairSerial: null }).data();
-
-                for (let i = 0; i < keys.length; i++) {
-                    if (WebServer._isSignedBy(c, keys[i].n, keys[i].e)) {
-                        logger.info('Found private key for ' + name);
-                        havePrivateKey = true;
-                        await rename(path.join(this._privatekeysPath, WebServer._getKeyFilenameFromRow(keys[i])), path.join(this._privatekeysPath, WebServer._getKeyFilename(name + '_key', keys[i].$loki)));
-                        keys[i].name = name + '_key';
-                        keys[i].pairSerial = c.serialNumber;
-                        this._privateKeys.update(keys[i]);
-                        result.types.push(CertTypes.key);
-                        result.updated.push({ type: CertTypes.key, id: keys[i].$loki });
-                        break;
-                    }
-                }
-
                 logger.info(`Certificate ${name} added`);
                 // This is declared as returning the wrong type hence cast below
                 let newRecord: CertificateRow & LokiObj = (this._certificates.insert({ 
@@ -1009,14 +1014,40 @@ export class WebServer {
                     publicKey: c.publicKey, 
                     privateKey: null, 
                     signedBy: signedBy,
+                    signedById: signedById,
                     issuer: WebServer._getSubject(c.issuer),
                     subject: WebServer._getSubject(c.subject),
                     notBefore: c.validity.notBefore,
                     notAfter: c.validity.notAfter, 
                     havePrivateKey: havePrivateKey,
                     fingerprint: new crypto.X509Certificate(pemString).fingerprint,
-                    fingerprint256: new crypto.X509Certificate(pemString).fingerprint256,
+                    fingerprint256: fingerprint256,
                 })) as CertificateRow & LokiObj;    // Return value erroneous omits LokiObj
+
+                // If the certificate is self-signed update the id in the record
+                if (signedById == -1) {
+                    this._certificates.chain().find({ $loki: newRecord.$loki }).update((r) => {
+                        r.signedById = r.$loki;
+                    })
+                }
+
+                // See if we have a private key for this certificate
+                let keys: (PrivateKeyRow & LokiObj)[] = this._privateKeys.chain().find({ pairId: null }).data();
+
+                for (let i in keys) {
+                    if (WebServer._isSignedBy(c, keys[i].n, keys[i].e)) {
+                        logger.info('Found private key for ' + name);
+                        havePrivateKey = true;
+                        await rename(path.join(this._privatekeysPath, WebServer._getKeyFilenameFromRow(keys[i])), path.join(this._privatekeysPath, WebServer._getKeyFilename(name + '_key', keys[i].$loki)));
+                        keys[i].name = name + '_key';
+                        keys[i].pairSerial = c.serialNumber;
+                        keys[i].pairId = newRecord.$loki;
+                        this._privateKeys.update(keys[i]);
+                        result.types.push(CertTypes.key);
+                        result.updated.push({ type: CertTypes.key, id: keys[i].$loki });
+                        break;
+                    }
+                }
 
                 // This guarantees a unique filename
                 let newName = WebServer._getCertificateFilenameFromRow(newRecord);
@@ -1044,8 +1075,8 @@ export class WebServer {
                 logger.warn(`Signed by certificate missing for ${c.name}`);
             }
         } 
-        let k = this._privateKeys.findOne({ pairSerial: c.serialNumber });
-        let s: number[] = this._certificates.find({ signedBy: c.serialNumber }).map((r) => r.$loki);
+        let k = this._privateKeys.findOne({ pairId: c.$loki });
+        let s: number[] = this._certificates.find({ signedById: c.$loki }).map((r) => r.$loki);
         return { 
             id: c.$loki,
             certType: CertTypes[c.type],
@@ -1086,9 +1117,10 @@ export class WebServer {
                 };
                 result.types.push(c.type);
                 result.deleted.push({ type: c.type, id: c.$loki });
-                let key = this._privateKeys.findOne({ pairSerial: c.serialNumber });
+                let key = this._privateKeys.findOne({ pairId: c.$loki });
                 if (key) {
                     key.pairSerial = null;
+                    key.pairId = null;
                     let unknownName = WebServer._getKeyFilename('unknown_key', key.$loki);
                     await rename(this._getKeysDir(WebServer._getKeyFilenameFromRow(key)), this._getKeysDir(unknownName));
                     key.name = WebServer._getDisplayName(unknownName);
@@ -1097,7 +1129,7 @@ export class WebServer {
                     result.updated.push({ type: CertTypes.key, id: key.$loki });
                 }
 
-                this._certificates.chain().find({ signedBy: c.serialNumber }).update((cert) => {
+                this._certificates.chain().find({ signedById: c.$loki }).update((cert) => {
                     if (c.$loki != cert.$loki) {
                         cert.signedBy = null;
                         result.types.push(cert.type);
@@ -1125,7 +1157,6 @@ export class WebServer {
      */
     private async _tryAddKey(filename: string, password?: string): Promise<OperationResultEx2> {
         return new Promise<OperationResultEx2>(async (resolve, reject) => {
-            // TODO Figure out how to check if this key has already been uploaded
             logger.info(`Trying to add ${path.basename(filename)}`);
             if (!await exists(filename)) {
                 reject(new CertError(404, `${path.basename(filename)} does not exist`));
@@ -1172,12 +1203,8 @@ export class WebServer {
                 let certs = this._certificates.find();
                 let newfile: string;
 
-                // TODO: Remove pairSerial when pairId has replaced its usage
-
                 for (let i in certs) {
-                    // if (WebServer._isSignedBy(await this._cache.getCertificate(WebServer._getCertificateFilenameFromRow(certs[i])), k.n, k.e)) {
                     if (WebServer._isSignedBy(await this._pkiCertFromPem(certs[i]), k.n, k.e)) {
-                    // if (WebServer._isSignedBy(pki.certificateFromPem(await readFile(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(certs[i])), { encoding: 'utf8' })),  k.n, k.e)) {
                         krow.pairSerial = certs[i].serialNumber;
                         krow.pairId = certs[i].$loki;
                         krow.pairCN = certs[i].subject.CN;
@@ -1189,7 +1216,7 @@ export class WebServer {
                 }
 
                 // Generate a file name for a key without a certificate
-                if (krow.pairSerial == null) {
+                if (krow.pairId == null) {
                     newfile = 'unknown_key';
                 }
 
@@ -1217,7 +1244,7 @@ export class WebServer {
         return { 
             id: r.$loki,
             name: r.pairId == null? r.name : r.pairCN + '_key',
-            certPair: (r.pairSerial == null)? 'Not present' : r.name.substring(0, r.name.length -4),
+            certPair: (r.pairId == null)? 'Not present' : r.name.substring(0, r.name.length -4),
             encrypted: r.encrypted,
         }
     }
@@ -1237,8 +1264,8 @@ export class WebServer {
 
                 // let certTypes: CertTypes[] = [CertTypes.key];
                 // let certificatesupdated: number[] = [];
-                if (k.pairSerial) {
-                    let cert = this._certificates.findOne({ serialNumber: k.pairSerial });
+                if (k.pairId) {
+                    let cert = this._certificates.findOne({ $loki: k.pairId });
                     if (!cert) {
                         logger.warn(`Could not find certificate with serial number ${k.pairSerial}`);
                     }
@@ -1333,7 +1360,6 @@ export class WebServer {
                     logger.debug(`Checking ${check.subject.getField('CN').value }`);
                     try {
                         if (certificate.verify(check)) {
-                            // BUG I think there is a better way to do this
                             this._certificates.chain().find({ 'serialNumber': check.serialNumber }).update((u) => {
                                 u.signedBy = certificate.serialNumber;
                             });
@@ -1452,7 +1478,7 @@ export class WebServer {
                     let c = this._certificates.findOne({ serialNumber: key.pairSerial });
 
                     if (!c) {
-                        logger.info(`Unable to find certificate with serial number ${c.serialNumber.match(/.{1,2}/g).join(':')} - set to none`);
+                        logger.warn(`Unable to find certificate with serial number ${c.serialNumber.match(/.{1,2}/g).join(':')} - set to none`);
                         key.pairSerial = null;
                         key.pairCN = null;
                         key.pairId = null;
@@ -1465,8 +1491,33 @@ export class WebServer {
                 }
             });
         }
+
+        let certs = this._certificates.chain().find({ signedById: undefined });
+
+        if (certs.count() > 0) {
+            logger.info('Fix up required to certificates table');
+            certs.update((c) => {
+                logger.info(`Adding signer information to ${c.subject.CN}`);
+                if (c.signedBy == null) {
+                    c.signedById = null;
+                }
+                else if (c.serialNumber == c.signedBy) {
+                    c.signedById = c.$loki;
+                }
+                else {
+                    let cs = this._certificates.findOne({ serialNumber: c.signedBy });
+                    if (cs == null) {
+                        logger.warn(`Could not find signing certificate for ${c.subject.CN}`);
+                        c.signedById = null;
+                    }
+                    else {
+                        c.signedById = cs.$loki;
+                    }
+                }
+            });
+        }
         
-        else {
+        if (keys.count() == 0 && certs.count() == 0) {
             logger.info('No database fix up is required.');
             return;
         }
