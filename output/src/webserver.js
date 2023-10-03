@@ -103,6 +103,7 @@ class WebServer {
         this._certificate = null;
         this._key = null;
         this._version = 'v' + require('../../package.json').version;
+        this._currentVersion = null;
         this._config = config;
         this._port = config.certServer.port;
         this._dataPath = config.certServer.root;
@@ -146,12 +147,16 @@ class WebServer {
                 if (null == (privateKeys = db.getCollection('privateKeys'))) {
                     privateKeys = db.addCollection('privateKeys', {});
                 }
+                if (null == (dbVersion = db.getCollection('dbversion'))) {
+                    dbVersion = db.addCollection('dbversion', {});
+                }
                 ew.EventSet();
             };
             try {
                 var ew = new eventWaiter_1.EventWaiter();
                 var certificates = null;
                 var privateKeys = null;
+                var dbVersion = null;
                 var db = new lokijs_1.default(path_1.default.join(this._dbPath.toString(), this.DB_NAME), {
                     autosave: true,
                     autosaveInterval: 2000,
@@ -165,6 +170,7 @@ class WebServer {
                 this._db = db;
                 this._certificates = certificates;
                 this._privateKeys = privateKeys;
+                this._dbVersion = dbVersion;
                 yield this._dbInit();
             }
             catch (err) {
@@ -725,6 +731,24 @@ class WebServer {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
                 try {
+                    let version = this._dbVersion.where((_v) => true);
+                    if (version.length > 1) {
+                        logger.fatal('Version table is corrupt. Should only contain one row');
+                        process.exit(4);
+                    }
+                    else if (version.length == 0) {
+                        // let v: DBVersionRow = { version: 0 };
+                        this._dbVersion.insert({ version: 0 });
+                        this._currentVersion = 0;
+                    }
+                    else {
+                        this._currentVersion = version[0].version;
+                    }
+                    if (WebServer._lowestDBVersion > this._currentVersion) {
+                        logger.error(`The lowest database version this release can operate with is ${WebServer._lowestDBVersion} but the database is at ${this._currentVersion}`);
+                        logger.fatal('Please install an earlier release of this application');
+                        process.exit(4);
+                    }
                     let files;
                     let certRows = this._certificates.chain().simplesort('name').data();
                     certRows.forEach((row) => {
@@ -1287,57 +1311,65 @@ class WebServer {
     }
     _databaseFixUp() {
         return __awaiter(this, void 0, void 0, function* () {
-            let keys = this._privateKeys.chain().find({ pairCN: undefined });
-            if (keys.count() > 0) {
-                logger.info('Fix up required to keys table');
-                keys.update((key) => {
-                    if (key.pairSerial == null) {
-                        logger.info(`Updating key id ${key.$loki} - no matching certificate found`);
-                        key.pairCN = null;
-                        key.pairId = null;
-                    }
-                    else {
-                        let c = this._certificates.findOne({ serialNumber: key.pairSerial });
-                        if (!c) {
-                            logger.warn(`Unable to find certificate with serial number ${c.serialNumber.match(/.{1,2}/g).join(':')} - set to none`);
-                            key.pairSerial = null;
+            // This section will update the database from 0 to 1
+            if (this._currentVersion < 1) {
+                let keys = this._privateKeys.chain().find({ pairCN: undefined });
+                if (keys.count() > 0) {
+                    logger.info('Fix up required to keys table');
+                    keys.update((key) => {
+                        if (key.pairSerial == null) {
+                            logger.info(`Updating key id ${key.$loki} - no matching certificate found`);
                             key.pairCN = null;
                             key.pairId = null;
                         }
                         else {
-                            logger.info(`Adding pair information from ${c.subject.CN}`);
-                            key.pairCN = c.subject.CN;
-                            key.pairId = c.$loki;
+                            let c = this._certificates.findOne({ serialNumber: key.pairSerial });
+                            if (!c) {
+                                logger.warn(`Unable to find certificate with serial number ${c.serialNumber.match(/.{1,2}/g).join(':')} - set to none`);
+                                key.pairSerial = null;
+                                key.pairCN = null;
+                                key.pairId = null;
+                            }
+                            else {
+                                logger.info(`Adding pair information from ${c.subject.CN}`);
+                                key.pairCN = c.subject.CN;
+                                key.pairId = c.$loki;
+                            }
                         }
-                    }
-                });
-            }
-            let certs = this._certificates.chain().find({ signedById: undefined });
-            if (certs.count() > 0) {
-                logger.info('Fix up required to certificates table');
-                certs.update((c) => {
-                    logger.info(`Adding signer information to ${c.subject.CN}`);
-                    if (c.signedBy == null) {
-                        c.signedById = null;
-                    }
-                    else if (c.serialNumber == c.signedBy) {
-                        c.signedById = c.$loki;
-                    }
-                    else {
-                        let cs = this._certificates.findOne({ serialNumber: c.signedBy });
-                        if (cs == null) {
-                            logger.warn(`Could not find signing certificate for ${c.subject.CN}`);
+                    });
+                }
+                let certs = this._certificates.chain().find({ signedById: undefined });
+                if (certs.count() > 0) {
+                    logger.info('Fix up required to certificates table');
+                    certs.update((c) => {
+                        logger.info(`Adding signer information to ${c.subject.CN}`);
+                        if (c.signedBy == null) {
                             c.signedById = null;
                         }
-                        else {
-                            c.signedById = cs.$loki;
+                        else if (c.serialNumber == c.signedBy) {
+                            c.signedById = c.$loki;
                         }
-                    }
-                });
+                        else {
+                            let cs = this._certificates.findOne({ serialNumber: c.signedBy });
+                            if (cs == null) {
+                                logger.warn(`Could not find signing certificate for ${c.subject.CN}`);
+                                c.signedById = null;
+                            }
+                            else {
+                                c.signedById = cs.$loki;
+                            }
+                        }
+                    });
+                }
+                if (keys.count() == 0 && certs.count() == 0) {
+                    logger.info('No database fix up is required.');
+                }
+                let newVersion = 1;
+                this._dbVersion.findAndUpdate({ version: this._currentVersion }, (v) => v.version = newVersion);
+                this._currentVersion = newVersion;
             }
-            if (keys.count() == 0 && certs.count() == 0) {
-                logger.info('No database fix up is required.');
-                return;
+            else {
+                logger.info('Database is a supported version for this release');
             }
         });
     }
@@ -1418,6 +1450,7 @@ class WebServer {
 }
 exports.WebServer = WebServer;
 WebServer.instance = null;
+WebServer._lowestDBVersion = 0;
 WebServer._makeNumberPositive = (hexString) => {
     let mostSignificativeHexDigitAsInt = parseInt(hexString[0], 16);
     if (mostSignificativeHexDigitAsInt < 8)
