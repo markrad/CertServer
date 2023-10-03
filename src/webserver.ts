@@ -874,6 +874,8 @@ export class WebServer {
                     this._currentVersion = version[0].version;
                 }
 
+                logger.info(`Database version is ${this._currentVersion}`);
+
                 if (WebServer._lowestDBVersion > this._currentVersion) {
                     logger.error(`The lowest database version this release can operate with is ${WebServer._lowestDBVersion} but the database is at ${this._currentVersion}`);
                     logger.fatal('Please install an earlier release of this application');
@@ -1558,6 +1560,7 @@ export class WebServer {
             let newVersion = 1;
             this._dbVersion.findAndUpdate({ version: this._currentVersion }, (v) => v.version = newVersion);
             this._currentVersion = newVersion;
+            console.info(`Databsae successfully upgraded to ${this._currentVersion}`);
         }
         else {
             logger.info('Database is a supported version for this release');
