@@ -296,6 +296,9 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         checkPacket(msg, '', 0, 2, 1);
         checkItems(msg.updated, [{ type: 4, id: 1 }, { type: 2, id: 2 }]);
         checkItems(msg.deleted, [{ type: 1, id: 1 }]);
+        res = await httpRequest('get', url + '/certdetails?id=2');
+        assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
+        assert.equal(res.body.signerId, null, 'Signed certificate still references nonexistent parent');
         // console.log(msg);
         console.log('passed');
 
@@ -309,6 +312,9 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         checkPacket(msg, 'someName', 1, 2, 0);
         checkItems(msg.added, [{ type: 1, id: 4 }]);
         checkItems(msg.updated, [{ type: 2, id: 2 }, { type: 4, id: 1 }]);
+        res = await httpRequest('get', url + '/certdetails?id=2');
+        assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
+        assert.equal(res.body.signerId, 4, 'Signed certificate does not reference uploaded parent');
         console.log('passed')
 
         step = _step('delete intermediate key');
