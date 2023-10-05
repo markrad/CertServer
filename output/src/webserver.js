@@ -1371,24 +1371,39 @@ class WebServer {
                     });
                 }
                 if (keys.count() == 0 && certs.count() == 0) {
-                    logger.info('No database fix up is required.');
+                    logger.info('No database fix up to version 1 is required.');
                 }
                 let newVersion = 1;
                 this._dbVersion.findAndUpdate({ version: this._currentVersion }, (v) => v.version = newVersion);
                 this._currentVersion = newVersion;
-                console.info(`Databsae successfully upgraded to ${this._currentVersion}`);
+                logger.info(`Database successfully upgraded to ${this._currentVersion}`);
             }
             if (this._currentVersion == 1) {
                 // This section will update the database from 1 to 2
                 // Remove unused items in keys
-                let updateCount = 0;
-                this._privateKeys.chain().update((k) => {
-                    if (k.pairSerial != undefined) {
+                let keys = this._privateKeys.chain().find({ pairSerial: { $ne: undefined } });
+                if (keys.count() > 0) {
+                    let updateCount = 0;
+                    keys.update((k) => {
                         k.pairSerial = undefined;
                         updateCount++;
-                    }
-                });
-                logger.debug(`Removed pairSerial field from ${updateCount} rows`);
+                    });
+                    logger.debug(`Removed pairSerial field from ${updateCount} rows`);
+                }
+                let certs = this._certificates.chain().find({ signedBy: { $ne: undefined } });
+                if (certs.count() > 0) {
+                    certs.update((c) => {
+                        c.signedBy = undefined;
+                        logger.info(`Removed signedBy from ${c.subject.CN}`);
+                    });
+                }
+                if (keys.count() == 0 && certs.count() == 0) {
+                    logger.info('No database fix up to version 2 is required.');
+                }
+                let newVersion = 2;
+                this._dbVersion.findAndUpdate({ version: this._currentVersion }, (v) => v.version = newVersion);
+                this._currentVersion = newVersion;
+                logger.info(`Database successfully upgraded to ${this._currentVersion}`);
             }
             logger.info('Database is a supported version for this release');
         });
