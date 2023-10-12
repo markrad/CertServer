@@ -880,7 +880,7 @@ class WebServer {
                     }
                     // Generate a filename for the common name
                     let name = WebServer._sanitizeName(c.subject.getField('CN').value);
-                    result.name = name;
+                    result.name = c.subject.getField('CN').value;
                     logger.info(`Certificate ${name} added`);
                     // This is declared as returning the wrong type hence cast below
                     let newRecord = (this._certificates.insert({
@@ -1087,8 +1087,11 @@ class WebServer {
                     // Generate a file name for a key without a certificate
                     if (krow.pairId == null) {
                         newfile = 'unknown_key';
+                        result.name = newfile;
                     }
-                    result.name = newfile;
+                    else {
+                        result.name = krow.pairCN + '_key';
+                    }
                     krow.name = newfile;
                     let newRecord = (this._privateKeys.insert(krow));
                     result.added.push({ type: CertTypes.key, id: newRecord.$loki });
