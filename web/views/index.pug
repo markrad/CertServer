@@ -289,7 +289,6 @@ block layout-content
             });
           },
           success: async (result, status) => {
-            //- processChanges(result.types);
             $.magnificPopup.open({
               items: {
                 src: `<div class="white-popup">Certificate ${name} deleted</div>`,
@@ -299,14 +298,6 @@ block layout-content
           }
         });
       }
-    }
-
-    function processChanges(types) {
-      types.split(';').forEach(async (type) => {
-        let files = await getDir(type);
-        if (type == 'key') buildKeyList($(`#${type}List`), files.files);
-        else buildCertList($(`#${type}List`), files.files);
-      });
     }
 
     function newIntermediateDialog(id, name) {
@@ -422,7 +413,6 @@ block layout-content
             });
           },
           success: async (result, status) => {
-            //- processChanges(result.types);
             $.magnificPopup.open({
               items: {
                 src: `<div class="white-popup">Key ${name} Deleted</div>`,
@@ -478,7 +468,6 @@ block layout-content
           },
           success: async (result, status) => {
             document.getElementById('uploadCertForm').reset();
-            //- processChanges(result.types);
             $.magnificPopup.open({
               items: {
                 src: `<div class="white-popup">File uploaded</div>`,
@@ -520,7 +509,6 @@ block layout-content
           },
           success: async (result, status) => {
             document.getElementById('uploadKeyForm').reset();
-            //- processChanges(result.types);
             $.magnificPopup.open({
               items: {
                 src: `<div class="white-popup">Key uploaded</div>`,
@@ -534,7 +522,6 @@ block layout-content
 
     function createCACertResponse(result) {
       console.log(result);
-      //- processChanges(result.types);
       $('#generateCAReset').click();
       $.magnificPopup.open({
         items: {
@@ -558,7 +545,6 @@ block layout-content
 
     function createLeafCertResponse(result) {
       console.log(result);
-      //- processChanges(result.types);
       $('#generateLeafReset').click();
       $.magnificPopup.open({
         items: {
