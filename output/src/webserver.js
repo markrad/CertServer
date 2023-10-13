@@ -37,7 +37,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WebServer = void 0;
 const node_fs_1 = require("node:fs");
-// import { exists } from 'node:fs/promises';
 const path_1 = __importDefault(require("path"));
 const http_1 = __importDefault(require("http"));
 const https_1 = __importDefault(require("https"));
@@ -52,7 +51,6 @@ const express_fileupload_1 = __importDefault(require("express-fileupload"));
 const serve_favicon_1 = __importDefault(require("serve-favicon"));
 const ws_1 = __importDefault(require("ws"));
 const log4js = __importStar(require("log4js"));
-// import { CertificateCache } from './certificateCache';
 const eventWaiter_1 = require("./utility/eventWaiter");
 const exists_1 = require("./utility/exists");
 const ExtensionBasicConstraints_1 = require("./Extensions/ExtensionBasicConstraints");
@@ -232,7 +230,7 @@ class WebServer {
                     try {
                         let result = yield this._tryAddCertificate(tempName);
                         this._broadcast(result);
-                        return response.status(200).json({ message: `Certificate ${result.name} added`, types: result.types.map((t) => CertTypes[t]).join(';') });
+                        return response.status(200).json({ message: `Certificate ${result.name} added` });
                     }
                     catch (err) {
                         return response.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).json({ error: err.message });
@@ -271,7 +269,7 @@ class WebServer {
                     try {
                         let result = yield this._tryAddKey(tempName, request.query.password);
                         this._broadcast(result);
-                        return response.status(200).json({ message: `Key ${result.name} added`, types: result.types.map((t) => CertTypes[t]).join(';') });
+                        return response.status(200).json({ message: `Key ${result.name} added` });
                     }
                     catch (err) {
                         return response.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).send(err.message);
@@ -439,9 +437,8 @@ class WebServer {
                     certResult.added = certResult.added.concat(keyResult.added);
                     certResult.name = `${certResult.name}/${keyResult.name}`;
                     this._broadcast(certResult);
-                    let retTypes = Array.from(new Set(certResult.types.concat(keyResult.types).concat([CertTypes.intermediate]))).map((type) => CertTypes[type]);
                     return response.status(200)
-                        .json({ message: `Certificate/Key ${certResult.name} added`, types: retTypes.join(';') });
+                        .json({ message: `Certificate/Key ${certResult.name} added` });
                 }
                 catch (err) {
                     logger.error(`Failed to create intermediate certificate: ${err.message}`);
@@ -534,9 +531,8 @@ class WebServer {
                     certResult.added = certResult.added.concat(keyResult.added);
                     certResult.name = `${certResult.name}/${keyResult.name}`;
                     this._broadcast(certResult);
-                    let retTypes = Array.from(new Set(certResult.types.concat(keyResult.types).concat([CertTypes.leaf]))).map((type) => CertTypes[type]);
                     return response.status(200)
-                        .json({ message: `Certificate/Key ${certResult.name}/${keyResult.name} added`, types: retTypes.join(';') });
+                        .json({ message: `Certificate/Key ${certResult.name}/${keyResult.name} added` });
                 }
                 catch (err) {
                     logger.error(`Error creating leaf certificate: ${err.message}`);
@@ -605,7 +601,7 @@ class WebServer {
                     yield (0, promises_1.writeFile)(path_1.default.join(this._workPath, 'upload.pem'), request.body, { encoding: 'utf8' });
                     let result = yield this._tryAddCertificate(this._getWorkDir('upload.pem'));
                     this._broadcast(result);
-                    return response.status(200).json({ message: `Certificate ${result.name} added`, type: result.types.map((t) => CertTypes[t]).join(';') });
+                    return response.status(200).json({ message: `Certificate ${result.name} added` });
                 }
                 catch (err) {
                     response.status((_e = err.status) !== null && _e !== void 0 ? _e : 500).json({ error: err.message });
@@ -617,7 +613,7 @@ class WebServer {
                     let c = this._resolveCertificateQuery(request.query);
                     let result = yield this._tryDeleteCert(c);
                     this._broadcast(result);
-                    return response.status(200).json({ message: `Certificate ${result.name} deleted`, types: result.types.map((t) => CertTypes[t]).join(';') });
+                    return response.status(200).json({ message: `Certificate ${result.name} deleted` });
                 }
                 catch (err) {
                     return response.status((_f = err.status) !== null && _f !== void 0 ? _f : 500).json(JSON.stringify({ error: err.message }));
@@ -646,7 +642,7 @@ class WebServer {
                     let result = yield this._tryAddKey(this._getWorkDir('upload.key'), request.query.password);
                     this._broadcast(result);
                     // TODO: I don't think type is used any longer
-                    return response.status(200).json({ message: `Key ${result.name} added`, type: result.types.map((t) => CertTypes[t]).join(';') });
+                    return response.status(200).json({ message: `Key ${result.name} added` });
                 }
                 catch (err) {
                     response.status(500).json({ error: err.message });
@@ -658,7 +654,7 @@ class WebServer {
                     let k = this._resolveKeyQuery(request.query);
                     let result = yield this._tryDeleteKey(k);
                     this._broadcast(result);
-                    return response.status(200).json({ message: `Key ${result.name} deleted`, types: result.types.map((t) => CertTypes[t]).join(';') });
+                    return response.status(200).json({ message: `Key ${result.name} deleted` });
                 }
                 catch (err) {
                     return response.status((_h = err.status) !== null && _h !== void 0 ? _h : 500).json({ error: err.message });
@@ -847,7 +843,7 @@ class WebServer {
                     if (msg.type != 'CERTIFICATE') {
                         throw new CertError(400, 'Unsupported type ' + msg.type);
                     }
-                    let result = { name: '', types: [], added: [], updated: [], deleted: [] };
+                    let result = { name: '', added: [], updated: [], deleted: [] };
                     let c = node_forge_1.pki.certificateFromPem(pemString);
                     let signedBy = null;
                     let signedById = null;
@@ -858,18 +854,17 @@ class WebServer {
                         throw new CertError(409, `${path_1.default.basename(filename)} serial number ${c.serialNumber} is a duplicate - ignored`);
                     }
                     // See if this is a root, intermiate, or leaf
+                    let type;
                     if (c.isIssuer(c)) {
-                        result.types.push(CertTypes.root);
-                        signedBy = c.serialNumber;
-                        signedById = -1;
+                        type = CertTypes.root;
                     }
                     else {
                         let bc = c.getExtension('basicConstraints');
                         if ((bc != null) && ((_a = bc.cA) !== null && _a !== void 0 ? _a : false) == true && ((_b = bc.pathlenConstraint) !== null && _b !== void 0 ? _b : 1) > 0) {
-                            result.types.push(CertTypes.intermediate);
+                            type = CertTypes.intermediate;
                         }
                         else {
-                            result.types.push(CertTypes.leaf);
+                            type = CertTypes.leaf;
                         }
                         // See if any existing certificates signed this one
                         let signer = yield this._findSigner(c);
@@ -885,7 +880,7 @@ class WebServer {
                     // This is declared as returning the wrong type hence cast below
                     let newRecord = (this._certificates.insert({
                         name: name,
-                        type: result.types[0],
+                        type: type,
                         serialNumber: c.serialNumber,
                         publicKey: c.publicKey,
                         privateKey: null,
@@ -899,6 +894,7 @@ class WebServer {
                         fingerprint: new crypto_1.default.X509Certificate(pemString).fingerprint,
                         fingerprint256: fingerprint256,
                     })); // Return value erroneous omits LokiObj
+                    result.added.push({ type: type, id: newRecord.$loki });
                     // If the certificate is self-signed update the id in the record
                     if (signedById == -1) {
                         this._certificates.chain().find({ $loki: newRecord.$loki }).update((r) => {
@@ -906,11 +902,10 @@ class WebServer {
                         });
                     }
                     // Update any certificates signed by this one
-                    if (result.types[0] != CertTypes.leaf) {
+                    if (type != CertTypes.leaf) {
                         // Update certificates that this one signed
                         let list = yield this._findSigned(c, newRecord.$loki);
-                        result.types = result.types.concat(list.types);
-                        result.updated = result.updated.concat(list.updated);
+                        result.updated = result.updated.concat(list);
                     }
                     // See if we have a private key for this certificate
                     let keys = this._privateKeys.chain().find({ pairId: null }).data();
@@ -923,7 +918,6 @@ class WebServer {
                             // keys[i].pairSerial = c.serialNumber;
                             keys[i].pairId = newRecord.$loki;
                             this._privateKeys.update(keys[i]);
-                            result.types.push(CertTypes.key);
                             result.updated.push({ type: CertTypes.key, id: keys[i].$loki });
                             break;
                         }
@@ -932,8 +926,6 @@ class WebServer {
                     let newName = WebServer._getCertificateFilenameFromRow(newRecord);
                     logger.info(`Renamed ${path_1.default.basename(filename)} to ${newName}`);
                     yield (0, promises_1.rename)(filename, path_1.default.join(this._certificatesPath, newName));
-                    result.added.push({ type: result.types[0], id: newRecord.$loki });
-                    result.types = (Array.from(new Set(result.types)));
                     resolve(result);
                 }
                 catch (err) {
@@ -987,12 +979,10 @@ class WebServer {
                     }
                     let result = {
                         name: '',
-                        types: [],
                         added: [],
                         updated: [],
                         deleted: [],
                     };
-                    result.types.push(c.type);
                     result.deleted.push({ type: c.type, id: c.$loki });
                     let key = this._privateKeys.findOne({ pairId: c.$loki });
                     if (key) {
@@ -1002,14 +992,12 @@ class WebServer {
                         yield (0, promises_1.rename)(this._getKeysDir(WebServer._getKeyFilenameFromRow(key)), this._getKeysDir(unknownName));
                         key.name = WebServer._getDisplayName(unknownName);
                         this._privateKeys.update(key);
-                        result.types.push(CertTypes.key);
                         result.updated.push({ type: CertTypes.key, id: key.$loki });
                     }
                     this._certificates.chain().find({ signedById: c.$loki }).update((cert) => {
                         if (c.$loki != cert.$loki) {
                             // cert.signedBy = null;
                             cert.signedById = null;
-                            result.types.push(cert.type);
                             result.updated.push({ type: cert.type, id: cert.$loki });
                         }
                     });
@@ -1040,12 +1028,10 @@ class WebServer {
                 try {
                     let result = {
                         name: '',
-                        types: [],
                         added: [],
                         updated: [],
                         deleted: [],
                     };
-                    result.types.push(CertTypes.key);
                     let k;
                     let kpem = yield (0, promises_1.readFile)(filename, { encoding: 'utf8' });
                     let msg = node_forge_1.pem.decode(kpem)[0];
@@ -1078,7 +1064,6 @@ class WebServer {
                             krow.pairSerial = certs[i].serialNumber;
                             krow.pairId = certs[i].$loki;
                             krow.pairCN = certs[i].subject.CN;
-                            result.types.push(certs[i].type);
                             result.updated.push({ type: certs[i].type, id: certs[i].$loki });
                             newfile = certs[i].name + '_key';
                             break;
@@ -1121,7 +1106,7 @@ class WebServer {
     _tryDeleteKey(k) {
         return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
             try {
-                let result = { types: [CertTypes.key], name: '', added: [], updated: [], deleted: [] };
+                let result = { name: '', added: [], updated: [], deleted: [] };
                 let filename = this._getKeysDir(WebServer._getKeyFilenameFromRow(k));
                 if (yield (0, exists_1.exists)(filename)) {
                     yield (0, promises_1.unlink)(filename);
@@ -1139,7 +1124,6 @@ class WebServer {
                     else {
                         cert.havePrivateKey = false;
                         this._certificates.update(cert);
-                        result.types.push(cert.type);
                         result.updated.push({ type: cert.type, id: cert.$loki });
                         // certificatesupdated.push(cert.$loki);
                     }
@@ -1215,7 +1199,7 @@ class WebServer {
                         { signedById: { $eq: null } },
                         { type: { $in: [CertTypes.leaf, CertTypes.intermediate] } }
                     ] });
-                let retVal = { types: [], updated: [] };
+                let retVal = [];
                 try {
                     for (const s of signeeList) {
                         // signeeList.forEach(async (s) => {
@@ -1228,8 +1212,7 @@ class WebServer {
                                     u.signedById = id;
                                 });
                                 logger.debug(`Marked ${s.name} as signed by ${certificate.subject.getField('CN').name}`);
-                                retVal.types.push(s.type);
-                                retVal.updated.push({ type: s.type, id: s.$loki });
+                                retVal.push({ type: s.type, id: s.$loki });
                                 // this._cache.markDirty(s.name);
                             }
                             else {

@@ -1,11 +1,10 @@
-import { existsSync, mkdirSync/*, writeFileSync*/ } from 'node:fs';
-// import { exists } from 'node:fs/promises';
+import { existsSync, mkdirSync } from 'node:fs';
 import path from 'path';
 import http from 'http';
 import https from 'https';
 import fs from 'fs';
 //import * as fspromises from 'fs/promises'
-import { /*access, constants,*/ readFile, writeFile, appendFile, copyFile, unlink, rename } from 'fs/promises'
+import { readFile, writeFile, appendFile, copyFile, unlink, rename } from 'fs/promises'
 import crypto from 'crypto';
 
 import { jsbn, pki, pem, util, random, md } from 'node-forge'; 
@@ -16,7 +15,6 @@ import serveFavicon from 'serve-favicon';
 import WsServer from 'ws';
 import * as log4js from 'log4js';
 
-// import { CertificateCache } from './certificateCache';
 import { EventWaiter } from './utility/eventWaiter';
 import { exists } from './utility/exists';
 import { ExtensionParent } from './Extensions/ExtensionParent';
@@ -123,11 +121,6 @@ type KeyBrief = {
     encrypted: boolean,
 }
 
-type OperationResultItem = {
-    type: CertTypes,
-    id: number
-}
-
 type GenerateCertRequest = {
     country: string,
     state: string,
@@ -145,6 +138,11 @@ type GenerateChildCertRequest = GenerateCertRequest & {
     SANArray?: string[],
 }
 
+type OperationResultItem = {
+    type: CertTypes,
+    id: number
+}
+
 /**
  * Used to return database entries that have been added, deleted, or updated.
  * 
@@ -154,9 +152,8 @@ type GenerateChildCertRequest = GenerateCertRequest & {
  * @member updated Array of certificates or keys updated
  * @member deleted Array of certificates or keys deleted
  */
-type OperationResultEx2 = {
+type OperationResult = {
     name: string,
-    types: CertTypes[],
     added: OperationResultItem[],
     updated: OperationResultItem[],
     deleted: OperationResultItem[],
@@ -351,9 +348,9 @@ export class WebServer {
                     return response.status(500).json({ error: err.message });
 
                 try {
-                    let result: OperationResultEx2  = await this._tryAddCertificate(tempName);
+                    let result: OperationResult  = await this._tryAddCertificate(tempName);
                     this._broadcast(result);
-                    return response.status(200).json({ message: `Certificate ${result.name} added`, types: result.types.map((t) => CertTypes[t]).join(';') });
+                    return response.status(200).json({ message: `Certificate ${result.name} added` });
                 }
                 catch (err) {
                     return response.status(err.status?? 500).json({ error: err.message });
@@ -391,7 +388,7 @@ export class WebServer {
                 try {
                     let result = await this._tryAddKey(tempName, request.query.password);
                     this._broadcast(result);
-                    return response.status(200).json({ message: `Key ${result.name} added`, types: result.types.map((t) => CertTypes[t]).join(';')});
+                    return response.status(200).json({ message: `Key ${result.name} added` });
                 }
                 catch (err) {
                     return response.status(err.status ?? 500).send(err.message);
@@ -567,9 +564,8 @@ export class WebServer {
                 certResult.added = certResult.added.concat(keyResult.added);
                 certResult.name = `${certResult.name}/${keyResult.name}`;
                 this._broadcast(certResult);
-                let retTypes = Array.from(new Set(certResult.types.concat(keyResult.types).concat([CertTypes.intermediate]))).map((type) => CertTypes[type]);
                 return response.status(200)
-                    .json({ message: `Certificate/Key ${certResult.name} added`, types: retTypes.join(';') });
+                    .json({ message: `Certificate/Key ${certResult.name} added` });
             }
             catch (err) {
                 logger.error(`Failed to create intermediate certificate: ${err.message}`);
@@ -665,9 +661,8 @@ export class WebServer {
                 certResult.added = certResult.added.concat(keyResult.added);
                 certResult.name = `${certResult.name}/${keyResult.name}`;
                 this._broadcast(certResult);
-                let retTypes = Array.from(new Set(certResult.types.concat(keyResult.types).concat([CertTypes.leaf]))).map((type) => CertTypes[type]);
                 return response.status(200)
-                    .json({ message: `Certificate/Key ${certResult.name}/${keyResult.name} added`, types: retTypes.join(';') });
+                    .json({ message: `Certificate/Key ${certResult.name}/${keyResult.name} added` });
             }
             catch (err) {
                 logger.error(`Error creating leaf certificate: ${err.message}`);
@@ -733,9 +728,9 @@ export class WebServer {
             }
             try {
                 await writeFile(path.join(this._workPath, 'upload.pem'), request.body, { encoding: 'utf8' });
-                let result: OperationResultEx2 = await this._tryAddCertificate(this._getWorkDir('upload.pem'));
+                let result: OperationResult = await this._tryAddCertificate(this._getWorkDir('upload.pem'));
                 this._broadcast(result);
-                return response.status(200).json({ message: `Certificate ${result.name} added`, type: result.types.map((t) => CertTypes[t]).join(';') });
+                return response.status(200).json({ message: `Certificate ${result.name} added` });
             }
             catch (err) {
                 response.status(err.status?? 500).json({ error: err.message });
@@ -744,9 +739,9 @@ export class WebServer {
         this._app.delete('/api/deleteCert', async (request, response) => {
             try {
                 let c = this._resolveCertificateQuery(request.query as QueryType);
-                let result: OperationResultEx2 = await this._tryDeleteCert(c);
+                let result: OperationResult = await this._tryDeleteCert(c);
                 this._broadcast(result);
-                return response.status(200).json({ message: `Certificate ${result.name} deleted` , types: result.types.map((t) => CertTypes[t]).join(';') });
+                return response.status(200).json({ message: `Certificate ${result.name} deleted` });
             }
             catch (err) {
                 return response.status(err.status?? 500).json(JSON.stringify({ error: err.message }));
@@ -771,10 +766,10 @@ export class WebServer {
                     return response.status(400).send('Key must be in standard 64 byte line length format - try --data-binary with curl');
                 }
                 await writeFile(this._getWorkDir('upload.key'), request.body, { encoding: 'utf8' });
-                let result: OperationResultEx2 = await this._tryAddKey(this._getWorkDir('upload.key'), request.query.password as string);
+                let result: OperationResult = await this._tryAddKey(this._getWorkDir('upload.key'), request.query.password as string);
                 this._broadcast(result);
                 // TODO: I don't think type is used any longer
-                return response.status(200).json({ message: `Key ${result.name} added`, type: result.types.map((t) => CertTypes[t]).join(';')});
+                return response.status(200).json({ message: `Key ${result.name} added` });
             }
             catch (err) {
                 response.status(500).json({ error: err.message });
@@ -783,9 +778,9 @@ export class WebServer {
         this._app.delete('/api/deleteKey', async (request, response) => {
             try {
                 let k = this._resolveKeyQuery(request.query);
-                let result: OperationResultEx2 = await this._tryDeleteKey(k);
+                let result: OperationResult = await this._tryDeleteKey(k);
                 this._broadcast(result);
-                return response.status(200).json({ message: `Key ${result.name} deleted` , types: result.types.map((t) => CertTypes[t]).join(';') });
+                return response.status(200).json({ message: `Key ${result.name} deleted` });
             }
             catch (err) {
                 return response.status(err.status?? 500).json({ error: err.message });
@@ -904,7 +899,7 @@ export class WebServer {
 
                 files = fs.readdirSync(this._certificatesPath);
 
-                let adding: Promise<OperationResultEx2>[] = [];
+                let adding: Promise<OperationResult>[] = [];
 
                 files.forEach(async (file) => {
                     let cert = this._certificates.findOne({ $loki: WebServer._getIdFromFileName(file) });
@@ -974,8 +969,8 @@ export class WebServer {
         });
     }
 
-    private async _tryAddCertificate(filename: string): Promise<OperationResultEx2> {
-        return new Promise<OperationResultEx2>(async (resolve, reject) => {
+    private async _tryAddCertificate(filename: string): Promise<OperationResult> {
+        return new Promise<OperationResult>(async (resolve, reject) => {
             logger.info(`Trying to add ${path.basename(filename)}`);
             if (!fs.existsSync(filename)) {
                 let err = new CertError(404, `${path.basename(filename)} does not exist`)
@@ -991,7 +986,7 @@ export class WebServer {
                     throw new CertError(400, 'Unsupported type ' + msg.type);
                 }
 
-                let result: OperationResultEx2 = { name: '', types: [], added: [], updated: [], deleted: [] };
+                let result: OperationResult = { name: '', added: [], updated: [], deleted: [] };
                 let c: pki.Certificate = pki.certificateFromPem(pemString);
                 let signedBy: string = null;
                 let signedById: number = null;
@@ -1005,19 +1000,18 @@ export class WebServer {
                 }
 
                 // See if this is a root, intermiate, or leaf
+                let type: CertTypes;
                 if (c.isIssuer(c)) {
-                    result.types.push(CertTypes.root);
-                    signedBy = c.serialNumber;
-                    signedById = -1;
+                    type = CertTypes.root;
                 }
                 else {
                     let bc: any = c.getExtension('basicConstraints');
 
                     if ((bc != null) && (bc.cA ?? false) == true && (bc.pathlenConstraint ?? 1) > 0) {
-                        result.types.push(CertTypes.intermediate);
+                        type = CertTypes.intermediate;
                     }
                     else {
-                        result.types.push(CertTypes.leaf);
+                        type = CertTypes.leaf;
                     }
 
                     // See if any existing certificates signed this one
@@ -1037,7 +1031,7 @@ export class WebServer {
                 // This is declared as returning the wrong type hence cast below
                 let newRecord: CertificateRow & LokiObj = (this._certificates.insert({ 
                     name: name, 
-                    type: result.types[0],
+                    type: type,
                     serialNumber: c.serialNumber, 
                     publicKey: c.publicKey, 
                     privateKey: null, 
@@ -1052,6 +1046,8 @@ export class WebServer {
                     fingerprint256: fingerprint256,
                 })) as CertificateRow & LokiObj;    // Return value erroneous omits LokiObj
 
+                result.added.push({ type: type, id: newRecord.$loki })
+
                 // If the certificate is self-signed update the id in the record
                 if (signedById == -1) {
                     this._certificates.chain().find({ $loki: newRecord.$loki }).update((r) => {
@@ -1060,12 +1056,11 @@ export class WebServer {
                 }
                 
                 // Update any certificates signed by this one
-                if (result.types[0] != CertTypes.leaf) {
+                if (type != CertTypes.leaf) {
                     // Update certificates that this one signed
-                    let list: { types: CertTypes[], updated: OperationResultItem[] } = await this._findSigned(c, newRecord.$loki);
+                    let list: OperationResultItem[]= await this._findSigned(c, newRecord.$loki);
 
-                    result.types = result.types.concat(list.types);
-                    result.updated = result.updated.concat(list.updated);
+                    result.updated = result.updated.concat(list);
                 }
 
                 // See if we have a private key for this certificate
@@ -1080,7 +1075,6 @@ export class WebServer {
                         // keys[i].pairSerial = c.serialNumber;
                         keys[i].pairId = newRecord.$loki;
                         this._privateKeys.update(keys[i]);
-                        result.types.push(CertTypes.key);
                         result.updated.push({ type: CertTypes.key, id: keys[i].$loki });
                         break;
                     }
@@ -1090,8 +1084,6 @@ export class WebServer {
                 let newName = WebServer._getCertificateFilenameFromRow(newRecord);
                 logger.info(`Renamed ${path.basename(filename)} to ${newName}`)
                 await rename(filename, path.join(this._certificatesPath, newName));
-                result.added.push({ type: result.types[0], id: newRecord.$loki });
-                result.types = (Array.from(new Set(result.types)));
                 resolve(result); 
             }
             catch (err) {
@@ -1133,8 +1125,8 @@ export class WebServer {
          };
     }
 
-    private async _tryDeleteCert(c: CertificateRow & LokiObj): Promise<OperationResultEx2> {
-        return new Promise<OperationResultEx2>(async (resolve, reject) => {
+    private async _tryDeleteCert(c: CertificateRow & LokiObj): Promise<OperationResult> {
+        return new Promise<OperationResult>(async (resolve, reject) => {
             try {
                 let filename = this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(c));
 
@@ -1145,14 +1137,12 @@ export class WebServer {
                     logger.error(`Could not find file ${filename}`);
                 }
                 
-                let result: OperationResultEx2 = {
+                let result: OperationResult = {
                     name: '',
-                    types: [],
                     added: [],
                     updated: [],
                     deleted: [],
                 };
-                result.types.push(c.type);
                 result.deleted.push({ type: c.type, id: c.$loki });
                 let key = this._privateKeys.findOne({ pairId: c.$loki });
                 if (key) {
@@ -1162,7 +1152,6 @@ export class WebServer {
                     await rename(this._getKeysDir(WebServer._getKeyFilenameFromRow(key)), this._getKeysDir(unknownName));
                     key.name = WebServer._getDisplayName(unknownName);
                     this._privateKeys.update(key);
-                    result.types.push(CertTypes.key);
                     result.updated.push({ type: CertTypes.key, id: key.$loki });
                 }
 
@@ -1170,7 +1159,6 @@ export class WebServer {
                     if (c.$loki != cert.$loki) {
                         // cert.signedBy = null;
                         cert.signedById = null;
-                        result.types.push(cert.type);
                         result.updated.push({ type: cert.type, id: cert.$loki });
                     }
                 })
@@ -1193,23 +1181,21 @@ export class WebServer {
      * 
      * @returns OperationResultEx2 promise containing updated entries
      */
-    private async _tryAddKey(filename: string, password?: string): Promise<OperationResultEx2> {
-        return new Promise<OperationResultEx2>(async (resolve, reject) => {
+    private async _tryAddKey(filename: string, password?: string): Promise<OperationResult> {
+        return new Promise<OperationResult>(async (resolve, reject) => {
             logger.info(`Trying to add ${path.basename(filename)}`);
             if (!await exists(filename)) {
                 reject(new CertError(404, `${path.basename(filename)} does not exist`));
             }
 
             try {
-                let result: OperationResultEx2 = {
+                let result: OperationResult = {
                     name: '',
-                    types: [],
                     added: [],
                     updated: [],
                     deleted: [],
                 };
 
-                result.types.push(CertTypes.key);
                 let k: pki.rsa.PrivateKey;
                 let kpem = await readFile(filename, { encoding: 'utf8' });
                 let msg = pem.decode(kpem)[0];
@@ -1246,7 +1232,6 @@ export class WebServer {
                         krow.pairSerial = certs[i].serialNumber;
                         krow.pairId = certs[i].$loki;
                         krow.pairCN = certs[i].subject.CN;
-                        result.types.push(certs[i].type);
                         result.updated.push({ type: certs[i].type, id: certs[i].$loki });
                         newfile = certs[i].name + '_key';
                         break;
@@ -1290,10 +1275,10 @@ export class WebServer {
         }
     }
 
-    private _tryDeleteKey(k: PrivateKeyRow & LokiObj): Promise<OperationResultEx2> {
-        return new Promise<OperationResultEx2>(async (resolve, reject) => {
+    private _tryDeleteKey(k: PrivateKeyRow & LokiObj): Promise<OperationResult> {
+        return new Promise<OperationResult>(async (resolve, reject) => {
             try {
-                let result: OperationResultEx2 = { types: [CertTypes.key], name: '', added: [], updated: [], deleted: [] };
+                let result: OperationResult = { name: '', added: [], updated: [], deleted: [] };
                 let filename = this._getKeysDir(WebServer._getKeyFilenameFromRow(k));
 
                 if (await exists(filename)) {
@@ -1313,7 +1298,6 @@ export class WebServer {
                     else {
                         cert.havePrivateKey = false;
                         this._certificates.update(cert);
-                        result.types.push(cert.type);
                         result.updated.push({type: cert.type, id: cert.$loki })
                         // certificatesupdated.push(cert.$loki);
                     }
@@ -1390,13 +1374,13 @@ export class WebServer {
         });
     }
 
-    private async _findSigned(certificate: pki.Certificate, id: number): Promise<{ types: CertTypes[], updated: OperationResultItem[] }> {
-        return new Promise<{ types: CertTypes[], updated: OperationResultItem[] }>(async (resolve, reject) => {
+    private async _findSigned(certificate: pki.Certificate, id: number): Promise<OperationResultItem[]> {
+        return new Promise<OperationResultItem[]>(async (resolve, reject) => {
             let signeeList = this._certificates.find({ $and: [
                 { signedById: { $eq: null } }, 
                 { type: {  $in: [ CertTypes.leaf, CertTypes.intermediate ] }}
             ]});
-            let retVal: { types: CertTypes[], updated: OperationResultItem[] } = { types: [], updated: [] };
+            let retVal: OperationResultItem[] = [];
             try {
                 for (const s of signeeList) {
                 // signeeList.forEach(async (s) => {
@@ -1409,8 +1393,7 @@ export class WebServer {
                                 u.signedById = id;
                             });
                             logger.debug(`Marked ${s.name} as signed by ${certificate.subject.getField('CN').name}`);
-                            retVal.types.push(s.type);
-                            retVal.updated.push({ type: s.type, id: s.$loki });
+                            retVal.push({ type: s.type, id: s.$loki });
                             // this._cache.markDirty(s.name);
                         }
                         else {
@@ -1430,7 +1413,7 @@ export class WebServer {
         });
     }
 
-    private _broadcast(data: OperationResultEx2): void {
+    private _broadcast(data: OperationResult): void {
         let msg = JSON.stringify(data);
         logger.debug('Updates: ' + msg);
 
