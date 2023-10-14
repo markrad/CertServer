@@ -753,7 +753,6 @@ class WebServer {
                             logger.warn(`Certificate ${row.name} not found - removed`);
                             this._certificates.remove(row);
                             this._certificates.chain().find({ $loki: row.signedById }).update((r) => {
-                                r.signedBy = undefined;
                                 r.signedById = null;
                                 logger.warn(`Removed signedBy from ${r.name}`);
                             });
@@ -845,7 +844,6 @@ class WebServer {
                     }
                     let result = { name: '', added: [], updated: [], deleted: [] };
                     let c = node_forge_1.pki.certificateFromPem(pemString);
-                    let signedBy = null;
                     let signedById = null;
                     let havePrivateKey = false;
                     // See if we already have this certificate
@@ -869,7 +867,6 @@ class WebServer {
                         // See if any existing certificates signed this one
                         let signer = yield this._findSigner(c);
                         if (signer != null) {
-                            signedBy = undefined;
                             signedById = signer.$loki;
                         }
                     }
@@ -884,7 +881,6 @@ class WebServer {
                         serialNumber: c.serialNumber,
                         publicKey: c.publicKey,
                         privateKey: null,
-                        signedBy: signedBy,
                         signedById: signedById,
                         issuer: WebServer._getSubject(c.issuer),
                         subject: WebServer._getSubject(c.subject),
@@ -1047,7 +1043,7 @@ class WebServer {
                     else {
                         k = node_forge_1.pki.privateKeyFromPem(kpem);
                     }
-                    let krow = { e: k.e, n: k.n, pairSerial: undefined, pairId: null, pairCN: null, name: null, type: CertTypes.key, encrypted: encrypted };
+                    let krow = { e: k.e, n: k.n, pairId: null, pairCN: null, name: null, type: CertTypes.key, encrypted: encrypted };
                     let keys = this._privateKeys.find();
                     let publicKey = node_forge_1.pki.setRsaPublicKey(k.n, k.e);
                     // See if we already have this key
@@ -1061,7 +1057,6 @@ class WebServer {
                     let newfile;
                     for (let i in certs) {
                         if (WebServer._isSignedBy(yield this._pkiCertFromPem(certs[i]), k.n, k.e)) {
-                            krow.pairSerial = certs[i].serialNumber;
                             krow.pairId = certs[i].$loki;
                             krow.pairCN = certs[i].subject.CN;
                             result.updated.push({ type: certs[i].type, id: certs[i].$loki });
@@ -1208,7 +1203,6 @@ class WebServer {
                         try {
                             if (certificate.verify(check)) {
                                 this._certificates.chain().find({ $loki: s.$loki }).update((u) => {
-                                    u.signedBy = undefined;
                                     u.signedById = id;
                                 });
                                 logger.debug(`Marked ${s.name} as signed by ${certificate.subject.getField('CN').name}`);
@@ -1306,107 +1300,9 @@ class WebServer {
     }
     _databaseFixUp() {
         return __awaiter(this, void 0, void 0, function* () {
-            if (this._currentVersion < 1) {
-                // This section will update the database from 0 to 1
-                let keys = this._privateKeys.chain().find({ pairCN: undefined });
-                if (keys.count() > 0) {
-                    logger.info('Fix up required to keys table');
-                    keys.update((key) => {
-                        if (key.pairSerial == null) {
-                            logger.info(`Updating key id ${key.$loki} - no matching certificate found`);
-                            key.pairCN = null;
-                            key.pairId = null;
-                        }
-                        else {
-                            let c = this._certificates.findOne({ serialNumber: key.pairSerial });
-                            if (!c) {
-                                logger.warn(`Unable to find certificate with serial number ${c.serialNumber.match(/.{1,2}/g).join(':')} - set to none`);
-                                key.pairSerial = null;
-                                key.pairCN = null;
-                                key.pairId = null;
-                            }
-                            else {
-                                logger.info(`Adding pair information from ${c.subject.CN}`);
-                                key.pairCN = c.subject.CN;
-                                key.pairId = c.$loki;
-                            }
-                        }
-                    });
-                }
-                let certs = this._certificates.chain().find({ signedById: undefined });
-                if (certs.count() > 0) {
-                    logger.info('Fix up required to certificates table');
-                    certs.update((c) => {
-                        logger.info(`Adding signer information to ${c.subject.CN}`);
-                        if (c.signedBy == null) {
-                            c.signedById = null;
-                        }
-                        else if (c.serialNumber == c.signedBy) {
-                            c.signedById = c.$loki;
-                        }
-                        else {
-                            let cs = this._certificates.findOne({ serialNumber: c.signedBy });
-                            if (cs == null) {
-                                logger.warn(`Could not find signing certificate for ${c.subject.CN}`);
-                                c.signedById = null;
-                            }
-                            else {
-                                c.signedById = cs.$loki;
-                            }
-                        }
-                    });
-                }
-                if (keys.count() == 0 && certs.count() == 0) {
-                    logger.info('No database fix up to version 1 is required.');
-                }
-                let newVersion = 1;
-                this._dbVersion.findAndUpdate({ version: this._currentVersion }, (v) => v.version = newVersion);
-                this._currentVersion = newVersion;
-                logger.info(`Database successfully upgraded to ${this._currentVersion}`);
-            }
-            if (this._currentVersion == 1) {
-                // This section will update the database from 1 to 2
-                // Remove unused items in keys
-                let keys = this._privateKeys.chain().find({ pairSerial: { $ne: undefined } });
-                if (keys.count() > 0) {
-                    let updateCount = 0;
-                    keys.update((k) => {
-                        k.pairSerial = undefined;
-                        updateCount++;
-                    });
-                    logger.debug(`Removed pairSerial field from ${updateCount} rows`);
-                }
-                let certs = this._certificates.chain().find({ signedBy: { $ne: undefined } });
-                if (certs.count() > 0) {
-                    certs.update((c) => {
-                        c.signedBy = undefined;
-                        logger.info(`Removed signedBy from ${c.subject.CN}`);
-                    });
-                }
-                if (keys.count() == 0 && certs.count() == 0) {
-                    logger.info('No database fix up to version 2 is required.');
-                }
-                let newVersion = 2;
-                this._dbVersion.findAndUpdate({ version: this._currentVersion }, (v) => v.version = newVersion);
-                this._currentVersion = newVersion;
-                logger.info(`Database successfully upgraded to ${this._currentVersion}`);
-            }
-            if (this._currentVersion == 2) {
-                // Will update database from version 2 o 3
-                let certs = this._certificates.chain().find({ signedBy: { $ne: undefined } });
-                if (certs.count() > 0) {
-                    certs.update((c) => {
-                        c.signedBy = undefined;
-                        logger.info(`Removed signedBy from ${c.subject.CN}`);
-                    });
-                }
-                else {
-                    logger.info('No database fix up to version 3 is required.');
-                }
-                let newVersion = 3;
-                this._dbVersion.findAndUpdate({ version: this._currentVersion }, (v) => v.version = newVersion);
-                this._currentVersion = newVersion;
-                logger.info(`Database successfully upgraded to ${this._currentVersion}`);
+            if (this._currentVersion < 3) {
+                console.error(`Database version ${this._currentVersion} is not supported by the release - try installing the previous minor version`);
+                process.exit(4);
             }
             logger.info('Database is a supported version for this release');
         });
