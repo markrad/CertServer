@@ -915,7 +915,7 @@ export class WebServer {
                 // let addresults: string[] = await Promise.all(adding);
                 // logger.debug(addresults.join(';'));
 
-                let nonRoot = this._certificates.find( { '$and': [ { 'type': { '$ne': CertTypes.root }}, { signedBy: null } ] });
+                let nonRoot = this._certificates.find( { '$and': [ { 'type': { '$ne': CertTypes.root }}, { signedById: null } ] });
 
                 for (let i: number = 0; i < nonRoot.length; i++) {
                     let signer = await this._findSigner(pki.certificateFromPem(fs.readFileSync(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(nonRoot[i])), { encoding: 'utf8' })));
@@ -1018,7 +1018,7 @@ export class WebServer {
                     let signer = await this._findSigner(c);
 
                     if (signer != null) {
-                        signedBy = signer.serialNumber;
+                        signedBy = undefined;
                         signedById = signer.$loki;
                     }
                 }
@@ -1492,6 +1492,7 @@ export class WebServer {
     }
 
     private async _databaseFixUp(): Promise<void> {
+
         if (this._currentVersion < 1) {
             // This section will update the database from 0 to 1
             let keys = this._privateKeys.chain().find({ pairCN: undefined });
@@ -1585,6 +1586,26 @@ export class WebServer {
             }
 
             let newVersion = 2;
+            this._dbVersion.findAndUpdate({ version: this._currentVersion }, (v) => v.version = newVersion);
+            this._currentVersion = newVersion;
+            logger.info(`Database successfully upgraded to ${this._currentVersion}`);
+        }
+
+        if (this._currentVersion == 2) {
+            // Will update database from version 2 o 3
+            let certs = this._certificates.chain().find({ signedBy: { $ne: undefined }});
+
+            if (certs.count() > 0) {
+                certs.update((c) => {
+                    c.signedBy = undefined;
+                    logger.info(`Removed signedBy from ${c.subject.CN}`);
+                });
+            }
+            else {
+                logger.info('No database fix up to version 3 is required.');
+            }
+
+            let newVersion = 3;
             this._dbVersion.findAndUpdate({ version: this._currentVersion }, (v) => v.version = newVersion);
             this._currentVersion = newVersion;
             logger.info(`Database successfully upgraded to ${this._currentVersion}`);
