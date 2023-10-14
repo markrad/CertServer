@@ -733,9 +733,8 @@ class WebServer {
                         process.exit(4);
                     }
                     else if (version.length == 0) {
-                        // let v: DBVersionRow = { version: 0 };
-                        this._dbVersion.insert({ version: 0 });
-                        this._currentVersion = 0;
+                        this._currentVersion = 3;
+                        this._dbVersion.insert({ version: this._currentVersion });
                     }
                     else {
                         this._currentVersion = version[0].version;
