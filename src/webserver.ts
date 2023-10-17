@@ -697,7 +697,7 @@ export class WebServer {
                     });
                 }
                 else {
-                    retVal = this._privateKeys.chain().find().sort((l, r) => l.name.localeCompare(r.name)).data().map((entry) => { 
+                    retVal = this._privateKeys.chain().find().sort((l, r) => l.pairCN.localeCompare(r.pairCN)).data().map((entry) => { 
                         return { name: (entry.pairCN? entry.pairCN + '_key' : entry.name), type: CertTypes[type].toString(), id: entry.$loki };
                     });
                 }
