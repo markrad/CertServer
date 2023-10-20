@@ -543,6 +543,11 @@ block layout-content
       $('#newIntermediate').dialog('close');
     }
 
+    function resetIntermediateForm() {
+      $('#newIntermediateForm')[0].reset();
+      $('#IntermediateSANList').empty();
+    }
+
     function createLeafCertResponse(result) {
       console.log(result);
       $('#generateLeafReset').click();
@@ -557,7 +562,7 @@ block layout-content
 
     function resetLeafForm() {
       $('#newLeafForm')[0].reset();
-      $('#SANList').empty();
+      $('#LeafSANList').empty();
     }
 
     async function getName(type, id) {
@@ -579,9 +584,19 @@ block layout-content
       });
     }
 
-    function AddSAN() {
-      let list = $('#SANList');
-      let input = $('#SANInput');
+    function AddIntermediateSAN() {
+      let list = $('#IntermediateSANList');
+      let input = $('#IntermediateSANInput');
+      AddSAN(list, input);
+    }
+
+    function AddLeafSAN() {
+      let list = $('#LeafSANList');
+      let input = $('#LeafSANInput');
+      AddSAN(list, input);
+    }
+
+    function AddSAN(list, input) {
       let type = input.find('.SANType');
       let value = input.find('.SANValue');
       let spanId = 'SAN' + list.children().length;
@@ -763,15 +778,15 @@ block layout-content
 
       let dialogInt = $('#newIntermediate').dialog({
         autoOpen: false,
-        height: 600,
+        //- height: 600,
         width: 350,
         modal: true,
       });
 
       let dialogLeaf = $('#newLeaf').dialog({
         autoOpen: false,
-        height: 680,
-        width: 350,
+        //- height: 640,
+        width: 400,
         modal: true,
       });
       let connectWebSocket = () => {
@@ -819,13 +834,21 @@ block layout-content
       input(type='text' name='unit' id='intermediateOU' value=OU class='text ui-widget-content ui-corner-all')
       label.modalLabel(for='Common Name') Common Name:
       input(type='text' name='commonName' id='intermediateCN' value='' class='text ui-widget-content ui-corner-all')
+      label.modalLabel(for='SANs') SANs
+      div#IntermediateSANList
+      div#IntermediateSANInput
+        select.SANType(title='SAN Type')
+          option DNS 
+          option IP
+        input.SANValue(type='text')
+        input.SANEnter(name='SanEnter' type='button' value='✔' onClick='AddIntermediateSAN()')
       label.modalLabel(for='Valid From') Valid from:
       input#IntermediateValidFrom(type='text' name='validFrom')
       label.modalLabel(for='Valid To') Valid to:
       input#IntermediateValidTo(type='text' name='validTo')
       input#intermediateSigner(type='text' name='signer' value='' class='hidden')
       div.intButtons
-        input.button2#generateIntermediateReset(type="reset", value="Reset" title="Reset")
+        input.button2#generateIntermediateReset(type="reset", value="Reset" title="Reset", onClick="resetIntermediateForm")
         input.button2#generateIntermediateButton.SubmitButton(type="submit" title="submit", value="Generate")
   div#newLeaf(title='** Title **')
    form#newLeafForm(action="/createLeafCert", method="post", encType="application/x-www-form-urlencoded")
@@ -845,13 +868,13 @@ block layout-content
       label.modalLabel(for='Common Name') Common Name:
       input(type='text' name='commonName' id='leafCN' value='' class='text ui-widget-content ui-corner-all')
       label.modalLabel(for='SANs') SANs
-      div#SANList
-      div#SANInput
+      div#LeafSANList
+      div#LeafSANInput
         select.SANType(title='SAN Type')
           option DNS 
           option IP
         input.SANValue(type='text')
-        input.SANEnter(name='SanEnter' type='button' value='✔' onClick='AddSAN()')
+        input.SANEnter(name='SanEnter' type='button' value='✔' onClick='AddLeafSAN()')
       label.modalLabel(for='Valid From') Valid from:
       input#LeafValidFrom(type='text' name='validFrom')
       label.modalLabel(for='Valid To') Valid to:

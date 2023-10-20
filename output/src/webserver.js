@@ -408,6 +408,19 @@ class WebServer {
                     // const ski: any = c.getExtension({ name: 'subjectKeyIdentifier' });
                     const { privateKey, publicKey } = node_forge_1.pki.rsa.generateKeyPair(2048);
                     const attributes = WebServer._setAttributes(subject);
+                    let sal = { domains: [subject.CN] };
+                    if (body.SANArray != undefined) {
+                        // Add alternate subject names or IPs
+                        let SANArray = Array.isArray(body.SANArray) ? body.SANArray : [body.SANArray];
+                        let domains = SANArray.filter((entry) => entry.startsWith('DNS:')).map((entry) => entry.split(' ')[1]);
+                        let ips = SANArray.filter((entry) => entry.startsWith('IP:')).map((entry) => entry.split(' ')[1]);
+                        if (domains.length > 0)
+                            sal.domains = sal.domains.concat(domains);
+                        if (ips.length > 0)
+                            sal['IPs'] = ips;
+                        logger.debug(sal.domains);
+                        logger.debug(sal.IPs);
+                    }
                     const extensions = [
                         new ExtensionBasicConstraints_1.ExtensionBasicConstraints({ cA: true, critical: true }),
                         new ExtensionKeyUsage_1.ExtensionKeyUsage({ keyCertSign: true, cRLSign: true }),
@@ -417,6 +430,7 @@ class WebServer {
                         // new ExtensionAuthorityKeyIdentifier({ /*authorityCertIssuer: true, keyIdentifier: true,*/ serialNumber: ski['subjectKeyIdentifier'] }),
                         // new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, keyIdentifier: true, authorityCertSerialNumber: true }),
                         new ExtensionSubjectKeyIdentifier_1.ExtensionSubjectKeyIdentifier({}),
+                        new ExtensionSubjectAltName_1.ExtensionSubjectAltName(sal),
                     ];
                     // Set the Certificate attributes for the new Root CA
                     cert.publicKey = publicKey;
@@ -1033,6 +1047,7 @@ class WebServer {
                     let encrypted = false;
                     if (msg.type == 'ENCRYPTED PRIVATE KEY') {
                         if (!password) {
+                            // TODO Fix lack of error message on web client
                             logger.warn(`Cannot add ${filename} - no pasword for encrypted key`);
                             return reject(new CertError(400, 'Password is required for key ' + filename));
                         }

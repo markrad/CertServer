@@ -533,6 +533,17 @@ export class WebServer {
                 // const ski: any = c.getExtension({ name: 'subjectKeyIdentifier' });
                 const { privateKey, publicKey } = pki.rsa.generateKeyPair(2048);
                 const attributes = WebServer._setAttributes(subject);
+                let sal:ExtensionSubjectAltNameOptions = { domains: [ subject.CN ] };
+                if (body.SANArray != undefined) {
+                    // Add alternate subject names or IPs
+                    let SANArray = Array.isArray(body.SANArray)? body.SANArray : [ body.SANArray ];
+                    let domains = SANArray.filter((entry: string) => entry.startsWith('DNS:')).map((entry: string) => entry.split(' ')[1]);
+                    let ips = SANArray.filter((entry: string) => entry.startsWith('IP:')).map((entry: string) => entry.split(' ')[1]);
+                    if (domains.length > 0) sal.domains = sal.domains.concat(domains);
+                    if (ips.length > 0) sal['IPs'] = ips;
+                    logger.debug(sal.domains);
+                    logger.debug(sal.IPs);
+                }
                 const extensions: ExtensionParent[] = [
                     new ExtensionBasicConstraints({ cA: true, critical: true }),
                     new ExtensionKeyUsage({ keyCertSign: true, cRLSign: true }),
@@ -542,6 +553,7 @@ export class WebServer {
                     // new ExtensionAuthorityKeyIdentifier({ /*authorityCertIssuer: true, keyIdentifier: true,*/ serialNumber: ski['subjectKeyIdentifier'] }),
                     // new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, keyIdentifier: true, authorityCertSerialNumber: true }),
                     new ExtensionSubjectKeyIdentifier({ }),
+                    new ExtensionSubjectAltName(sal),
                 ]
                 // Set the Certificate attributes for the new Root CA
                 cert.publicKey = publicKey;
@@ -1197,6 +1209,7 @@ export class WebServer {
                 let encrypted: boolean = false;
                 if (msg.type == 'ENCRYPTED PRIVATE KEY') {
                     if (!password) {
+                        // TODO Fix lack of error message on web client
                         logger.warn(`Cannot add ${filename} - no pasword for encrypted key`); 
                         return reject(new CertError(400, 'Password is required for key ' + filename));
                     }
