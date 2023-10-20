@@ -101,11 +101,16 @@ span.certValueKey {
 }
 
 span.certValueSigner {
-    background-color: palegreen;
+    background-color: #66CD66;
+    /* color: #98FB98;
+    color: #76EE76;
+    color: #66CD66;
+    color: #458B45;
+    color: #2E8B57; */
 }
 
 span.certValueSigned {
-    background-color: paleturquoise;
+    background-color: #7AC5CD;
 }
 
 span.certButtons {
