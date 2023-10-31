@@ -66,7 +66,7 @@ type CertificateRow = {
     fingerprint256: string,
     publicKey: any, 
     privateKey: string,
-    // signedBy: string,
+    tags: string[],
     signedById: number,
     issuer: CertificateSubject,
     subject: CertificateSubject,
@@ -112,6 +112,7 @@ type CertificateBrief = {
     fingerprint: string,
     fingerprint256: string,
     signed: number[],
+    tags: string[],
 }
 
 type KeyBrief = {
@@ -332,6 +333,11 @@ export class WebServer {
         });
         this._app.post('/createLeafCert', async (request, _response, next) => {
             request.url = '/api/createLeafCert';
+            next();
+        });
+        this._app.post('/updateCertTag', async (request, _response, next) => {
+            request.url = '/api/updateCertTag';
+            request.query['id'] = request.body.toTag;
             next();
         });
         this._app.post('/uploadCert', ((request: any, response) => {
@@ -705,7 +711,7 @@ export class WebServer {
                 let retVal: CertificateLine[] = [];
                 if (type != CertTypes.key) {
                     retVal = this._certificates.chain().find({ type: type }).sort((l, r) => l.name.localeCompare(r.name)).data().map((entry) => { 
-                        return { name: entry.subject.CN, type: CertTypes[type].toString(), id: entry.$loki }; 
+                        return { name: entry.subject.CN, type: CertTypes[type].toString(), id: entry.$loki, tags: entry.tags?? [] }; 
                     });
                 }
                 else {
@@ -757,6 +763,21 @@ export class WebServer {
             }
             catch (err) {
                 return response.status(err.status?? 500).json(JSON.stringify({ error: err.message }));
+            }
+        });
+        this._app.post('/api/updateCertTag', async (request, response) => {
+            try {
+                if (request.body.tags.match(/[<>\(\)\{\}\/]/) !== null) throw new Error('Tags cannot contain < > / { } ( )');
+                let tags = (request.body.tags as string).split(';').map((t) => t.trim()).filter((t) => t != '');
+                let result: OperationResult = this._resolveCertificateUpdate(request.query as QueryType, (c) => {
+                    c.tags = tags;
+                });
+                this._broadcast(result);
+                return response.status(200).json({ message: `Certificate tags updated` });
+            }
+            catch (err) {
+                return response.status(err.status?? 500).json({ error: err.message });
+                // return response.status(err.status?? 500).json(`{"error": "${err.message}"}`);
             }
         });
         this._app.get('/api/keyname', async(request, response) => {
@@ -832,17 +853,22 @@ export class WebServer {
 
         let server: http.Server | https.Server;
 
-        if (this._certificate) {
-            const options = {
-                cert: this._certificate,
-                key: this._key,
-            };
-            server = https.createServer(options, this._app).listen(this._port, '0.0.0.0');
+        try {
+            if (this._certificate) {
+                const options = {
+                    cert: this._certificate,
+                    key: this._key,
+                };
+                server = https.createServer(options, this._app).listen(this._port, '0.0.0.0');
+            }
+            else {
+                server = http.createServer(this._app).listen(this._port, '0.0.0.0');
+            }
+            logger.info('Listening on ' + this._port);
         }
-        else {
-            server = http.createServer(this._app).listen(this._port, '0.0.0.0');
+        catch (err) {
+            logger.fatal(`Failed to start webserver: ${err}`);
         }
-        logger.info('Listening on ' + this._port);
 
         server.on('upgrade', async (request, socket, head) => {
             try {
@@ -1051,6 +1077,7 @@ export class WebServer {
                     havePrivateKey: havePrivateKey,
                     fingerprint: new crypto.X509Certificate(pemString).fingerprint,
                     fingerprint256: fingerprint256,
+                    tags: []
                 })) as CertificateRow & LokiObj;    // Return value erroneous omits LokiObj
 
                 result.added.push({ type: type, id: newRecord.$loki })
@@ -1129,6 +1156,7 @@ export class WebServer {
             fingerprint: c.fingerprint,
             fingerprint256: c.fingerprint256,
             signed: s,
+            tags: c.tags?? [],
          };
     }
 
@@ -1441,15 +1469,11 @@ export class WebServer {
      */
     private _resolveCertificateQuery(query: QueryType): CertificateRow & LokiObj {
         let c: (CertificateRow & LokiObj)[];
-        // let selector: any;
 
         if ('name' in query && 'id' in query) throw new CertError(422, 'Name and id are mutually exclusive');
-        // if (query.name && query.id) throw new CertError(422, 'Name and id are mutually exclusive');
         if (!('name' in query) && !('id' in query)) throw new CertError(400, 'Name or id must be specified');
         
         let selector = ('name' in query)? { name: query.name as string } : { $loki: parseInt(query.id as string)};
-        // if (query.name) selector = { name: query.name as string };
-        // else if (query.id) selector = { $loki: parseInt(query.id as string)};
 
         c = this._certificates.find(selector);
 
@@ -1461,6 +1485,29 @@ export class WebServer {
         }
 
         return c[0];
+    }
+
+    private _resolveCertificateUpdate(query: QueryType, updater: (row: CertificateRow & LokiObj) => void): OperationResult {
+        if ('name' in query && 'id' in query) throw new CertError(422, 'Name and id are mutually exclusive');
+        if (!('name' in query) && !('id' in query)) throw new CertError(400, 'Name or id must be specified');
+        let selector = ('name' in query)? { name: query.name as string } : { $loki: parseInt(query.id as string)};
+
+        let c = this._certificates.chain().find(selector);
+
+        if (c.count() == 0) {
+            throw new CertError(404, `No certificate for ${JSON.stringify(query)} found`);
+        }
+        else if (c.count() > 1) {
+            throw new CertError(400, `Multiple certificates match the CN ${JSON.stringify(query)} - use id instead`);
+        }
+
+        let result: OperationResult = { name: null, added: [], updated: [], deleted: [] };
+        let cd = c.data()[0];
+        result.name = cd.subject.CN;
+        result.updated.push({ type: cd.type, id: cd.$loki });
+
+        c.update(updater);
+        return result;
     }
 
     private _resolveKeyQuery(query: any): PrivateKeyRow & LokiObj {

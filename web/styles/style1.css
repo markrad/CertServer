@@ -65,6 +65,11 @@ div.SubmitButton {
 button#uploadButton {
     /* padding-left: 4px; */
     margin-left: 8px;
+    float: left;
+}
+
+button.tagButton {
+    margin-left: 28px;
 }
 
 span.idLine {
@@ -94,6 +99,10 @@ span.certValue {
     word-wrap: break-word;
     float: right;
     width: 95%
+}
+
+span.certTags {
+    float:inline-end;
 }
 
 span.certValueKey {
@@ -138,6 +147,13 @@ div.certInfo {
 
 span.certPrivateKey {
     color: red;
+}
+
+button.certTagsEdit {
+    font-size: 7pt;
+    font-style: italic;
+    font-weight: 900;
+    color: orangered;
 }
 
 span.keyArrow {

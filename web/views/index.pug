@@ -69,20 +69,23 @@ block layout-content
     }
 
     function buildCertEntry(file) {
-      let listEntryHTML = ({ id, name }) => `
+      let listEntryHTML = ({ id, name, tags }) => `
         <li class="certLine" id="c${id}">
           <span onclick="certClick('${id}')">
             <span class="certArrow">˃</span>
             <span class="idLine">
               <span class="idValue">${id}</span>
             </span>
-            <span class="certValue">${name}</span>
+            <span class="certValue">
+              <span class="certName">${name}</span>
+              <span class="certTags">${tags}</span>
+            </span>
           </span>
           <div class="certDetails">
           </div>
         </li>
       `;
-      return listEntryHTML({ id: file.id, name: file.name });
+      return listEntryHTML({ id: file.id, name: file.name, tags: `[${file.tags.join(';')}]` });
     }
 
     function buildCertDetail(detail) {
@@ -110,6 +113,7 @@ block layout-content
         validTo,
         signer,
         keyPresent,
+        tags,
       }) => `
         <div class="certInfo slideform">
           <div class="certInfoButtons"> 
@@ -152,7 +156,13 @@ block layout-content
           </div>
           <div class="certInfoKey">
             <span class="certInfoKeyLabel">Key Present:&nbsp;</span>
-            <span class="certInfoKeyValue">${keyPresent}</span>
+            <span class="certInfoKeyValue">${keyPresent}</span> 
+          </div>
+          <div class="CertTags">
+            <span class="certTagsLabel">Tags: [</span>
+            <span class="certTagsValue">${tags}</span>
+            <span class="certTagsEnd">]</span>
+            <button class="certTagsEdit" onClick=tagsEdit('c${id}')>🖉</button>
           </div>
         </div>
       `;
@@ -180,6 +190,7 @@ block layout-content
         validTo: detail.validTo,
         signer: detail.signer,
         keyPresent: detail.keyPresent,
+        tags: detail.tags.length != 0? detail.tags.join(';') : '',
       });
     }
 
@@ -188,9 +199,6 @@ block layout-content
       let line = $('.certLine#c' + id);
       let details = line.find('.certDetails');
       let arrow = line.find('.certArrow');
-      //- $('.certValueKey').each(() => $(this).removeClass('certValueKey'));
-      //- $('.certValueSigner').each(() => $(this).removeClass('certValueSigner'));
-      //- $('.certValueSigned').each(() => $(this).removeClass('certValueSigned'));
       $('.certValueKey').removeClass('certValueKey');
       $('.certValueSigner').removeClass('certValueSigner');
       $('.certValueSigned').removeClass('certValueSigned');
@@ -221,7 +229,7 @@ block layout-content
             [result.issuer.O, 'certInfoIssuerO'],
             [result.issuer.OU, 'certInfoIssuerOU'],
             [result.issuer.CN, 'certInfoIssuerCN'],
-            [result.signed, 'certInfoSigned'], 
+            [result.signed, 'certInfoSigner'], 
           ].forEach((entry) => {
             if (entry[0] == null) {
               let t = details.find('.' + entry[1]);
@@ -298,6 +306,15 @@ block layout-content
           }
         });
       }
+    }
+
+    function tagsEdit(id) {
+      let entry = $('#' + id);
+      let dialog = $('#tagsEdit');
+      $('#certificateId').val(id.substring(1));
+      let test = entry.find('.certTagsValue');
+      $('#tags').val(entry.find('.certTagsValue').text());
+      dialog.dialog('open');
     }
 
     function newIntermediateDialog(id, name) {
@@ -548,6 +565,22 @@ block layout-content
       $('#IntermediateSANList').empty();
     }
 
+    function updateTagsDisplay(result) {
+      console.log(result);
+      $('tagsCancelButton').click();
+      $.magnificPopup.open({
+        items: {
+          src: `<div class="white-popup">${result.message}</div>`,
+          type: 'inline'
+        }
+      });
+      $('#tagsEdit').dialog('close');
+    }
+
+    function tagsCancel() {
+      $(this).dialog('close');
+    }
+
     function createLeafCertResponse(result) {
       console.log(result);
       $('#generateLeafReset').click();
@@ -691,9 +724,11 @@ block layout-content
             try {
               // BUG: This needs to use id - fixed but not tested
               let result = await getCertDetails({ id: change.id });
+              $(`${idName}${change.id} .certTags`).text(`[${result.tags.join(';')}]`);
               $(`${idName}${change.id} .certPrivateKey`).text(result.keyPresent == 'yes'? ' with private key' : '');
               $(`${idName}${change.id} .certInfoSignerValue`).text(result.signer);
               $(`${idName}${change.id} .certInfoKeyValue`).text(result.keyPresent);
+              $(`${idName}${change.id} .certTagsValue`).text(result.tags.join(';'));
               if (result.keyPresent == 'no') $(`${idName}${change.id} .certOptionalButtons`).hide();
               else $(`${idName}${change.id} .certOptionalButtons`).show();
             }
@@ -776,6 +811,27 @@ block layout-content
         } 
       });
 
+      $('#tagsEditForm').ajaxForm({
+        datType: 'json',
+        success: updateTagsDisplay,
+        error: (xhr, msg, err) => {
+          let outmsg = JSON.parse(xhr.responseText);
+          $.magnificPopup.open({
+            items: {
+              src: `<div class="error-popup">${err}: ${outmsg.error}</div>`,
+              type: 'inline'
+            }
+          });
+        } 
+
+      })
+
+      let dialogTagsEdit = $('#tagsEdit').dialog({
+        autoOpen: false,
+        modal: true,
+        width: 450,
+      })
+
       let dialogInt = $('#newIntermediate').dialog({
         autoOpen: false,
         //- height: 600,
@@ -789,6 +845,7 @@ block layout-content
         width: 400,
         modal: true,
       });
+      
       let connectWebSocket = () => {
         let wsURL = (window.location.protocol == 'https:'? 'wss://' : 'ws://') + 
           window.location.hostname + 
@@ -817,73 +874,81 @@ block layout-content
       }
       connectWebSocket();
     });
+  div#tagsEdit(title='Edit Tags')
+    form#tagsEditForm(action="/updateCertTag", method="post", encType="application/x-www-form-urlencoded")
+      fieldset 
+        label(for='tags') Tags: 
+        input(type='text' name='tags' id='tags' value='' class='text ui-widget-content ui-corner-all')
+        input#tagsCancelButton.tagButton(title='TagsCancel' type='reset' value='✘' onClick='tagsCancel')
+        input#tagsUpdateButton(name='TagsUpdate' type='submit' value='✔')
+        input#certificateId(type='text' name='toTag' value='' class='hidden')
   div#newIntermediate(title='** Title **')
-   form#newIntermediateForm(action="/createIntermediateCert", method="post", encType="application/x-www-form-urlencoded")
-    fieldset
-      label.modalLabel(for="Password") Password (if key is encrypted):
-      input(type='password' name='password' id='intPassword' value='' class='text ui-widget-content ui-corner-all')
-      label.modalLabel(for='Country') Country: 
-      input(type='text' name='country' id='intermediateC' value=C class='text ui-widget-content ui-corner-all')
-      label.modalLabel(for='State' styles { float: left; }) State:
-      input(type='text' name='state' id='intermediateST' value=ST class='text ui-widget-content ui-corner-all')
-      label.modalLabel(for='Location') Location:
-      input(type='text' name='location' id='intermediateL' value=L class='text ui-widget-content ui-corner-all')
-      label.modalLabel(for='Organization') Organization:
-      input(type='text' name='organization' id='intermediateO' value=O class='text ui-widget-content ui-corner-all')
-      label.modalLabel(for='Unit') Unit:
-      input(type='text' name='unit' id='intermediateOU' value=OU class='text ui-widget-content ui-corner-all')
-      label.modalLabel(for='Common Name') Common Name:
-      input(type='text' name='commonName' id='intermediateCN' value='' class='text ui-widget-content ui-corner-all')
-      label.modalLabel(for='SANs') SANs
-      div#IntermediateSANList
-      div#IntermediateSANInput
-        select.SANType(title='SAN Type')
-          option DNS 
-          option IP
-        input.SANValue(type='text')
-        input.SANEnter(name='SanEnter' type='button' value='✔' onClick='AddIntermediateSAN()')
-      label.modalLabel(for='Valid From') Valid from:
-      input#IntermediateValidFrom(type='text' name='validFrom')
-      label.modalLabel(for='Valid To') Valid to:
-      input#IntermediateValidTo(type='text' name='validTo')
-      input#intermediateSigner(type='text' name='signer' value='' class='hidden')
-      div.intButtons
-        input.button2#generateIntermediateReset(type="reset", value="Reset" title="Reset", onClick="resetIntermediateForm")
-        input.button2#generateIntermediateButton.SubmitButton(type="submit" title="submit", value="Generate")
+    form#newIntermediateForm(action="/createIntermediateCert", method="post", encType="application/x-www-form-urlencoded")
+      fieldset
+        label.modalLabel(for="Password") Password (if key is encrypted):
+        input(type='password' name='password' id='intPassword' value='' class='text ui-widget-content ui-corner-all')
+        label.modalLabel(for='Country') Country: 
+        input(type='text' name='country' id='intermediateC' value=C class='text ui-widget-content ui-corner-all')
+        label.modalLabel(for='State' styles { float: left; }) State:
+        input(type='text' name='state' id='intermediateST' value=ST class='text ui-widget-content ui-corner-all')
+        label.modalLabel(for='Location') Location:
+        input(type='text' name='location' id='intermediateL' value=L class='text ui-widget-content ui-corner-all')
+        label.modalLabel(for='Organization') Organization:
+        input(type='text' name='organization' id='intermediateO' value=O class='text ui-widget-content ui-corner-all')
+        label.modalLabel(for='Unit') Unit:
+        input(type='text' name='unit' id='intermediateOU' value=OU class='text ui-widget-content ui-corner-all')
+        label.modalLabel(for='Common Name') Common Name:
+        input(type='text' name='commonName' id='intermediateCN' value='' class='text ui-widget-content ui-corner-all')
+        label.modalLabel(for='SANs') SANs
+        div#IntermediateSANList
+        div#IntermediateSANInput
+          select.SANType(title='SAN Type')
+            option DNS 
+            option IP
+          input.SANValue(type='text')
+          input.SANEnter(name='SanEnter' type='button' value='✔' onClick='AddIntermediateSAN()')
+        label.modalLabel(for='Valid From') Valid from:
+        input#IntermediateValidFrom(type='text' name='validFrom')
+        label.modalLabel(for='Valid To') Valid to:
+        input#IntermediateValidTo(type='text' name='validTo')
+        input#intermediateSigner(type='text' name='signer' value='' class='hidden')
+        div.intButtons
+          input.button2#generateIntermediateReset(type="reset", value="Reset" title="Reset", onClick="resetIntermediateForm")
+          input.button2#generateIntermediateButton.SubmitButton(type="submit" title="submit", value="Generate")
   div#newLeaf(title='** Title **')
-   form#newLeafForm(action="/createLeafCert", method="post", encType="application/x-www-form-urlencoded")
-    fieldset
-      label.modalLabel(for="Password") Password (if key is encrypted):
-      input(type='password' name='password' id='leafPassword' value='' class='text ui-widget-content ui-corner-all')
-      label.modalLabel(for='Country') Country: 
-      input(type='text' name='country' id='leafC' value=C class='text ui-widget-content ui-corner-all')
-      label.modalLabel(for='State' styles { float: left; }) State:
-      input(type='text' name='state' title='State' id='leafST' value=ST class='text ui-widget-content ui-corner-all')
-      label.modalLabel(for='Location') Location:
-      input(type='text' name='location' id='leafL' value=L class='text ui-widget-content ui-corner-all')
-      label.modalLabel(for='Organization') Organization:
-      input(type='text' name='organization' id='leafO' value=O class='text ui-widget-content ui-corner-all')
-      label.modalLabel(for='Unit') Unit:
-      input(type='text' name='unit' id='leafOU' value=OU class='text ui-widget-content ui-corner-all')
-      label.modalLabel(for='Common Name') Common Name:
-      input(type='text' name='commonName' id='leafCN' value='' class='text ui-widget-content ui-corner-all')
-      label.modalLabel(for='SANs') SANs
-      div#LeafSANList
-      div#LeafSANInput
-        select.SANType(title='SAN Type')
-          option DNS 
-          option IP
-        input.SANValue(type='text')
-        input.SANEnter(name='SanEnter' type='button' value='✔' onClick='AddLeafSAN()')
-      label.modalLabel(for='Valid From') Valid from:
-      input#LeafValidFrom(type='text' name='validFrom')
-      label.modalLabel(for='Valid To') Valid to:
-      input#LeafValidTo(type='text' name='validTo')
-      input#leafSigner(type='text' name='signer' value='' class='hidden')
-      div.intButtons
-        //- input.button2#generateLeafReset(type="reset", value="Reset" title="Reset")
-        input.button2#generateLeafReset(type="button", value="Reset" title="Reset" onClick="resetLeafForm()")
-        input.button2#generateLeafButton.SubmitButton(type="submit" title="submit", value="Generate")
+    form#newLeafForm(action="/createLeafCert", method="post", encType="application/x-www-form-urlencoded")
+      fieldset
+        label.modalLabel(for="Password") Password (if key is encrypted):
+        input(type='password' name='password' id='leafPassword' value='' class='text ui-widget-content ui-corner-all')
+        label.modalLabel(for='Country') Country: 
+        input(type='text' name='country' id='leafC' value=C class='text ui-widget-content ui-corner-all')
+        label.modalLabel(for='State' styles { float: left; }) State:
+        input(type='text' name='state' title='State' id='leafST' value=ST class='text ui-widget-content ui-corner-all')
+        label.modalLabel(for='Location') Location:
+        input(type='text' name='location' id='leafL' value=L class='text ui-widget-content ui-corner-all')
+        label.modalLabel(for='Organization') Organization:
+        input(type='text' name='organization' id='leafO' value=O class='text ui-widget-content ui-corner-all')
+        label.modalLabel(for='Unit') Unit:
+        input(type='text' name='unit' id='leafOU' value=OU class='text ui-widget-content ui-corner-all')
+        label.modalLabel(for='Common Name') Common Name:
+        input(type='text' name='commonName' id='leafCN' value='' class='text ui-widget-content ui-corner-all')
+        label.modalLabel(for='SANs') SANs
+        div#LeafSANList
+        div#LeafSANInput
+          select.SANType(title='SAN Type')
+            option DNS 
+            option IP
+          input.SANValue(type='text')
+          input.SANEnter(name='SanEnter' type='button' value='✔' onClick='AddLeafSAN()')
+        label.modalLabel(for='Valid From') Valid from:
+        input#LeafValidFrom(type='text' name='validFrom')
+        label.modalLabel(for='Valid To') Valid to:
+        input#LeafValidTo(type='text' name='validTo')
+        input#leafSigner(type='text' name='signer' value='' class='hidden')
+        div.intButtons
+          //- input.button2#generateLeafReset(type="reset", value="Reset" title="Reset")
+          input.button2#generateLeafReset(type="button", value="Reset" title="Reset" onClick="resetLeafForm()")
+          input.button2#generateLeafButton.SubmitButton(type="submit" title="submit", value="Generate")
   div.View
     span 
      h1.Banner 

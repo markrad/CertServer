@@ -214,6 +214,11 @@ class WebServer {
                 request.url = '/api/createLeafCert';
                 next();
             }));
+            this._app.post('/updateCertTag', (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
+                request.url = '/api/updateCertTag';
+                request.query['id'] = request.body.toTag;
+                next();
+            }));
             this._app.post('/uploadCert', ((request, response) => {
                 // FUTURE Allow multiple files to be submitted
                 // FUTURE: Allow chain style files to be submitted
@@ -577,7 +582,8 @@ class WebServer {
                     let retVal = [];
                     if (type != CertTypes.key) {
                         retVal = this._certificates.chain().find({ type: type }).sort((l, r) => l.name.localeCompare(r.name)).data().map((entry) => {
-                            return { name: entry.subject.CN, type: CertTypes[type].toString(), id: entry.$loki };
+                            var _a;
+                            return { name: entry.subject.CN, type: CertTypes[type].toString(), id: entry.$loki, tags: (_a = entry.tags) !== null && _a !== void 0 ? _a : [] };
                         });
                     }
                     else {
@@ -633,14 +639,31 @@ class WebServer {
                     return response.status((_f = err.status) !== null && _f !== void 0 ? _f : 500).json(JSON.stringify({ error: err.message }));
                 }
             }));
-            this._app.get('/api/keyname', (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.post('/api/updateCertTag', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 var _g;
+                try {
+                    if (request.body.tags.match(/[<>\(\)\{\}\/]/) !== null)
+                        throw new Error('Tags cannot contain < > / { } ( )');
+                    let tags = request.body.tags.split(';').map((t) => t.trim()).filter((t) => t != '');
+                    let result = this._resolveCertificateUpdate(request.query, (c) => {
+                        c.tags = tags;
+                    });
+                    this._broadcast(result);
+                    return response.status(200).json({ message: `Certificate tags updated` });
+                }
+                catch (err) {
+                    return response.status((_g = err.status) !== null && _g !== void 0 ? _g : 500).json({ error: err.message });
+                    // return response.status(err.status?? 500).json(`{"error": "${err.message}"}`);
+                }
+            }));
+            this._app.get('/api/keyname', (request, response) => __awaiter(this, void 0, void 0, function* () {
+                var _h;
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     response.status(200).json({ 'name': (k.pairCN ? k.pairCN + '_key' : k.name) });
                 }
                 catch (err) {
-                    response.status((_g = err.status) !== null && _g !== void 0 ? _g : 500).json({ error: err.message });
+                    response.status((_h = err.status) !== null && _h !== void 0 ? _h : 500).json({ error: err.message });
                 }
             }));
             this._app.post('/api/uploadKey', (request, response) => __awaiter(this, void 0, void 0, function* () {
@@ -663,7 +686,7 @@ class WebServer {
                 }
             }));
             this._app.delete('/api/deleteKey', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _h;
+                var _j;
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     let result = yield this._tryDeleteKey(k);
@@ -671,11 +694,11 @@ class WebServer {
                     return response.status(200).json({ message: `Key ${result.name} deleted` });
                 }
                 catch (err) {
-                    return response.status((_h = err.status) !== null && _h !== void 0 ? _h : 500).json({ error: err.message });
+                    return response.status((_j = err.status) !== null && _j !== void 0 ? _j : 500).json({ error: err.message });
                 }
             }));
             this._app.get('/api/getKeyPem', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _j;
+                var _k;
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     response.download(this._getKeysDir(WebServer._getKeyFilenameFromRow(k)), k.name + '.pem', (err) => {
@@ -686,11 +709,11 @@ class WebServer {
                 }
                 catch (err) {
                     logger.error('Key download failed: ', err.message);
-                    return response.status((_j = err.status) !== null && _j !== void 0 ? _j : 500).json({ error: err.message });
+                    return response.status((_k = err.status) !== null && _k !== void 0 ? _k : 500).json({ error: err.message });
                 }
             }));
             this._app.get('/api/chaindownload', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _k;
+                var _l;
                 try {
                     let c = this._resolveCertificateQuery(request.query);
                     let filename = yield this._getChain(c);
@@ -703,21 +726,26 @@ class WebServer {
                 }
                 catch (err) {
                     logger.error('Chain download failed: ' + err.message);
-                    return response.status((_k = err.status) !== null && _k !== void 0 ? _k : 500).json({ error: err.message });
+                    return response.status((_l = err.status) !== null && _l !== void 0 ? _l : 500).json({ error: err.message });
                 }
             }));
             let server;
-            if (this._certificate) {
-                const options = {
-                    cert: this._certificate,
-                    key: this._key,
-                };
-                server = https_1.default.createServer(options, this._app).listen(this._port, '0.0.0.0');
+            try {
+                if (this._certificate) {
+                    const options = {
+                        cert: this._certificate,
+                        key: this._key,
+                    };
+                    server = https_1.default.createServer(options, this._app).listen(this._port, '0.0.0.0');
+                }
+                else {
+                    server = http_1.default.createServer(this._app).listen(this._port, '0.0.0.0');
+                }
+                logger.info('Listening on ' + this._port);
             }
-            else {
-                server = http_1.default.createServer(this._app).listen(this._port, '0.0.0.0');
+            catch (err) {
+                logger.fatal(`Failed to start webserver: ${err}`);
             }
-            logger.info('Listening on ' + this._port);
             server.on('upgrade', (request, socket, head) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     this._ws.handleUpgrade(request, socket, head, (ws) => {
@@ -902,6 +930,7 @@ class WebServer {
                         havePrivateKey: havePrivateKey,
                         fingerprint: new crypto_1.default.X509Certificate(pemString).fingerprint,
                         fingerprint256: fingerprint256,
+                        tags: []
                     })); // Return value erroneous omits LokiObj
                     result.added.push({ type: type, id: newRecord.$loki });
                     // If the certificate is self-signed update the id in the record
@@ -948,6 +977,7 @@ class WebServer {
         });
     }
     _getCertificateBrief(c) {
+        var _a;
         let c2 = null;
         if (c.signedById != null) {
             c2 = this._certificates.findOne({ $loki: c.signedById });
@@ -973,6 +1003,7 @@ class WebServer {
             fingerprint: c.fingerprint,
             fingerprint256: c.fingerprint256,
             signed: s,
+            tags: (_a = c.tags) !== null && _a !== void 0 ? _a : [],
         };
     }
     _tryDeleteCert(c) {
@@ -1261,15 +1292,11 @@ class WebServer {
      */
     _resolveCertificateQuery(query) {
         let c;
-        // let selector: any;
         if ('name' in query && 'id' in query)
             throw new CertError(422, 'Name and id are mutually exclusive');
-        // if (query.name && query.id) throw new CertError(422, 'Name and id are mutually exclusive');
         if (!('name' in query) && !('id' in query))
             throw new CertError(400, 'Name or id must be specified');
         let selector = ('name' in query) ? { name: query.name } : { $loki: parseInt(query.id) };
-        // if (query.name) selector = { name: query.name as string };
-        // else if (query.id) selector = { $loki: parseInt(query.id as string)};
         c = this._certificates.find(selector);
         if (c.length == 0) {
             throw new CertError(404, `No certificate for ${JSON.stringify(query)} found`);
@@ -1278,6 +1305,26 @@ class WebServer {
             throw new CertError(400, `Multiple certificates match the CN ${JSON.stringify(query)} - use id instead`);
         }
         return c[0];
+    }
+    _resolveCertificateUpdate(query, updater) {
+        if ('name' in query && 'id' in query)
+            throw new CertError(422, 'Name and id are mutually exclusive');
+        if (!('name' in query) && !('id' in query))
+            throw new CertError(400, 'Name or id must be specified');
+        let selector = ('name' in query) ? { name: query.name } : { $loki: parseInt(query.id) };
+        let c = this._certificates.chain().find(selector);
+        if (c.count() == 0) {
+            throw new CertError(404, `No certificate for ${JSON.stringify(query)} found`);
+        }
+        else if (c.count() > 1) {
+            throw new CertError(400, `Multiple certificates match the CN ${JSON.stringify(query)} - use id instead`);
+        }
+        let result = { name: null, added: [], updated: [], deleted: [] };
+        let cd = c.data()[0];
+        result.name = cd.subject.CN;
+        result.updated.push({ type: cd.type, id: cd.$loki });
+        c.update(updater);
+        return result;
     }
     _resolveKeyQuery(query) {
         let k;

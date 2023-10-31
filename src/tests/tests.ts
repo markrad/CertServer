@@ -181,6 +181,16 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         // console.log(msg);
         console.log('passed');
 
+        step = _step('add tags to intermediate');
+        res = await httpRequest('post', url + '/api/updateCertTag?id=2', 'tag1 ; tag2');
+        assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
+        await ew.EventWait();
+        ew.EventReset();
+        msg = JSON.parse(wsQueue.shift() as string);
+        checkPacket(msg, 'intName', 0, 1, 0);
+        checkItems(msg.updated, [{ type: 2, id: 2}]);
+        console.log('passed');
+
         step = _step('get root certificate list');
         res = await httpRequest('get', url + '/api/certlist?type=root');
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body}`);
@@ -189,6 +199,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         assert.equal(res.body.files[0].name, 'someName', `File has incorrect name ${res.body.files[0].name}`);
         assert.equal(res.body.files[0].type, 'root', `File has incorrect type ${res.body.files[0].type}`);
         assert.equal(res.body.files[0].id, 1, `File has incorrect id ${res.body.files[0].id}`);
+        assert.deepEqual(res.body.files[0].tags, [ ], 'Tags are incorreect');
         let rootId = res.body.files[0].id;
         console.log('passed');
 
@@ -200,6 +211,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         assert.equal(res.body.files[0].name, 'intName', `File has incorrect name ${res.body.files[0].name}`);
         assert.equal(res.body.files[0].type, 'intermediate', `File has incorrect type ${res.body.files[0].type}`);
         assert.equal(res.body.files[0].id, 2, `File has incorrect id ${res.body.files[0].id}`);
+        assert.deepEqual(res.body.files[0].tags, [ 'tag1', 'tag2' ], 'Tags are incorreect');
         let intId = res.body.files[0].id;
         console.log('passed');
 
@@ -228,8 +240,13 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         console.log('passed');
 
         step = _step('get certificate details by id');
-        res = await httpRequest('get', url + '/certdetails?id=3');
+        res = await httpRequest('get', url + '/certdetails?id=2');
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
+        assert.equal(res.body.certType, 'intermediate', `Wrong certificate type ${res.body.certType} returned`);
+        assert.equal(res.body.id, 2, `Wrong id ${res.body.id} returned`);
+        assert.equal(res.body.keyId, 2, `Wrong key id ${res.body.keyId} returned`);
+        assert.equal(res.body.name, 'intName', `Wrong name ${res.body.name} returned`);
+        assert.deepEqual(res.body.tags, [ 'tag1', 'tag2' ], 'Tags are incorreect');
         console.log('passed');
 
         step = _step('get key details by id');
