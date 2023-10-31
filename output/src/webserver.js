@@ -50,6 +50,7 @@ const express_1 = __importDefault(require("express"));
 const express_fileupload_1 = __importDefault(require("express-fileupload"));
 const serve_favicon_1 = __importDefault(require("serve-favicon"));
 const ws_1 = __importDefault(require("ws"));
+const stream_1 = require("stream");
 const log4js = __importStar(require("log4js"));
 const eventWaiter_1 = require("./utility/eventWaiter");
 const exists_1 = require("./utility/exists");
@@ -137,6 +138,7 @@ class WebServer {
      */
     start() {
         return __awaiter(this, void 0, void 0, function* () {
+            const cshost = ({ protocol, hostname, port }) => `${protocol}://${hostname}:${port}`;
             logger.info(`CertServer starting - ${this._version}`);
             let getCollections = () => {
                 if (null == (certificates = db.getCollection('certificates'))) {
@@ -201,6 +203,16 @@ class WebServer {
                     OU: this._config.certServer.subject.OU,
                     version: this._version,
                 });
+            });
+            this._app.get('/api/helper', (request, response) => {
+                response.setHeader('content-type', 'applicaton/text');
+                response.setHeader('content-disposition', `attachment; filename="${request.hostname}-${this._port}.sh"`);
+                const readable = stream_1.Readable.from([
+                    `function getcert(){ wget --content-disposition ${cshost({ protocol: this._certificate ? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getcertificatepem?id=$@}\n`,
+                    `function getkey(){ wget --content-disposition ${cshost({ protocol: this._certificate ? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getkeypem?id=$@}\n`,
+                    `function getchain(){ wget --content-disposition ${cshost({ protocol: this._certificate ? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getchaindownload?id=$@}\n`
+                ]);
+                readable.pipe(response);
             });
             this._app.post('/createCACert', (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
                 request.url = '/api/createcacert';

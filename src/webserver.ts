@@ -9,10 +9,11 @@ import crypto from 'crypto';
 
 import { jsbn, pki, pem, util, random, md } from 'node-forge'; 
 import loki, { Collection, LokiFsAdapter } from 'lokijs'
-import Express, { NextFunction /*, query*/ } from 'express';
+import Express, { NextFunction } from 'express';
 import FileUpload from 'express-fileupload';
 import serveFavicon from 'serve-favicon';
 import WsServer from 'ws';
+import { Readable } from 'stream';
 import * as log4js from 'log4js';
 
 import { EventWaiter } from './utility/eventWaiter';
@@ -255,7 +256,12 @@ export class WebServer {
      * @returns Promise\<void>
      */
     async start() {
-        
+        type cshostType = {
+            protocol: string,
+            hostname: string,
+            port: number,
+        }
+        const cshost: (c: cshostType) => string = ({ protocol, hostname, port }) => `${protocol}://${hostname}:${port}`;
         logger.info(`CertServer starting - ${this._version}`);
         let getCollections: () => void = () => {
             if (null == (certificates = db.getCollection<CertificateRow>('certificates'))) {
@@ -323,6 +329,16 @@ export class WebServer {
                 version: this._version,
             });
         });
+        this._app.get('/api/helper', (request, response) => {
+            response.setHeader('content-type', 'applicaton/text');
+            response.setHeader('content-disposition', `attachment; filename="${request.hostname}-${this._port}.sh"`);
+            const readable = Readable.from([
+                `function getcert(){ wget --content-disposition ${cshost({ protocol: this._certificate? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getcertificatepem?id=$@}\n`,
+                `function getkey(){ wget --content-disposition ${cshost({ protocol: this._certificate? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getkeypem?id=$@}\n`,
+                `function getchain(){ wget --content-disposition ${cshost({ protocol: this._certificate? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getchaindownload?id=$@}\n`
+            ]);
+            readable.pipe(response);
+        })
         this._app.post('/createCACert', async (request, _response, next) => {
             request.url = '/api/createcacert'
             next();

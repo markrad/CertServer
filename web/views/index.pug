@@ -334,7 +334,7 @@ block layout-content
     }
 
     function buildKeyDetail(detail) {
-      let detailHTML = ({ id, name, certPair, encrypted }) => `
+      const detailHTML = ({ id, name, certPair, encrypted }) => `
         <div class="keyInfo slideform">
           <div class="certInfoButtons"> 
             <button type="button" class="button2 keyBtnDownload" onClick="keyDownload('${id}')">Download</button>
