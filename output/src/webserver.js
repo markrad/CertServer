@@ -654,9 +654,10 @@ class WebServer {
             this._app.post('/api/updateCertTag', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 var _g;
                 try {
-                    if (request.body.tags.match(/[<>\(\)\{\}\/]/) !== null)
-                        throw new Error('Tags cannot contain < > / { } ( )');
-                    let tags = request.body.tags.split(';').map((t) => t.trim()).filter((t) => t != '');
+                    let body = typeof request.body == 'string' ? JSON.parse(request.body) : request.body;
+                    if (body.tags.match(/[<>\(\)\{\}\/]/) !== null)
+                        throw new CertError(400, 'Tags cannot contain < > / { } ( )');
+                    let tags = body.tags.split(';').map((t) => t.trim()).filter((t) => t != '');
                     let result = this._resolveCertificateUpdate(request.query, (c) => {
                         c.tags = tags;
                     });
@@ -752,6 +753,10 @@ class WebServer {
                 }
                 else {
                     server = http_1.default.createServer(this._app).listen(this._port, '0.0.0.0');
+                    server.on('error', (err) => {
+                        logger.fatal(`Webserver error: ${err.message}`);
+                        process.exit(4);
+                    });
                 }
                 logger.info('Listening on ' + this._port);
             }

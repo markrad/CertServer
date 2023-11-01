@@ -157,7 +157,7 @@ const types = ['root', 'intermediate', 'leaf', 'key'];
         // console.log(msg);
         console.log('passed');
         step = _step('add tags to intermediate');
-        res = yield httpRequest('post', url + '/api/updateCertTag?id=2', 'tag1 ; tag2');
+        res = yield httpRequest('post', url + '/api/updateCertTag?id=2', JSON.stringify({ tags: 'tag1 ; tag2' }));
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         yield ew.EventWait();
         ew.EventReset();
