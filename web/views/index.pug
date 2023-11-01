@@ -263,10 +263,10 @@ block layout-content
       let details = line.find('.certDetails');
       let arrow = line.find('.certArrow');
       if (details.is(':hidden') == false) {
-        certHide(line, details, arrow);
+        certHide(details, arrow);
       }
       else {
-        await certShow(id, line, details, arrow);
+        await certShow(id, details, arrow);
       }
     }
 
@@ -758,9 +758,8 @@ block layout-content
           let info = $(`${idName}${change.id} .certInfo`);
           if (info.length > 0) {
             try {
-              // BUG: This needs to use id - fixed but not tested
               let result = await getCertDetails({ id: change.id });
-              $(`${idName}${change.id} .certTags`).text(`[${result.tags.join(';')}]`);
+              $(`${idName}${change.id} .certTags`).text(`${result.tags.join(';')}`);
               $(`${idName}${change.id} .certPrivateKey`).text(result.keyPresent == 'yes'? ' with private key' : '');
               $(`${idName}${change.id} .certInfoSignerValue`).text(result.signer);
               $(`${idName}${change.id} .certInfoKeyValue`).text(result.keyPresent);
