@@ -3,7 +3,8 @@ extends layout
 block layout-content
   script(type="text/javascript").
 
-    //- BUG Fix key insertion sort sequence
+    // BUG Fix key insertion sort sequence
+    // TODO Clean up this code
     
     const typeLookup = [
       '',
@@ -78,14 +79,18 @@ block layout-content
             </span>
             <span class="certValue">
               <span class="certName">${name}</span>
-              <span class="certTags">${tags}</span>
+              <span class="CertTagsOuter">
+                <span class="certTagsL">[</span>
+                <span class="certTags">${tags}</span>
+                <span class="certTagsR">]</span>
+              </span>
             </span>
           </span>
           <div class="certDetails">
           </div>
         </li>
       `;
-      return listEntryHTML({ id: file.id, name: file.name, tags: `[${file.tags.join(';')}]` });
+      return listEntryHTML({ id: file.id, name: file.name, tags: `${file.tags.join(';')}` });
     }
 
     function buildCertDetail(detail) {
@@ -194,65 +199,74 @@ block layout-content
       });
     }
 
+    function certHide(details, arrow) {
+      $('.certValueKey').removeClass('certValueKey');
+      $('.certValueSigner').removeClass('certValueSigner');
+      $('.certValueSigned').removeClass('certValueSigned');
+      details.slideUp(400, () => {
+        details['0'].innerText = '';
+        arrow['0'].innerText = '>';
+      });
+    }
+
+    async function certShow(id, details, arrow) {
+      $('.certValueKey').removeClass('certValueKey');
+      $('.certValueSigner').removeClass('certValueSigner');
+      $('.certValueSigned').removeClass('certValueSigned');
+      arrow['0'].innerText = '˅';
+      try {
+        var result = await getCertDetails({ id: id});
+        let content = buildCertDetail(result);
+        details['0'].innerHTML = content;
+        if (result.certType == 'root') details.find('.' + 'certBtnDownloadChain').hide();
+        if (result.keyPresent == 'no' || result.certType == 'leaf') details.find('.' + 'certOptionalButtons').hide();
+        let nullTest = [
+          [result.subject.C, 'certInfoSubjectC'],
+          [result.subject.ST, 'certInfoSubjectST'],
+          [result.subject.L, 'certInfoSubjectL'],
+          [result.subject.O, 'certInfoSubjectO'],
+          [result.subject.OU, 'certInfoSubjectOU'],
+          [result.subject.CN, 'certInfoSubjectCN'],
+          [result.issuer.C, 'certInfoIssuerC'],
+          [result.issuer.ST, 'certInfoIssuerST'],
+          [result.issuer.L, 'certInfoIssuerL'],
+          [result.issuer.O, 'certInfoIssuerO'],
+          [result.issuer.OU, 'certInfoIssuerOU'],
+          [result.issuer.CN, 'certInfoIssuerCN'],
+          [result.signed, 'certInfoSigner'], 
+        ].forEach((entry) => {
+          if (entry[0] == null) {
+            let t = details.find('.' + entry[1]);
+            t.hide();
+          }
+        });
+
+        details.slideDown(500);
+
+        $(`#k${result.keyId}`).find('.certValue').addClass('certValueKey');
+        $(`#c${result.signerId}`).find('.certValue').addClass('certValueSigner');
+        result.signed.forEach((s) => $(`#c${s}`).find('.certValue').addClass('certValueSigned'));
+      }
+      catch ({ error, message }) {
+        $.magnificPopup.open({
+          items: {
+            src: `<div class="error-popup">${error}: ${message}</div>`,
+            type: 'inline'
+          }
+        });
+      }
+    }
+
     async function certClick(id) {
       console.log('.certLine#c' + id);
       let line = $('.certLine#c' + id);
       let details = line.find('.certDetails');
       let arrow = line.find('.certArrow');
-      $('.certValueKey').removeClass('certValueKey');
-      $('.certValueSigner').removeClass('certValueSigner');
-      $('.certValueSigned').removeClass('certValueSigned');
       if (details.is(':hidden') == false) {
-        details.slideUp(400, () => {
-          details['0'].innerText = '';
-          arrow['0'].innerText = '>';
-        });
+        certHide(line, details, arrow);
       }
       else {
-        arrow['0'].innerText = '˅';
-        try {
-          var result = await getCertDetails({ id: id});
-          let content = buildCertDetail(result);
-          details['0'].innerHTML = content;
-          if (result.certType == 'root') details.find('.' + 'certBtnDownloadChain').hide();
-          if (result.keyPresent == 'no' || result.certType == 'leaf') details.find('.' + 'certOptionalButtons').hide();
-          let nullTest = [
-            [result.subject.C, 'certInfoSubjectC'],
-            [result.subject.ST, 'certInfoSubjectST'],
-            [result.subject.L, 'certInfoSubjectL'],
-            [result.subject.O, 'certInfoSubjectO'],
-            [result.subject.OU, 'certInfoSubjectOU'],
-            [result.subject.CN, 'certInfoSubjectCN'],
-            [result.issuer.C, 'certInfoIssuerC'],
-            [result.issuer.ST, 'certInfoIssuerST'],
-            [result.issuer.L, 'certInfoIssuerL'],
-            [result.issuer.O, 'certInfoIssuerO'],
-            [result.issuer.OU, 'certInfoIssuerOU'],
-            [result.issuer.CN, 'certInfoIssuerCN'],
-            [result.signed, 'certInfoSigner'], 
-          ].forEach((entry) => {
-            if (entry[0] == null) {
-              let t = details.find('.' + entry[1]);
-              t.hide();
-            }
-          });
-
-          details.slideDown(500);
-
-          $(`#k${result.keyId}`).find('.certValue').addClass('certValueKey');
-          $(`#c${result.signerId}`).find('.certValue').addClass('certValueSigner');
-          result.signed.forEach((s) => $(`#c${s}`).find('.certValue').addClass('certValueSigned'));
-
-          //- console.log('success');
-        }
-        catch ({ error, message }) {
-          $.magnificPopup.open({
-            items: {
-              src: `<div class="error-popup">${error}: ${message}</div>`,
-              type: 'inline'
-            }
-          });
-        }
+        await certShow(id, line, details, arrow);
       }
     }
 
@@ -442,16 +456,38 @@ block layout-content
     }
 
     function togglePane(id) {
+      // FUTURE Add chevrons
+      // TODO Find sliders by class
       let p = $(id);
       if (p.is(':visible')) {
         p.slideUp(500);
       }
       else {
-        ['#uploadCertForm', '#uploadKeyForm', '#generateCertForm'].forEach((form) => {
+        ['#uploadCertForm', '#uploadKeyForm', '#generateCertForm', '#tagChooser'].forEach((form) => {
           if (form != id) $(form).slideUp(500);
         })
         p.slideDown(500);
       }
+    }
+
+    function searchTags() {
+      let filter = $('#tagChooserValue');
+      let lines = $('.certLine');
+      $('.certLine').each((i, line) => {
+        let tags = $(line).find('.certTags');
+        if (tags.text().match(filter.val()) == null) {
+          $(line).hide();
+          let details = $(line).find('.certDetails');
+          let arrow = $(line).find('.certArrow');
+          certHide(details, arrow);
+        }
+        else {
+          $(line).show();
+        }
+        console.log(tags.val());
+      });
+      
+      console.log(filter.val());
     }
 
     function uploadCert(e) {
@@ -879,7 +915,7 @@ block layout-content
       fieldset 
         label(for='tags') Tags: 
         input(type='text' name='tags' id='tags' value='' class='text ui-widget-content ui-corner-all')
-        input#tagsCancelButton.tagButton(title='TagsCancel' type='reset' value='✘' onClick='tagsCancel')
+        input#tagsCancelButton.tagButton(title='TagsCancel' type='reset' value='✘' onclick='tagsCancel()')
         input#tagsUpdateButton(name='TagsUpdate' type='submit' value='✔')
         input#certificateId(type='text' name='toTag' value='' class='hidden')
   div#newIntermediate(title='** Title **')
@@ -957,6 +993,7 @@ block layout-content
     button(type='button' class='button1' onclick='togglePane(\'#uploadCertForm\')') Upload Certificate
     button(type='button' class='button1' onclick='togglePane(\'#uploadKeyForm\')') Upload Key
     button(type='button' class='button1' onclick='togglePane(\'#generateCertForm\')') Generate New CA
+    button(type='button' class='button2 button3'  onclick='togglePane(\'#tagChooser\')') Tags Filter
     //- form#uploadCertForm(action="/uploadCert", method="post", encType="multipart/form-data" class='slideForm') 
     form#uploadCertForm(method="post", encType="multipart/form-data" class='slideForm') 
       .Upload
@@ -1020,7 +1057,9 @@ block layout-content
       div.SubmitButton
         input.button2#generateCAReset(type="reset", value="Reset" title="Reset")
         input.button2#generateCAButton.SubmitButton(type="submit" title="submit", value="Generate")
-
+    form#tagChooser(class='slideForm')
+      span.tagChooserValue 
+        input#tagChooserValue(type='text' name='tagChooserInput' title='Tag Chooser Input' oninput='searchTags()')
     .Certs 
       .Title
         h3 Root Certificates
