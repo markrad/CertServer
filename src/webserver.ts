@@ -1164,13 +1164,13 @@ export class WebServer {
         return { 
             id: c.$loki,
             certType: CertTypes[c.type],
-            name: c.name,
+            name: c.subject.CN,
             issuer: c.issuer,
             subject: c.subject,
             validFrom: c.notBefore,
             validTo: c.notAfter,
             serialNumber: c.serialNumber == null? '' : c.serialNumber.match(/.{1,2}/g).join(':'),  // Hacky fix for dude entries in db
-            signer: c2? c2.name : null,
+            signer: c2? c2.subject.CN : null,
             signerId: c2? c2.$loki : null,
             keyPresent: k != null? 'yes' : 'no',
             keyId: k? k.$loki : null,

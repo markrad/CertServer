@@ -68,8 +68,16 @@ button#uploadButton {
     float: left;
 }
 
-button.tagButton {
-    margin-left: 28px;
+.tagButton {
+    margin-left: 10px;
+}
+
+.tags {
+    width: calc(100% - 140px);
+}
+
+.twelvePoint {
+    font-size: 12pt;
 }
 
 span.idLine {
@@ -97,7 +105,7 @@ span.certValue {
     font-family: 'Courier New', Courier, monospace;
     cursor: pointer;
     word-wrap: break-word;
-    float: right;
+    /* float: right; */
     width: 95%
 }
 

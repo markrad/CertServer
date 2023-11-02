@@ -864,7 +864,8 @@ block layout-content
       let dialogTagsEdit = $('#tagsEdit').dialog({
         autoOpen: false,
         modal: true,
-        width: 450,
+        width: 400,
+        height: 110,
       })
 
       let dialogInt = $('#newIntermediate').dialog({
@@ -913,9 +914,10 @@ block layout-content
     form#tagsEditForm(action="/updateCertTag", method="post", encType="application/x-www-form-urlencoded")
       fieldset 
         label(for='tags') Tags: 
-        input(type='text' name='tags' id='tags' value='' class='text ui-widget-content ui-corner-all')
-        input#tagsCancelButton.tagButton(title='TagsCancel' type='reset' value='✘' onclick='tagsCancel()')
-        input#tagsUpdateButton(name='TagsUpdate' type='submit' value='✔')
+        input(type='text' name='tags' id='tags' value='' class='text ui-widget-content ui-corner-all tags')
+        span#tagsEditButtons.tagsEditButtons
+          input#tagsCancelButton.tagButton(title='TagsCancel' type='reset' value='✘' onclick='tagsCancel()')
+          input#tagsUpdateButton.tagButton(name='TagsUpdate' type='submit' value='✔')
         input#certificateId(type='text' name='toTag' value='' class='hidden')
   div#newIntermediate(title='** Title **')
     form#newIntermediateForm(action="/createIntermediateCert", method="post", encType="application/x-www-form-urlencoded")
