@@ -28,17 +28,21 @@ async function getDir(dir) {
     });
 }
 
+// Add all keys to the UI
 function buildKeyList(target, files) {
     target.empty();
-    if (files.length == 0)
+    if (files.length == 0) {
         target.append('<li class="empty">None</li>');
-    else
+    }
+    else {
         files.sort((l, r) => l.name.localeCompare(r))
-        .forEach((file) => {
-        target.append(buildKeyEntry(file));
-    });
+            .forEach((file) => {
+                target.append(buildKeyEntry(file));
+            });
+    }
 }
 
+// Builds HTML for a key entry in the UI
 function buildKeyEntry(file) {
     let listEntryHTML = ({ id, name }) => `
         <li class="keyLine" id="k${id}">
@@ -56,6 +60,135 @@ function buildKeyEntry(file) {
     return listEntryHTML({ id: file.id, name: file.name });
 }
 
+function buildKeyDetail(detail) {
+    const detailHTML = ({ id, name, certPair, encrypted }) => `
+        <div class="keyInfo slideform">
+        <div class="certInfoButtons"> 
+            <button type="button" class="button2 keyBtnDownload" onClick="keyDownload('${id}')">Download</button>
+            <button type="button" class="button2 button2Red keyBtnDelete" onClick="keyDelete('${id}')">Delete</button>
+        </div>
+        <div class="keyName">
+            <span class="keyNameLabel">Name:&nbsp;</span>
+            <span class="keyNameValue">${name}</span>
+        </div>
+        <div class="keyPair">
+            <span class="keyPairLabel">Pair:&nbsp;</span>
+            <span class="keyPairValue">${certPair}</span>
+        </div>
+        <div class="keyEncrypted">
+            <span class="keyEncryptedLabel">Encrypted:&nbsp;</span>
+            <span class="keyEncryptedValue">${encrypted}</span>
+        </div>
+    `;
+    return detailHTML({ id: detail.id, name: detail.name, certPair: detail.certPair, encrypted: result.encrypted? 'yes' : 'no' });
+}
+
+async function keyClick(id) {
+    let line = $('.keyLine#k' + id);
+    let details = line.find('.keyDetails');
+    let arrow = line.find('.keyArrow');
+    if (details.is(':hidden') == false) {
+        details.slideUp(400, () => {
+            details.html('');
+            arrow.text('>');
+        });
+    }
+    else {
+        arrow.text('˅');
+        try {
+            result = await getKeyDetails({ id: id });
+            let content = buildKeyDetail(result);
+            details.html(content);
+            console.log('success');
+            details.slideDown(500);           // &#9650
+        }
+        catch (err) {
+            showError(err.error, err.message);
+        };
+    };
+}
+
+// Get key details from the server
+async function getKeyDetails({ id }) {
+    return new Promise((resolve, reject) => {
+        let url = `/keyDetails?id=${id}`;
+        $.ajax({
+            url: url,
+            method: 'GET',
+            processData: false,
+            contentType: false,
+            error: (xhr, msg, err) => {
+                reject({ error: err, message: xhr.responseText });
+            },
+            success: (result, status) => {
+                resolve(result);
+            }
+        });
+    });
+}
+
+// Call the server to download the key
+function keyDownload(id) {
+    let filename = $(`#k${id} .certValue`).text() + '.pem';
+    let filelocation = '/api/getkeypem?id=' + id;
+    const anchor = $('<a>', { href: filelocation, download: filename })[0];
+    $('body').append(anchor);
+    anchor.click();
+    $(anchor).remove();
+}
+
+// Call the server to delete a key
+function keyDelete(id) {
+    let keyName = $(`#k${id} .certValue`).text();
+    if (confirm(`This will delete ${keyName}. \n\nDo you wish to continue?`)) {
+        $.ajax({
+            url: '/deleteKey?id=' + id,
+            method: 'DELETE',
+            processData: false,
+            contentType: false,
+            error: (xhr, msg, err) => {
+                showError(err, JSON.parse(xhr.responseText).error);
+            },
+            success: async (_result, _status) => {
+                showMessage(`Key ${keyName} deleted`);
+            }
+        });
+    }
+}
+
+// Upload a new key
+function uploadKey(e) {
+    var data = new FormData();
+    var files = $('#keyUpload');
+    if (files[0].files.length == 0) {
+        alert('No files choosen');
+    }
+    else {
+        for (let i = 0; i < files[0].files.length; i++) {
+            data.append('keyFile', files[0].files[i]);
+        }
+
+        let url = `/uploadKey${$('#keyPasswordValue').val() == '' ? '' : `?password=${$('#keyPasswordValue').val()}`}`;
+
+        $.ajax({
+            url: url,
+            method: 'POST',
+            processData: false,
+            contentType: false,
+            data: data,
+            error: (xhr, _msg, err) => {
+                document.getElementById('uploadKeyForm').reset();
+                showError(err, JSON.parse(xhr.responseText).error);
+            },
+            success: async (_result, _status) => {
+                document.getElementById('uploadKeyForm').reset();
+                showMessage('Key uploaded');
+            }
+        });
+    }
+}
+
+// Adds certficates to the section passed
 function buildCertList(target, files) {
     target.empty();
     if (files.length == 0)
@@ -70,6 +203,7 @@ function buildCertList(target, files) {
     }
 }
 
+// Builds HTML for a certificate in the UI
 function buildCertEntry(file) {
     let listEntryHTML = ({ id, name, tags }) => `
         <li class="certLine" id="c${id}">
@@ -94,6 +228,7 @@ function buildCertEntry(file) {
     return listEntryHTML({ id: file.id, name: file.name, tags: `${file.tags.join(';')}` });
 }
 
+// Build the certificate detail HTML
 function buildCertDetail(detail) {
     let detailHTML = ({
         id,
@@ -200,25 +335,27 @@ function buildCertDetail(detail) {
     });
 }
 
+// Hide the certificate detail
 function certHide(details, arrow) {
     $('.certValueKey').removeClass('certValueKey');
     $('.certValueSigner').removeClass('certValueSigner');
     $('.certValueSigned').removeClass('certValueSigned');
     details.slideUp(400, () => {
-        details['0'].innerText = '';
-        arrow['0'].innerText = '>';
+        details.text('');
+        arrow.text('>');
     });
 }
 
+// Show the certificate detail
 async function certShow(id, details, arrow) {
     $('.certValueKey').removeClass('certValueKey');
     $('.certValueSigner').removeClass('certValueSigner');
     $('.certValueSigned').removeClass('certValueSigned');
-    arrow['0'].innerText = '˅';
+    arrow.text('˅');
     try {
         var result = await getCertDetails({ id: id});
         let content = buildCertDetail(result);
-        details['0'].innerHTML = content;
+        details.html(content);
         if (result.certType == 'root') details.find('.' + 'certBtnDownloadChain').hide();
         if (result.keyPresent == 'no' || result.certType == 'leaf') details.find('.' + 'certOptionalButtons').hide();
         [
@@ -253,6 +390,7 @@ async function certShow(id, details, arrow) {
     }
 }
 
+// Shows or hides certificate detail
 async function certClick(id) {
     let line = $('.certLine#c' + id);
     let details = line.find('.certDetails');
@@ -265,34 +403,35 @@ async function certClick(id) {
     }
 }
 
-async function getCertDetails({ name, id }) {
+// Get certificate details from the server
+async function getCertDetails({ id }) {
     return new Promise(async (resolve, reject) => {
         try {
-        let url = '/certDetails' + (name? '?name=' + name : '?id=' + id);
-        var request = $.ajax({
-            url: url,
-            method: 'GET',
-            processData: false,
-            contentType: false,
-            error: (xhr, msg, err) => {
-            reject({ error: err, message: xhr.responseText});
-            },
-            success: (result, status) => {
-            resolve(result);
-            }
-        });
+            let url = `/certDetails?id=${id}`;
+            $.ajax({
+                url: url,
+                method: 'GET',
+                processData: false,
+                contentType: false,
+                error: (xhr, msg, err) => {
+                    reject({ error: err, message: xhr.responseText});
+                },
+                success: (result, status) => {
+                    resolve(result);
+                }
+            });
         }
         catch (err) {
-        reject({ error: err, message: 'Unknown error' });
+            reject({ error: err, message: 'Unknown error' });
         }       
     });
 }
 
+// Ask the server to delete a certificate
 function certDelete(name, id) {
     if (confirm(`This will delete certificate ${name}. \n\nDo you wish to continue?`)) {
-        console.log('Would delete ' + name);
-        var request = $.ajax({
-            url: '/deleteCert?id=' + id,
+        $.ajax({
+            url: `/deleteCert?id=${id}`,
             method: 'DELETE',
             processData: false,
             contentType: false,
@@ -307,172 +446,7 @@ function certDelete(name, id) {
     }
 }
 
-function tagsEdit(id) {
-    let entry = $('#' + id);
-    let dialog = $('#tagsEdit');
-    $('#certificateId').val(id.substring(1));
-    let test = entry.find('.certTagsValue');
-    $('#tags').val(entry.find('.certTagsValue').text());
-    dialog.dialog('open');
-}
-
-function newIntermediateDialog(id, name) {
-    let dialog = $('#newIntermediate');
-    dialog.dialog('option', 'title', `${name} -> intermediate`);
-    $('#intermediateSigner').val(id); 
-    dialog.dialog('open');
-}
-
-function newLeafDialog(id, name) {
-    console.log(name);
-    let dialog = $('#newLeaf');
-    dialog.dialog('option', 'title', `${name} -> leaf`);
-    $('#leafSigner').val(id); 
-    dialog.dialog('open');
-}
-
-function buildKeyDetail(detail) {
-    const detailHTML = ({ id, name, certPair, encrypted }) => `
-        <div class="keyInfo slideform">
-        <div class="certInfoButtons"> 
-            <button type="button" class="button2 keyBtnDownload" onClick="keyDownload('${id}')">Download</button>
-            <button type="button" class="button2 button2Red keyBtnDelete" onClick="keyDelete('${id}')">Delete</button>
-        </div>
-        <div class="keyName">
-            <span class="keyNameLabel">Name:&nbsp;</span>
-            <span class="keyNameValue">${name}</span>
-        </div>
-        <div class="keyPair">
-            <span class="keyPairLabel">Pair:&nbsp;</span>
-            <span class="keyPairValue">${certPair}</span>
-        </div>
-        <div class="keyEncrypted">
-            <span class="keyEncryptedLabel">Encrypted:&nbsp;</span>
-            <span class="keyEncryptedValue">${encrypted}</span>
-        </div>
-    `;
-    return detailHTML({ id: detail.id, name: detail.name, certPair: detail.certPair, encrypted: result.encrypted? 'yes' : 'no' });
-}
-
-async function keyClick(id) {
-    let line = $('.keyLine#k' + id);
-    let details = line.find('.keyDetails');
-    let arrow = line.find('.keyArrow');
-    if (details.is(':hidden') == false) {
-        details.slideUp(400, () => {
-            details['0'].innerText = '';
-            arrow['0'].innerText = '>';
-        });
-    }
-    else {
-        arrow['0'].innerText = '˅';
-        try {
-            result = await getKeyDetails({ id: id });
-            let content = buildKeyDetail(result);
-            details['0'].innerHTML = content;
-            console.log('success');
-            details.slideDown(500);           // &#9650
-        }
-        catch (err) {
-            showError(err.error, err.message);
-        };
-    };
-}
-
-async function getKeyDetails({ name, id }) {
-    return new Promise((resolve, reject) => {
-        let url = '/keyDetails?' + (name? 'name=' + name : 'id=' + id);
-        var request = $.ajax({
-        url: url,
-        method: 'GET',
-        processData: false,
-        contentType: false,
-        error: (xhr, msg, err) => {
-            reject({ error: err, message: xhr.responseText });
-        },
-        success: (result, status) => {
-            resolve(result);
-        }
-        });
-    });
-}
-
-function keyDownload(id) {
-    let filename = $(`#k${id} .certValue`).text() + '.pem';
-    let filelocation = '/api/getkeypem?id=' + id;
-    const anchor = $('<a>', { href: filelocation, download: filename })[0];
-    $('body').append(anchor);
-    anchor.click();
-    $(anchor).remove();
-}
-
-function keyDelete(id) {
-    let keyName = $(`#k${id} .certValue`).text();
-    if (confirm(`This will delete ${keyName}. \n\nDo you wish to continue?`)) {
-        $.ajax({
-            url: '/deleteKey?id=' + id,
-            method: 'DELETE',
-            processData: false,
-            contentType: false,
-            error: (xhr, msg, err) => {
-                showError(err, JSON.parse(xhr.responseText).error);
-            },
-            success: async (_result, _status) => {
-                showMessaage(`Key ${keyName} deleted`);
-            }
-        });
-    }
-}
-
-function togglePane(id) {
-    // FUTURE Add chevrons
-    let p = $(id);
-    if (p.is(':visible')) {
-        p.slideUp(500);
-    }
-    else {
-        $('.topSlide').each(function(_i, form) {
-            if (`#${form.id}` != id) $(form).slideUp(500);
-        });
-        p.slideDown(500);
-    }
-}
-
-function searchTags() {
-    let filter = $('#tagChooserValue');
-    let lines = $('.certLine');
-    $('.certLine').each((i, line) => {
-        let tags = $(line).find('.certTags');
-        if (tags.text().match(filter.val()) == null) {
-            $(line).hide();
-            let details = $(line).find('.certDetails');
-            let arrow = $(line).find('.certArrow');
-            certHide(details, arrow);
-        }
-        else {
-            $(line).show();
-        }
-    });
-}
-
-function showMessage(msg) {
-    $.magnificPopup.open({
-        items: {
-            src: `<div class="white-popup">${msg}</div>`,
-            type: 'inline'
-        }
-    });
-}
-
-function showError(error, message) {
-    $.magnificPopup.open({
-        items: {
-            src: `<div class="error-popup">${error}: ${message}</div>`,
-            type: 'inline'
-        }
-    });
-}
-
+// Upload a new certificate
 function uploadCert(e) {
     var data = new FormData();
     var files = $('#certUpload');
@@ -502,35 +476,103 @@ function uploadCert(e) {
     }
 }
 
-function uploadKey(e) {
-    var data = new FormData();
-    var files = $('#keyUpload');
-    if (files[0].files.length == 0) {
-        alert('No files choosen');
-    }
-    else {
-        for (let i = 0; i < files[0].files.length; i++) {
-            data.append('keyFile', files[0].files[i]);
-        }
-
-        let url = `/uploadKey${$('#keyPasswordValue').val() == '' ? '' : `?password=${$('#keyPasswordValue').val()}`}`;
-
+// Get the certificate name (CN) from the id
+async function getName(type, id) {
+    return new Promise((resolve, reject) => {
+        let url = type == 4? '/api/keyname' : '/api/certname';
+        url += '?id=' + id.toString();
         $.ajax({
             url: url,
-            method: 'POST',
+            method: 'GET',
             processData: false,
             contentType: false,
-            data: data,
-            error: (xhr, _msg, err) => {
-                document.getElementById('uploadKeyForm').reset();
-                showError(err, JSON.parse(xhr.responseText).error);
+            error: (xhr, msg, err) => {
+                reject(err);
             },
-            success: async (_result, _status) => {
-                document.getElementById('uploadKeyForm').reset();
-                showMessage('Key uploaded');
+            success: async (result, status) => {
+                resolve(result.name);
             }
         });
+    });
+}
+
+// Open the certificate tags dialog box
+function tagsEdit(id) {
+    let entry = $('#' + id);
+    let dialog = $('#tagsEdit');
+    $('#certificateId').val(id.substring(1));
+    $('#tags').val(entry.find('.certTagsValue').text());
+    dialog.dialog('open');
+}
+
+// Open the new intermediate certificate dialog box
+function newIntermediateDialog(id, name) {
+    let dialog = $('#newIntermediate');
+    dialog.dialog('option', 'title', `${name} -> intermediate`);
+    $('#intermediateSigner').val(id); 
+    dialog.dialog('open');
+}
+
+// Open the new leaf certificate box
+function newLeafDialog(id, name) {
+    console.log(name);
+    let dialog = $('#newLeaf');
+    dialog.dialog('option', 'title', `${name} -> leaf`);
+    $('#leafSigner').val(id); 
+    dialog.dialog('open');
+}
+
+// Slide top panes in or out of view
+function togglePane(id) {
+    // FUTURE Add chevrons
+    let p = $(id);
+    if (p.is(':visible')) {
+        p.slideUp(500);
     }
+    else {
+        $('.topSlide').each(function(_i, form) {
+            if (`#${form.id}` != id) $(form).slideUp(500);
+        });
+        p.slideDown(500);
+    }
+}
+
+// Search tags and hide those that don't match
+function searchTags() {
+    let filter = $('#tagChooserValue');
+    let lines = $('.certLine');
+    $('.certLine').each((i, line) => {
+        let tags = $(line).find('.certTags');
+        if (tags.text().match(filter.val()) == null) {
+            $(line).hide();
+            let details = $(line).find('.certDetails');
+            let arrow = $(line).find('.certArrow');
+            certHide(details, arrow);
+        }
+        else {
+            $(line).show();
+        }
+    });
+}
+
+// Show an informational message box
+function showMessage(msg) {
+    $.magnificPopup.open({
+        items: {
+            src: `<div class="white-popup">${msg}</div>`,
+            type: 'inline'
+        }
+    });
+}
+
+// Show an error message box
+function showError(error, message) {
+    $.magnificPopup.open({
+        items: {
+            src: `<div class="error-popup">${error}: ${message}</div>`,
+            type: 'inline'
+        }
+    });
 }
 
 function createCACertResponse(result) {
@@ -574,26 +616,6 @@ function resetLeafForm() {
     $('#LeafSANList').empty();
 }
 
-// Get the certificate name (CN) from the id
-async function getName(type, id) {
-    return new Promise((resolve, reject) => {
-        let url = type == 4? '/api/keyname' : '/api/certname';
-        url += '?id=' + id.toString();
-        $.ajax({
-            url: url,
-            method: 'GET',
-            processData: false,
-            contentType: false,
-            error: (xhr, msg, err) => {
-                reject(err);
-            },
-            success: async (result, status) => {
-                resolve(result.name);
-            }
-        });
-    });
-}
-
 function AddIntermediateSAN() {
     let list = $('#IntermediateSANList');
     let input = $('#IntermediateSANInput');
@@ -621,7 +643,7 @@ function AddSAN(list, input) {
 }
 
 function removeSAN(spanId) {
-    $('#' + spanId).remove();
+    $(`#${spanId}`).remove();
 }
 
 // Update the page with updates sent via the WebSocket
