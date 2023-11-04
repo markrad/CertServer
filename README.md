@@ -50,7 +50,7 @@ This specifies the root directory that the server will use to save certificates,
     + **O:** Default for subject organization  
     + **OU:** Default for subject organizational unit  
 ## Running in a Docker Container
-A [dockerfile](./docker/dockerfile) is provided that will build an image to run the server in Linux Alpine and a [docker-compose](./docker/docker-compose.yml) file that show how you might run it using mounted volumes for the data and the config. It is recommended that you mount the directory that you specified as the root directory in the config and the directory that contains the config file itself.
+A [dockerfile](./docker/Dockerfile) is provided that will build an image to run the server in Linux Alpine and a [docker-compose](./docker/docker-compose.yml) file that show how you might run it using mounted volumes for the data and the config. It is recommended that you mount the directory that you specified as the root directory in the config and the directory that contains the config file itself.
 
 The easier option is to pull the image from the ghcr repository. You can do this with latest or a specific version number (M.m.p such as 1.2.11):
 ```
@@ -147,7 +147,7 @@ Sample response:
 }
 ```
 ### Get a list of certificates by type:  
-GET `http://server:4141/api/certlist?type=root | intermediate | leaf | key`  
+`GET http://server:4141/api/certlist?type=root | intermediate | leaf | key`  
 Sample output:  
 ```json
 {
@@ -159,6 +159,15 @@ Sample output:
     }
   ]
 }
+```
+#### Examples
+##### Curl
+```bash
+curl http://myserver:4141/api/certlist?type=leaf
+```
+##### PowerShell
+```powershell
+Invoke-WebRequest -Uri http://myserver:4141/api/certlist?type=leaf
 ```
 ### Download a certificate pem file:  
 GET `http://server:4141/api/getcertificatepem/id=<certificate id>` or  
@@ -202,7 +211,7 @@ Sample output:
 GET `http://server:4141/api/getkeypem/id=<key id>` or  
 GET `http://server:4141/api/getkeypem/name=<key name>`  
 Returns the pem file. If name is used and two keys share the same common name it will fail with an error.
-### Upload a certificate pem file:  
+### Upload a key pem file:  
 POST `http://server:4141/api/uploadkey`  
 Uploads an existing key to the server. The pem data is placed in the post data. The POST must follow the following conventions:  
   + The pem content is in standard 64 byte lines. Hint: use --data-binary @filename when using curl
@@ -213,6 +222,19 @@ Sample response:
     "message": "Key intName_key added",
     "type": "key;intermediate"
 }
+```
+#### Examples
+##### Curl
+```
+curl -X POST -H "Content-Type: text/plain" --data-binary @./mykey.pem http://myserver:4141/api/uploadkey 
+```
+##### PowerShell
+```powershell
+$body = [System.IO.File]::ReadAllText('.\mykey.pem')
+Invoke-WebRequest -Uri http://myserver:4141/api/uploadkey `
+  -ContentType 'text/plain' `
+  -Method POST `
+  -Body $body
 ```
 ### Delete a key:  
 DELETE `http://server:4141/api/deletekey/id=<key id>` or  
