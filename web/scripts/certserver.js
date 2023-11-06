@@ -379,6 +379,16 @@ async function certShow(id, details, arrow) {
             }
         });
 
+        let now = new Date();
+
+        if (new Date(result.validTo) < now) {
+            details.find('.certInfoTo').addClass('certOutOfValidity');
+        }
+
+        if (new Date(result.validFrom) > now) {
+            details.find('.certInfoFrom').addClass('certOutOfValidity');
+        }
+
         details.slideDown(500);
 
         $(`#k${result.keyId}`).find('.certValue').addClass('certValueKey');

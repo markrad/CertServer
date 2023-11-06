@@ -130,6 +130,10 @@ span.certValueSigned {
     background-color: #7AC5CD;
 }
 
+.certOutOfValidity {
+    color: red;
+}
+
 span.certButtons {
     text-align: right;
     display: block;
