@@ -68,6 +68,15 @@ var CertTypes;
     CertTypes[CertTypes["leaf"] = 3] = "leaf";
     CertTypes[CertTypes["key"] = 4] = "key";
 })(CertTypes || (CertTypes = {}));
+var userAgentOS;
+(function (userAgentOS) {
+    userAgentOS[userAgentOS["UNKNOWN"] = 0] = "UNKNOWN";
+    userAgentOS[userAgentOS["WINDOWS"] = 1] = "WINDOWS";
+    userAgentOS[userAgentOS["MAC"] = 2] = "MAC";
+    userAgentOS[userAgentOS["LINUX"] = 3] = "LINUX";
+    userAgentOS[userAgentOS["ANDROID"] = 4] = "ANDROID";
+    userAgentOS[userAgentOS["IPHONE"] = 5] = "IPHONE";
+})(userAgentOS || (userAgentOS = {}));
 class CertError extends Error {
     constructor(status, message) {
         super(message);
@@ -206,12 +215,90 @@ class WebServer {
             });
             this._app.get('/api/helper', (request, response) => {
                 response.setHeader('content-type', 'applicaton/text');
-                response.setHeader('content-disposition', `attachment; filename="${request.hostname}-${this._port}.sh"`);
-                const readable = stream_1.Readable.from([
-                    `function getcert(){ wget --content-disposition ${cshost({ protocol: this._certificate ? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getcertificatepem?id=$@}\n`,
-                    `function getkey(){ wget --content-disposition ${cshost({ protocol: this._certificate ? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getkeypem?id=$@}\n`,
-                    `function getchain(){ wget --content-disposition ${cshost({ protocol: this._certificate ? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getchaindownload?id=$@}\n`
-                ]);
+                let userAgent = request.get('User-Agent');
+                let os;
+                if (request.query.os) {
+                    if (request.query.os.toUpperCase() in userAgentOS) {
+                        let work = request.query.os.toUpperCase();
+                        os = userAgentOS[work];
+                        logger.debug(`OS specified as ${userAgentOS[os]}`);
+                    }
+                    else {
+                        return response.status(400).json({ error: `OS invalid or unsupported ${request.query.os}` });
+                    }
+                }
+                else {
+                    os = WebServer._guessOs(userAgent);
+                    logger.debug(`${userAgent} guessed to be ${userAgentOS[os]}`);
+                }
+                let readable;
+                if (os == userAgentOS.LINUX || os == userAgentOS.MAC) {
+                    response.setHeader('content-disposition', `attachment; filename="${request.hostname}-${this._port}.sh"`);
+                    readable = stream_1.Readable.from([
+                        `function getcert(){ wget --content-disposition ${cshost({ protocol: this._certificate ? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getcertificatepem?id=$@}\n`,
+                        `function getkey(){ wget --content-disposition ${cshost({ protocol: this._certificate ? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getkeypem?id=$@}\n`,
+                        `function getchain(){ wget --content-disposition ${cshost({ protocol: this._certificate ? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getchaindownload?id=$@}\n`
+                    ]);
+                }
+                else if (os == userAgentOS.WINDOWS) {
+                    response.setHeader('content-disposition', `attachment; filename="${request.hostname}-${this._port}.ps1"`);
+                    readable = stream_1.Readable.from([
+                        `function Get-Filename {\n`,
+                        `param (\n`,
+                        `$url\n`,
+                        `)\n`,
+                        `$filename = ''\n`,
+                        `try {\n`,
+                        `$req = Invoke-WebRequest -Uri $url\n`,
+                        `$filename = $req.Headers.'Content-Disposition'.split(';')[1].Split('=')[1].Replace('"', '')\n`,
+                        `}\n`,
+                        `catch {\n`,
+                        `Write-Host 'Request failed'\n`,
+                        `Write-Host $_.ErrorDetails\n`,
+                        `}\n`,
+                        `return $filename\n`,
+                        `}\n`,
+                        `function Get-URIPrefix {\n`,
+                        `return "${cshost({ protocol: this._certificate ? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/"\n`,
+                        `}\n`,
+                        `function Get-File {\n`,
+                        `param (\n`,
+                        `$uriSuffix\n`,
+                        `)\n`,
+                        `$prefix = Get-URIPrefix\n`,
+                        `$uri = $prefix + $uriSuffix\n`,
+                        `$filename = Get-Filename $uri\n`,
+                        `if ($filename -ne '') {\n`,
+                        `Invoke-WebRequest -Uri $uri -OutFile ".\\$filename"\n`,
+                        `Write-Output ".\\$filename written"\n`,
+                        `}\n`,
+                        `}\n`,
+                        `function Get-CertPem {\n`,
+                        `param (\n`,
+                        `$certificateId\n`,
+                        `)\n`,
+                        `$uri = "getcertificatepem?id=$certificateId"\n`,
+                        `Get-File $uri\n`,
+                        `}\n`,
+                        `function Get-Chain {\n`,
+                        `param (\n`,
+                        `$certificateId\n`,
+                        `)\n`,
+                        `$uri = "chaindownload?id=$certificateId"\n`,
+                        `Get-File $uri\n`,
+                        `}\n`,
+                        `function Get-KeyPem {\n`,
+                        `param (\n`,
+                        `$keyId\n`,
+                        `)\n`,
+                        `$uri = "getkeypem?id=$keyId"\n`,
+                        `Get-File $uri\n`,
+                        `}\n`,
+                    ]);
+                }
+                else {
+                    return response.status(400).json({ error: `No script for OS ${userAgentOS[os]}}` });
+                }
                 readable.pipe(response);
             });
             this._app.post('/createCACert', (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
@@ -727,6 +814,7 @@ class WebServer {
             }));
             this._app.get('/api/chaindownload', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 var _l;
+                // BUG - Breaks if there chain is not complete
                 try {
                     let c = this._resolveCertificateQuery(request.query);
                     let filename = yield this._getChain(c);
@@ -1206,6 +1294,9 @@ class WebServer {
                     newFile += i.toString();
                     yield (0, promises_1.copyFile)(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(c)), newFile);
                     while (c.signedById != c.$loki) {
+                        if (c.signedById === null) {
+                            return reject(new CertError(404, 'Certificate chain is incomplete'));
+                        }
                         c = this._certificates.findOne({ $loki: c.signedById });
                         yield (0, promises_1.appendFile)(newFile, yield (0, promises_1.readFile)(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(c))));
                     }
@@ -1384,6 +1475,26 @@ class WebServer {
             }
             logger.info('Database is a supported version for this release');
         });
+    }
+    static _guessOs(userAgent) {
+        if (userAgent === null || userAgent === '')
+            return userAgentOS.UNKNOWN;
+        let ua = userAgent.toLowerCase();
+        if (ua.includes('windows'))
+            return userAgentOS.WINDOWS;
+        if (ua.includes('linux'))
+            return userAgentOS.LINUX;
+        if (ua.includes('curl'))
+            return userAgentOS.LINUX; // Best guess
+        if (ua.includes('mac'))
+            return userAgentOS.MAC;
+        if (ua.includes('x11'))
+            return userAgentOS.LINUX;
+        if (ua.includes('iphone'))
+            return userAgentOS.IPHONE;
+        if (ua.includes('android'))
+            return userAgentOS.ANDROID;
+        return userAgentOS.UNKNOWN;
     }
     static _isValidRNASequence(rnas) {
         for (let r in rnas) {
