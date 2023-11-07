@@ -829,7 +829,7 @@ $(async function() {
         window.location.hostname + 
         ':' + window.location.port;
         const ws = new WebSocket(wsURL);
-        wsonopen = wsonopen;
+        ws.onopen = wsonopen;
         ws.onclose = wsonclose;
         ws.onerror = wsonerror;
         ws.onmessage =  wsonmessage;
