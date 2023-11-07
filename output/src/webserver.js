@@ -812,18 +812,32 @@ class WebServer {
                     return response.status((_k = err.status) !== null && _k !== void 0 ? _k : 500).json({ error: err.message });
                 }
             }));
-            this._app.get('/api/chaindownload', (request, response) => __awaiter(this, void 0, void 0, function* () {
+            // this._app.get('/api/chaindownload', async (request, response) => {
+            //     // BUG - Breaks if there chain is not complete
+            //     try {
+            //         let c = this._resolveCertificateQuery(request.query as QueryType);
+            //         let filename = await this._getChain(c);
+            //         response.download(filename, `${c.name}_full_chain.pem`, async (err) => {
+            //             if (err) {
+            //                 return response.status(500).json({ error: `Failed to send chain for ${request.query}: ${err.message}` });
+            //             }
+            //             await unlink(filename);
+            //         });
+            //     }
+            //     catch (err) {
+            //         logger.error('Chain download failed: ' + err.message);
+            //         return response.status(err.status?? 500).json({ error: err.message });
+            //     }
+            // });
+            this._app.get('/api/ChainDownload', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 var _l;
                 // BUG - Breaks if there chain is not complete
                 try {
                     let c = this._resolveCertificateQuery(request.query);
-                    let filename = yield this._getChain(c);
-                    response.download(filename, `${c.name}_full_chain.pem`, (err) => __awaiter(this, void 0, void 0, function* () {
-                        if (err) {
-                            return response.status(500).json({ error: `Failed to send chain for ${request.query}: ${err.message}` });
-                        }
-                        yield (0, promises_1.unlink)(filename);
-                    }));
+                    let fileData = yield this._getChain(c);
+                    response.type('application/text');
+                    response.setHeader('Content-Disposition', `inline; filename=${WebServer._getCertificateFilenameFromRow(c)}_chain.pem`);
+                    response.send(fileData);
                 }
                 catch (err) {
                     logger.error('Chain download failed: ' + err.message);
@@ -1204,25 +1218,25 @@ class WebServer {
                     }
                     // See if this is the key pair for a certificate
                     let certs = this._certificates.find();
-                    let newfile;
+                    let newFile;
                     for (let i in certs) {
                         if (WebServer._isSignedBy(yield this._pkiCertFromPem(certs[i]), k.n, k.e)) {
                             krow.pairId = certs[i].$loki;
                             krow.pairCN = certs[i].subject.CN;
                             result.updated.push({ type: certs[i].type, id: certs[i].$loki });
-                            newfile = certs[i].name + '_key';
+                            newFile = certs[i].name + '_key';
                             break;
                         }
                     }
                     // Generate a file name for a key without a certificate
                     if (krow.pairId == null) {
-                        newfile = 'unknown_key';
-                        result.name = newfile;
+                        newFile = 'unknown_key';
+                        result.name = newFile;
                     }
                     else {
                         result.name = krow.pairCN + '_key';
                     }
-                    krow.name = newfile;
+                    krow.name = newFile;
                     let newRecord = (this._privateKeys.insert(krow));
                     result.added.push({ type: CertTypes.key, id: newRecord.$loki });
                     let newName = WebServer._getKeyFilenameFromRow(newRecord);
@@ -1282,25 +1296,44 @@ class WebServer {
             }
         }));
     }
+    // private async _getChain(c: CertificateRow & LokiObj): Promise<string> {
+    //     return new Promise(async (resolve, reject) => {
+    //         try {
+    //             let newFile = this._getWorkDir('temp_');
+    //             let i = 0;
+    //             while (await exists(newFile + i.toString())) {
+    //                 i++;
+    //             }
+    //             newFile += i.toString();
+    //             await copyFile(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(c)), newFile);
+    //             while (c.signedById != c.$loki) {
+    //                 if (c.signedById === null) {
+    //                     return reject(new CertError(404, 'Certificate chain is incomplete'));
+    //                 }
+    //                 c = this._certificates.findOne({ $loki: c.signedById});
+    //                 await appendFile(newFile, await readFile(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(c))));
+    //             }
+    //             resolve(newFile);
+    //         }
+    //         catch (err) {
+    //             reject(new CertError(500, err.message));
+    //         }
+    //     });
+    // }
     _getChain(c) {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
                 try {
-                    let newFile = this._getWorkDir('temp_');
-                    let i = 0;
-                    while (yield (0, exists_1.exists)(newFile + i.toString())) {
-                        i++;
-                    }
-                    newFile += i.toString();
-                    yield (0, promises_1.copyFile)(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(c)), newFile);
+                    let file = '';
+                    file = yield (0, promises_1.readFile)(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(c)), { encoding: 'utf8' });
                     while (c.signedById != c.$loki) {
                         if (c.signedById === null) {
                             return reject(new CertError(404, 'Certificate chain is incomplete'));
                         }
                         c = this._certificates.findOne({ $loki: c.signedById });
-                        yield (0, promises_1.appendFile)(newFile, yield (0, promises_1.readFile)(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(c))));
+                        file += yield (0, promises_1.readFile)(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(c)), { encoding: 'utf8' });
                     }
-                    resolve(newFile);
+                    resolve(file);
                 }
                 catch (err) {
                     reject(new CertError(500, err.message));
