@@ -1,5 +1,23 @@
 {
     "cSpell.words": [
-        "devcontainers"
+        "certname",
+        "certserver",
+        "devcontainers",
+        "getcert",
+        "getchain",
+        "getkey",
+        "keyname",
+        "lokijs",
+        "mycert",
+        "mykey",
+        "newca",
+        "newint",
+        "newleaf",
+        "privatekeys",
+        "webserver",
+        "wsonclose",
+        "wsonerror",
+        "wsonmessage",
+        "wsonopen"
     ]
 }
