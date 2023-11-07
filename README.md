@@ -8,7 +8,7 @@ Typically, my job will require me to generate certificates for various purposes,
 
 The problem I would run into was tracking various certificates over a multitude of different machines for different purposes. Often I would end up using OpenSSL to regenerate them. I don't know about you, but I have to look up the OpenSSL arguments every time I need to do this.
 ## Usage
-My solution to this is this simple web application. You can create a root certifcate, from that create a chain of intermediate certifcates, and finally a leaf certificate. Once they have all been created, you can download the leaf certificate's private key and the full certificate chain from the leaf up.
+My solution to this is this simple web application. You can create a root certificate, from that create a chain of intermediate certificates, and finally a leaf certificate. Once they have all been created, you can download the leaf certificate's private key and the full certificate chain from the leaf up.
 
 In my case, these certificates are typically used for X.509 authentication with an Azure Device Provisioning Service or an Azure IoT hub. These have been tested and work as expected. Also tested is generating a root and intermediate for use in an nested IoT Edge parent/child relationships. These also replace the Edge quick start certificates too.
 
@@ -68,8 +68,37 @@ docker run \
 
 A REST API is also available since your host may not be capable of running a web browser. In most cases you can use the name of the certificate or key, but, since they are not guaranteed to be unique, you can also use the id displayed next to each certificate and key.
 
+### Helper method
+This method will (attempt) to return a script that you can utilize for acquiring certificates, certificate chains, and keys. If you are on Windows it will return a ps1 script and on Linux it will return a bash script. 
+`POST http://server:4141/api/helper[?os=linux|windows|mac]`
+
+The os parameter is optional. The server will attempt to determine the appropriate operating system from the user agent. If this is wrong or unsupported it can be overridden by specifying the required script.
+
+This call will return a script which should be saved to your storage. For example on Linux or Mac:
+```bash
+curl http://server:4141/api/helper -o helper.sh
+source helper.sh
+# Get the certificate with id <id>
+getcert <id>
+# Get the key with id <id>
+getkey <id>
+# Get the certificate chain starting at id <id>
+getchain <id>
+```
+or on Windows
+```powershell
+Invoke-WebRequest -Uri http://server:4141/api/helper -OutFile helper.ps1
+. helper.ps1
+# Get the certificate with id <id>
+Get-CertPem <id>
+# Get the key with id <id>
+Get-KeyPem <id>
+# Get the certificate chain starting at id <id>
+Get-Chain <id>
+```
+
 ### Create a new self-signed certificate authority (root CA)
-POST `http://server:4141/api/createcacert`  
+`POST http://server:4141/api/createcacert`  
 Post data:
 ```JSON
 {
@@ -92,8 +121,8 @@ Sample response:
 }
 ```
 ### Create a new intermediate certificate
-Intermediate certificates can be signed by either a root CA or another intermedidate certificate.  
-POST `http://server:4141/api/createintermediatecert`  
+Intermediate certificates can be signed by either a root CA or another intermediate certificate.  
+`POST http://server:4141/api/createintermediatecert`  
 Post data:
 ```JSON
 {
@@ -117,8 +146,8 @@ Sample response:
 }
 ```
 ### Create a new leaf certificate
-Leaf certificates can be signed by either a root CA or intermedidate certificate but they **cannot sign** other certificates.  
-POST `http://server:4141/api/createleafcert`  
+Leaf certificates can be signed by either a root CA or intermediate certificate but they **cannot sign** other certificates.  
+`POST http://server:4141/api/createleafcert`  
 Post data:
 ```JSON
 {
@@ -170,15 +199,15 @@ curl http://myserver:4141/api/certlist?type=leaf
 Invoke-WebRequest -Uri http://myserver:4141/api/certlist?type=leaf
 ```
 ### Download a certificate pem file:  
-GET `http://server:4141/api/getcertificatepem/id=<certificate id>` or  
-GET `http://server:4141/api/getcertificatepem/name=<certificate name>`  
-Returns the pem file. If name is used and two certicates share the same common name it will fail with an error.
+`GET http://server:4141/api/getcertificatepem/id=<certificate id>` or  
+`GET http://server:4141/api/getcertificatepem/name=<certificate name>`  
+Returns the pem file. If name is used and two certificates share the same common name it will fail with an error.
 ### Download the certificate's full chain file:
-GET `http://server:4141/api/chaindownload/id=<certificate id>` or  
-GET `http://server:4141/api/chaindownload/name=<certificate name>`  
-Returns a pem file containing the full chain of certificates from the one selected up. This is in the correct order to pass as a full chain pem file. If name is used and two certicates share the same common name it will fail with an error.
+`GET http://server:4141/api/chaindownload/id=<certificate id>` or  
+`GET http://server:4141/api/chaindownload/name=<certificate name>`  
+Returns a pem file containing the full chain of certificates from the one selected up. This is in the correct order to pass as a full chain pem file. If name is used and two certificates share the same common name it will fail with an error.
 ### Upload a certificate pem file:  
-POST `http://server:4141/api/uploadcert`  
+`POST http://server:4141/api/uploadcert`  
 Uploads an existing certificate to the server. The pem data is placed in the post data. The POST must follow the following conventions:  
   + The pem content is in standard 64 byte lines. Hint: use --data-binary @filename when using curl
   + The Content-Type header must be set to text/plain. In curl -H "Content-Type: text/plain"  
@@ -189,12 +218,24 @@ Sample response:
   "type":"root"
 }
 ```
+##### Curl
+```
+curl -X POST -H "Content-Type: text/plain" --data-binary @./mycert.pem http://myserver:4141/api/uploadcert 
+```
+##### PowerShell
+```powershell
+$body = [System.IO.File]::ReadAllText('.\mycert.pem')
+Invoke-WebRequest -Uri http://myserver:4141/api/uploadcert `
+  -ContentType 'text/plain' `
+  -Method POST `
+  -Body $body
+```
 ### Delete a certificate:  
-DELETE `http://server:4141/api/deleteCert/id=<certificate id>` or  
-DELETE `http://server:4141/api/deleteCert/name=<certificate name>`  
-Deletes the certificate from the server. If name is used and two certicates share the same common name it will fail with an error.
+`DELETE http://server:4141/api/deleteCert/id=<certificate id>` or  
+`DELETE http://server:4141/api/deleteCert/name=<certificate name>`  
+Deletes the certificate from the server. If name is used and two certificates share the same common name it will fail with an error.
 ### Get a list of keys:  
-GET `http://server:4141/api/keylist`  
+`GET http://server:4141/api/keylist`  
 Sample output:  
 ```json
 {
@@ -208,11 +249,11 @@ Sample output:
 }
 ```
 ### Download a key pem file:  
-GET `http://server:4141/api/getkeypem/id=<key id>` or  
-GET `http://server:4141/api/getkeypem/name=<key name>`  
+`GET http://server:4141/api/getkeypem/id=<key id>` or  
+`GET http://server:4141/api/getkeypem/name=<key name>`  
 Returns the pem file. If name is used and two keys share the same common name it will fail with an error.
 ### Upload a key pem file:  
-POST `http://server:4141/api/uploadkey`  
+`POST http://server:4141/api/uploadkey`  
 Uploads an existing key to the server. The pem data is placed in the post data. The POST must follow the following conventions:  
   + The pem content is in standard 64 byte lines. Hint: use --data-binary @filename when using curl
   + The Content-Type header must be set to text/plain. In curl -H "Content-Type: text/plain"  
@@ -237,6 +278,6 @@ Invoke-WebRequest -Uri http://myserver:4141/api/uploadkey `
   -Body $body
 ```
 ### Delete a key:  
-DELETE `http://server:4141/api/deletekey/id=<key id>` or  
-DELETE `http://server:4141/api/deletekey/name=<key name>`  
-Deletes the key from the server. If name is used and two certicates share the same common name it will fail with an error.
+`DELETE http://server:4141/api/deletekey/id=<key id>` or  
+`DELETE http://server:4141/api/deletekey/name=<key name>`  
+Deletes the key from the server. If name is used and two certificates share the same common name it will fail with an error.
