@@ -4,6 +4,7 @@
         "certname",
         "certserver",
         "cshost",
+        "deepmerge",
         "devcontainers",
         "fileupload",
         "getcert",
