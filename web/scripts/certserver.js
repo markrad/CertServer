@@ -15,7 +15,7 @@ const typeLookup = [
 async function getDir(dir) {
     return new Promise((resolve, reject) => {
         $.ajax({
-            url: `/certlist?type=${dir}`,
+            url: `/certList?type=${dir}`,
             method: 'GET',
             error: (_xhr, _status, err) => { 
                 console.error('Failed to get ' + dir);
@@ -49,9 +49,11 @@ function buildKeyEntry(file) {
         <span onclick="keyClick('${id}')">
             <span class="keyArrow">></span>
             <span class="idLine">
-            <span class="idValue">${id}</span>
+                <span class="idValue">${id}</span>
             </span>
-            <span class="certValue">${name}</span>
+            <span class="certValue">
+                <span class="certName">${name}</span>
+            </span>
         </span>
         <div class="keyDetails">
         </div>
@@ -62,7 +64,7 @@ function buildKeyEntry(file) {
 
 function buildKeyDetail(detail) {
     const detailHTML = ({ id, name, certPair, encrypted }) => `
-        <div class="keyInfo slideform">
+        <div class="keyInfo">
         <div class="certInfoButtons"> 
             <button type="button" class="button2 keyBtnDownload" onClick="keyDownload('${id}')">Download</button>
             <button type="button" class="button2 button2Red keyBtnDelete" onClick="keyDelete('${id}')">Delete</button>
@@ -130,8 +132,8 @@ async function getKeyDetails({ id }) {
 // Call the server to download the key
 function keyDownload(id) {
     let filename = $(`#k${id} .certValue`).text() + '.pem';
-    let filelocation = '/api/getkeypem?id=' + id;
-    const anchor = $('<a>', { href: filelocation, download: filename })[0];
+    let fileLocation = '/api/getKeyPem?id=' + id;
+    const anchor = $('<a>', { href: fileLocation, download: filename })[0];
     $('body').append(anchor);
     anchor.click();
     $(anchor).remove();
@@ -161,7 +163,7 @@ function uploadKey(e) {
     var data = new FormData();
     var files = $('#keyUpload');
     if (files[0].files.length == 0) {
-        alert('No files choosen');
+        alert('No files chosen');
     }
     else {
         for (let i = 0; i < files[0].files.length; i++) {
@@ -188,7 +190,7 @@ function uploadKey(e) {
     }
 }
 
-// Adds certficates to the section passed
+// Adds certificates to the section passed
 function buildCertList(target, files) {
     target.empty();
     if (files.length == 0)
@@ -210,15 +212,15 @@ function buildCertEntry(file) {
         <span onclick="certClick('${id}')">
             <span class="certArrow">˃</span>
             <span class="idLine">
-            <span class="idValue">${id}</span>
+                <span class="idValue">${id}</span>
             </span>
             <span class="certValue">
-            <span class="certName">${name}</span>
-            <span class="CertTagsOuter">
-                <span class="certTagsL">[</span>
-                <span class="certTags">${tags}</span>
-                <span class="certTagsR">]</span>
-            </span>
+                <span class="certName">${name}</span>
+                <span class="CertTagsOuter">
+                    <span class="certTagsL">[</span>
+                    <span class="certTags">${tags}</span>
+                    <span class="certTagsR">]</span>
+                </span>
             </span>
         </span>
         <div class="certDetails">
@@ -256,10 +258,10 @@ function buildCertDetail(detail) {
         keyPresent,
         tags,
     }) => `
-        <div class="certInfo slideform">
+        <div class="certInfo">
         <div class="certInfoButtons"> 
             <a href="/api/getCertificatePem?id=${id}" class="button2 certBtnDownload">Download</a>
-            <a href="/api/chaindownload?id=${id}" class="button2 certBtnDownloadChain">Download Chain</a>
+            <a href="/api/chainDownload?id=${id}" class="button2 certBtnDownloadChain">Download Chain</a>
             <button type="button" class="button2 button2Red certBtnDelete" onClick="certDelete('${name}', '${id}')">Delete</button>
             <span class="certOptionalButtons">
             <button type="button" class="button2" onClick="newIntermediateDialog('${id}', '${name}')">New Intermediate</button>
@@ -450,7 +452,7 @@ function certDelete(name, id) {
                 showError(err, result.error);
             },
             success: async (result, status) => {
-                showMessage(`>Certificate ${name} deleted`);
+                showMessage(`Certificate ${name} deleted`);
             }
         });
     }
@@ -461,7 +463,7 @@ function uploadCert(e) {
     var data = new FormData();
     var files = $('#certUpload');
     if (files[0].files.length == 0) {
-        alert('No files choosen');
+        alert('No files chosen');
     }
     else {
         for (let i = 0; i < files[0].files.length; i++) {
@@ -500,7 +502,7 @@ async function getName(type, id) {
                 reject(err);
             },
             success: async (result, status) => {
-                resolve(result.name);
+                resolve(result);
             }
         });
     });
@@ -675,28 +677,27 @@ function processUpdates(changePacket) {
 
     changeJSON.added.forEach(async (change) => {
         let certs = [];
-        let name = await getName(change.type, change.id);
+        let result = await getName(change.type, change.id);
         let header = $(`${lists[change.type - 1]} li`);
-        let entry = (change.type == 4? buildKeyEntry({ name: name, id: change.id }) : buildCertEntry({ name: name, id: change.id }));
+        let entry = (change.type == 4? buildKeyEntry(result) : buildCertEntry(result));
 
         if (header.length > 0 && header.first().attr('class') == 'empty') {
             header.first().remove();
         }
 
-        console.log(name);
         $(`#${typeLookup[change.type]}List li`).each(function() {
-            let span = $(this).find('span.certValue');
+            let span = $(this).find('span.certName');
             certs.push({ parent: $(this), span: span.text() });
         });
         if (certs.length == 0) {
             $(`#${typeLookup[change.type]}List`).append(entry);
         }
-        else if (name.localeCompare(certs[certs.length - 1].span) == 1) {
+        else if (result.name.localeCompare(certs[certs.length - 1].span) == 1) {
             certs[certs.length - 1].parent.after(entry);
         }
         else {
             for (let i = 0; i < certs.length; i++) {
-                if (name.localeCompare(certs[i].span) == -1) {
+                if (result.name.localeCompare(certs[i].span) == -1) {
                     certs[i].parent.before(entry);
                     break;
                 }

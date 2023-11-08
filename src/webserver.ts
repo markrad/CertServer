@@ -271,7 +271,7 @@ export class WebServer {
             hostname: string,
             port: number,
         }
-        const cshost: (c: cshostType) => string = ({ protocol, hostname, port }) => `${protocol}://${hostname}:${port}`;
+        const csHost: (c: cshostType) => string = ({ protocol, hostname, port }) => `${protocol}://${hostname}:${port}`;
         logger.info(`CertServer starting - ${this._version}`);
         let getCollections: () => void = () => {
             if (null == (certificates = db.getCollection<CertificateRow>('certificates'))) {
@@ -340,7 +340,7 @@ export class WebServer {
             });
         });
         this._app.get('/api/helper', (request, response) => {
-            response.setHeader('content-type', 'applicaton/text');
+            response.setHeader('content-type', 'application/text');
             let userAgent = request.get('User-Agent')
             let os: userAgentOS;
 
@@ -364,9 +364,9 @@ export class WebServer {
             if (os == userAgentOS.LINUX || os == userAgentOS.MAC) {
                 response.setHeader('content-disposition', `attachment; filename="${request.hostname}-${this._port}.sh"`);
                 readable = Readable.from([
-                    `function getcert(){ wget --content-disposition ${cshost({ protocol: this._certificate? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getcertificatepem?id=$@}\n`,
-                    `function getkey(){ wget --content-disposition ${cshost({ protocol: this._certificate? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getkeypem?id=$@}\n`,
-                    `function getchain(){ wget --content-disposition ${cshost({ protocol: this._certificate? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getchaindownload?id=$@}\n`
+                    `function getcert(){ wget --content-disposition ${csHost({ protocol: this._certificate? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getCertificatePem?id=$@}\n`,
+                    `function getkey(){ wget --content-disposition ${csHost({ protocol: this._certificate? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getKeyPem?id=$@}\n`,
+                    `function getchain(){ wget --content-disposition ${csHost({ protocol: this._certificate? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/chainDownload?id=$@}\n`
                 ]);
             }
             else if (os == userAgentOS.WINDOWS) {
@@ -388,7 +388,7 @@ export class WebServer {
                         `return $filename\n`,
                     `}\n`,
                     `function Get-URIPrefix {\n`,
-                        `return "${cshost({ protocol: this._certificate? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/"\n`,
+                        `return "${csHost({ protocol: this._certificate? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/"\n`,
                     `}\n`,
                     `function Get-File {\n`,
                         `param (\n`,
@@ -406,21 +406,21 @@ export class WebServer {
                         `param (\n`,
                             `$certificateId\n`,
                         `)\n`,
-                        `$uri = "getcertificatepem?id=$certificateId"\n`,
+                        `$uri = "getCertificatePem?id=$certificateId"\n`,
                         `Get-File $uri\n`,
                     `}\n`,
                     `function Get-Chain {\n`,
                         `param (\n`,
                             `$certificateId\n`,
                         `)\n`,
-                        `$uri = "chaindownload?id=$certificateId"\n`,
+                        `$uri = "chainDownload?id=$certificateId"\n`,
                         `Get-File $uri\n`,
                     `}\n`,
                     `function Get-KeyPem {\n`,
                         `param (\n`,
                             `$keyId\n`,
                         `)\n`,
-                        `$uri = "getkeypem?id=$keyId"\n`,
+                        `$uri = "getKeyPem?id=$keyId"\n`,
                         `Get-File $uri\n`,
                     `}\n`,
                 ]);
@@ -431,7 +431,7 @@ export class WebServer {
             readable.pipe(response);
         })
         this._app.post('/createCACert', async (request, _response, next) => {
-            request.url = '/api/createcacert'
+            request.url = '/api/createCACert'
             next();
         });
         this._app.post('/createIntermediateCert', async (request, _response, next) => {
@@ -447,28 +447,21 @@ export class WebServer {
             request.query['id'] = request.body.toTag;
             next();
         });
-        this._app.post('/uploadCert', ((request: any, response) => {
+        this._app.post('/uploadCert', (async (request: any, response) => {
             // FUTURE Allow multiple files to be submitted
             // FUTURE: Allow chain style files to be submitted
             // FUTURE: Allow der and pfx files to be submitted
             if (!request.files || Object.keys(request.files).length == 0) {
                 return response.status(400).json({ error: 'No file selected' });
             }
-            let certfile = request.files.certFile;
-            let tempName = path.join(this._workPath, certfile.name);
-            certfile.mv(tempName, async (err: Error) => {
-                if (err)
-                    return response.status(500).json({ error: err.message });
-
-                try {
-                    let result: OperationResult  = await this._tryAddCertificate(tempName);
-                    this._broadcast(result);
-                    return response.status(200).json({ message: `Certificate ${result.name} added` });
-                }
-                catch (err) {
-                    return response.status(err.status?? 500).json({ error: err.message });
-                }
-            });
+            try {
+                let result: OperationResult = await this._tryAddCertificate({ pemString: request.files.certFile.data.toString() });
+                this._broadcast(result);
+            }
+            catch (err) {
+                logger.error(`Upload certificate failed: ${err.message}`);
+                return response.status(err.status?? 500).json({ error: err.message });
+            }
         }));
         this._app.delete('/deleteCert', ((request: any, _response: any, next: NextFunction) => {
             request.url = '/api/deleteCert';
@@ -488,32 +481,24 @@ export class WebServer {
                 response.status(err.status ?? 500).json({ error: err.message })
             }
         });
-        this._app.post('/uploadKey', ((request: any, response) => {
+        this._app.post('/uploadKey', async (request: any, response) => {
             if (!request.files || Object.keys(request.files).length == 0) {
                 return response.status(400).json({ error: 'No file selected' });
             }
-            let keyFile = request.files.keyFile;
-
-            let tempName = path.join(this._workPath, keyFile.name);
-            keyFile.mv(tempName, async (err: Error) => {
-                if (err) return response.status(500).send(err);
-
-                try {
-                    let result = await this._tryAddKey(tempName, request.query.password);
-                    this._broadcast(result);
-                    return response.status(200).json({ message: `Key ${result.name} added` });
-                }
-                catch (err) {
-                    return response.status(err.status ?? 500).send(err.message);
-                }
-            });
-        }));
+            try {
+                let result: OperationResult = await this._tryAddKey({ pemString: request.files.keyFile.data.toString(), password: request.query.password });
+                this._broadcast(result);
+            }
+            catch (err) {
+                return response.status(err.status ?? 500).json({ error: err.message });
+            }
+        });
         this._app.delete('/deleteKey', ((request, _response, next: NextFunction) => {
             request.url = '/api/deleteKey';
             next();
         }))
         this._app.get('/keyList', (request, _response, next) => {
-            request.url = '/certlist';
+            request.url = '/certList';
             next();
         });
         this._app.get('/keyDetails', async (request, response) => {
@@ -580,10 +565,8 @@ export class WebServer {
                 cert.sign(privateKey, md.sha512.create());
         
                 // Convert to PEM format
-                await writeFile(path.join(this._workPath, 'newca.pem'), pki.certificateToPem(cert), {encoding: 'utf8'});
-                await writeFile(path.join(this._workPath, 'newca-key.pem'), pki.privateKeyToPem(privateKey), { encoding: 'utf8' });
-                let certResult = await this._tryAddCertificate((path.join(this._workPath, 'newca.pem')));
-                let keyResult = await this._tryAddKey((path.join(this._workPath, 'newca-key.pem')));
+                let certResult = await this._tryAddCertificate({ pemString: pki.certificateToPem(cert) });
+                let keyResult = await this._tryAddKey({ pemString: pki.privateKeyToPem(privateKey) });
                 certResult.added = certResult.added.concat(keyResult.added);
                 certResult.name = `${certResult.name}/${keyResult.name}`;
                 this._broadcast(certResult);
@@ -682,10 +665,8 @@ export class WebServer {
                 cert.sign(k, md.sha512.create());
         
                 // Convert to PEM format
-                await writeFile(path.join(this._workPath, 'newint.pem'), pki.certificateToPem(cert), {encoding: 'utf8'});
-                await writeFile(path.join(this._workPath, 'newint-key.pem'), pki.privateKeyToPem(privateKey), { encoding: 'utf8' });
-                let certResult = await this._tryAddCertificate((path.join(this._workPath, 'newint.pem')));
-                let keyResult = await this._tryAddKey((path.join(this._workPath, 'newint-key.pem')));
+                let certResult = await this._tryAddCertificate({ pemString: pki.certificateToPem(cert) });
+                let keyResult = await this._tryAddKey({ pemString: pki.privateKeyToPem(privateKey) });
                 certResult.added = certResult.added.concat(keyResult.added);
                 certResult.name = `${certResult.name}/${keyResult.name}`;
                 this._broadcast(certResult);
@@ -779,10 +760,8 @@ export class WebServer {
                 cert.sign(k, md.sha512.create());
 
                 // Convert to PEM format
-                await writeFile(path.join(this._workPath, 'newleaf.pem'), pki.certificateToPem(cert), {encoding: 'utf8'});
-                await writeFile(path.join(this._workPath, 'newleaf-key.pem'), pki.privateKeyToPem(privateKey), { encoding: 'utf8' });
-                let certResult = await this._tryAddCertificate((path.join(this._workPath, 'newleaf.pem')));
-                let keyResult = await this._tryAddKey((path.join(this._workPath, 'newleaf-key.pem')));
+                let certResult = await this._tryAddCertificate({ pemString: pki.certificateToPem(cert) });
+                let keyResult = await this._tryAddKey({ pemString: pki.privateKeyToPem(privateKey) });
                 certResult.added = certResult.added.concat(keyResult.added);
                 certResult.name = `${certResult.name}/${keyResult.name}`;
                 this._broadcast(certResult);
@@ -797,7 +776,7 @@ export class WebServer {
         this._app.get('/api/certName', async(request, response) => {
             try {
                 let c = this._resolveCertificateQuery(request.query as QueryType);
-                response.status(200).json({ 'name': c.subject.CN });
+                response.status(200).json({ name: c.subject.CN, id: c.$loki, tags: c.tags });
             }
             catch (err) {
                 response.status(err.status ?? 500).json({ error: err.message });
@@ -852,8 +831,7 @@ export class WebServer {
                 return response.status(400).json({ error: 'Certificate must be in standard 64 byte line length format - try --data-binary with curl' });
             }
             try {
-                await writeFile(path.join(this._workPath, 'upload.pem'), request.body, { encoding: 'utf8' });
-                let result: OperationResult = await this._tryAddCertificate(this._getWorkDir('upload.pem'));
+                let result: OperationResult = await this._tryAddCertificate({ pemString: request.body });
                 this._broadcast(result);
                 return response.status(200).json({ message: `Certificate ${result.name} added` });
             }
@@ -891,7 +869,7 @@ export class WebServer {
         this._app.get('/api/keyname', async(request, response) => {
             try {
                 let k = this._resolveKeyQuery(request.query);
-                response.status(200).json({ 'name': (k.pairCN? k.pairCN + '_key' : k.name) });
+                response.status(200).json({ 'name': (k.pairCN? k.pairCN + '_key' : k.name), id: k.$loki, tags: [] });
             }
             catch (err) {
                 response.status(err.status ?? 500).json({ error: err.message });
@@ -906,8 +884,7 @@ export class WebServer {
                 if (!(request.body as string).includes('\n')) {
                     return response.status(400).send('Key must be in standard 64 byte line length format - try --data-binary with curl');
                 }
-                await writeFile(this._getWorkDir('upload.key'), request.body, { encoding: 'utf8' });
-                let result: OperationResult = await this._tryAddKey(this._getWorkDir('upload.key'), request.query.password as string);
+                let result: OperationResult = await this._tryAddKey({ pemString: request.body, password: request.query.password as string });
                 this._broadcast(result);
                 // TODO: I don't think type is used any longer
                 return response.status(200).json({ message: `Key ${result.name} added` });
@@ -942,23 +919,6 @@ export class WebServer {
                 return response.status(err.status?? 500).json({ error: err.message });
             }
         });
-        // this._app.get('/api/chaindownload', async (request, response) => {
-        //     // BUG - Breaks if there chain is not complete
-        //     try {
-        //         let c = this._resolveCertificateQuery(request.query as QueryType);
-        //         let filename = await this._getChain(c);
-        //         response.download(filename, `${c.name}_full_chain.pem`, async (err) => {
-        //             if (err) {
-        //                 return response.status(500).json({ error: `Failed to send chain for ${request.query}: ${err.message}` });
-        //             }
-        //             await unlink(filename);
-        //         });
-        //     }
-        //     catch (err) {
-        //         logger.error('Chain download failed: ' + err.message);
-        //         return response.status(err.status?? 500).json({ error: err.message });
-        //     }
-        // });
         this._app.get('/api/ChainDownload', async (request, response) => {
             // BUG - Breaks if there chain is not complete
             try {
@@ -1068,15 +1028,13 @@ export class WebServer {
                     let cert = this._certificates.findOne({ $loki: WebServer._getIdFromFileName(file) });
                     if (!cert) {
                         try {
-                            adding.push(this._tryAddCertificate(this._getCertificatesDir(file)));
+                            adding.push(this._tryAddCertificate({ filename: this._getCertificatesDir(file) }));
                         }
                         catch (err) {}
                     }
                 });
 
                 await Promise.all(adding);
-                // let addresults: string[] = await Promise.all(adding);
-                // logger.debug(addresults.join(';'));
 
                 let nonRoot = this._certificates.find( { '$and': [ { 'type': { '$ne': CertTypes.root }}, { signedById: null } ] });
 
@@ -1107,7 +1065,7 @@ export class WebServer {
                     let key = this._privateKeys.findOne({ $loki: WebServer._getIdFromFileName(file) });
                     if (!key) {
                         try {
-                            adding.push(this._tryAddKey(path.join(this._privatekeysPath, file)));
+                            adding.push(this._tryAddKey({ filename: path.join(this._privatekeysPath, file) }));
                         }
                         catch (err) {
                             logger.debug('WTF');
@@ -1115,9 +1073,7 @@ export class WebServer {
                     }
                 });
 
-                // addresults = await Promise.all(adding);
                 await Promise.allSettled(adding);
-                // logger.debug(addresults.join(';'));
 
                 this._db.saveDatabase((err) => {
                     if (err) reject(err);
@@ -1132,17 +1088,18 @@ export class WebServer {
         });
     }
 
-    private async _tryAddCertificate(filename: string): Promise<OperationResult> {
+    private async _tryAddCertificate(input: { filename: string, pemString?: string } | { filename?: string, pemString: string }): Promise<OperationResult> {
         return new Promise<OperationResult>(async (resolve, reject) => {
-            logger.info(`Trying to add ${path.basename(filename)}`);
-            if (!fs.existsSync(filename)) {
-                let err = new CertError(404, `${path.basename(filename)} does not exist`)
-                throw err;
-            }
-
             try {
-                let pemString = await readFile(filename, { encoding: 'utf8' });
-                let msg = pem.decode(pemString)[0];
+                if (input.filename) {
+                    logger.info(`Trying to add ${path.basename(input.filename)}`);
+                    if (!await exists(input.filename)) {
+                        reject(new CertError(404, `${path.basename(input.filename)} does not exist`));
+                    }
+                    input.pemString = await readFile(input.filename, { encoding: 'utf8' });
+        
+                }
+                let msg = pem.decode(input.pemString)[0];
                 logger.debug(`Received ${msg.type}`);
 
                 if (msg.type != 'CERTIFICATE') {
@@ -1150,18 +1107,19 @@ export class WebServer {
                 }
 
                 let result: OperationResult = { name: '', added: [], updated: [], deleted: [] };
-                let c: pki.Certificate = pki.certificateFromPem(pemString);
+                let c: pki.Certificate = pki.certificateFromPem(input.pemString);
+                logger.debug(`Adding certificate ${c.subject.getField('CN').value}`);
                 let signedById: number = null;
                 let havePrivateKey: boolean = false;
 
                 // See if we already have this certificate
-                let fingerprint256 = new crypto.X509Certificate(pemString).fingerprint256;
+                let fingerprint256 = new crypto.X509Certificate(input.pemString).fingerprint256;
 
                 if (this._certificates.findOne({ fingerprint256: fingerprint256 }) != null) {
-                    throw new CertError(409, `${path.basename(filename)} serial number ${c.serialNumber} is a duplicate - ignored`);
+                    throw new CertError(409, `${c.subject.getField('CN').value} serial number ${c.serialNumber} is a duplicate - ignored`);
                 }
 
-                // See if this is a root, intermiate, or leaf
+                // See if this is a root, intermediate, or leaf
                 let type: CertTypes;
                 if (c.isIssuer(c)) {
                     type = CertTypes.root;
@@ -1202,7 +1160,7 @@ export class WebServer {
                     notBefore: c.validity.notBefore,
                     notAfter: c.validity.notAfter, 
                     havePrivateKey: havePrivateKey,
-                    fingerprint: new crypto.X509Certificate(pemString).fingerprint,
+                    fingerprint: new crypto.X509Certificate(input.pemString).fingerprint,
                     fingerprint256: fingerprint256,
                     tags: []
                 })) as CertificateRow & LokiObj;    // Return value erroneous omits LokiObj
@@ -1243,8 +1201,8 @@ export class WebServer {
 
                 // This guarantees a unique filename
                 let newName = WebServer._getCertificateFilenameFromRow(newRecord);
-                logger.info(`Renamed ${path.basename(filename)} to ${newName}`)
-                await rename(filename, path.join(this._certificatesPath, newName));
+                await writeFile(this._getCertificatesDir(newName), input.pemString, { encoding: 'utf8' });
+                logger.info(`Written file ${newName}`)
                 resolve(result); 
             }
             catch (err) {
@@ -1343,14 +1301,16 @@ export class WebServer {
      * 
      * @returns OperationResultEx2 promise containing updated entries
      */
-    private async _tryAddKey(filename: string, password?: string): Promise<OperationResult> {
+    private async _tryAddKey(input: { filename: string, pemString?: string, password?: string } | { filename?: string, pemString: string, password?: string }): Promise<OperationResult> {
         return new Promise<OperationResult>(async (resolve, reject) => {
-            logger.info(`Trying to add ${path.basename(filename)}`);
-            if (!await exists(filename)) {
-                reject(new CertError(404, `${path.basename(filename)} does not exist`));
-            }
-
             try {
+                if (input.filename) {
+                    logger.info(`Trying to add ${path.basename(input.filename)}`);
+                    if (!await exists(input.filename)) {
+                        reject(new CertError(404, `${path.basename(input.filename)} does not exist`));
+                    }
+                    input.pemString = await readFile(input.filename, { encoding: 'utf8' });
+                }
                 let result: OperationResult = {
                     name: '',
                     added: [],
@@ -1359,23 +1319,22 @@ export class WebServer {
                 };
 
                 let k: pki.rsa.PrivateKey;
-                let kpem = await readFile(filename, { encoding: 'utf8' });
-                let msg = pem.decode(kpem)[0];
+                let msg = pem.decode(input.pemString)[0];
                 let encrypted: boolean = false;
                 if (msg.type == 'ENCRYPTED PRIVATE KEY') {
-                    if (!password) {
+                    if (!input.password) {
                         // TODO Fix lack of error message on web client
-                        logger.warn(`Cannot add ${filename} - no pasword for encrypted key`); 
-                        return reject(new CertError(400, 'Password is required for key ' + filename));
+                        logger.warn(`Encrypted key requires password`); 
+                        return reject(new CertError(400, 'Password is required for key ' + input.filename?? ''));
                     }
-                    k = pki.decryptRsaPrivateKey(kpem , password);
+                    k = pki.decryptRsaPrivateKey(input.pemString , input.password);
                     encrypted = true;
                 }
                 else {
-                    k = pki.privateKeyFromPem(kpem);
+                    k = pki.privateKeyFromPem(input.pemString);
                 }
 
-                let krow: PrivateKeyRow = { e: k.e, n: k.n, pairId: null, pairCN: null, name: null, type: CertTypes.key, encrypted: encrypted };
+                let kRow: PrivateKeyRow = { e: k.e, n: k.n, pairId: null, pairCN: null, name: null, type: CertTypes.key, encrypted: encrypted };
                 let keys = this._privateKeys.find();
                 let publicKey = pki.setRsaPublicKey(k.n, k.e);
 
@@ -1392,8 +1351,8 @@ export class WebServer {
 
                 for (let i in certs) {
                     if (WebServer._isSignedBy(await this._pkiCertFromPem(certs[i]), k.n, k.e)) {
-                        krow.pairId = certs[i].$loki;
-                        krow.pairCN = certs[i].subject.CN;
+                        kRow.pairId = certs[i].$loki;
+                        kRow.pairCN = certs[i].subject.CN;
                         result.updated.push({ type: certs[i].type, id: certs[i].$loki });
                         newFile = certs[i].name + '_key';
                         break;
@@ -1401,20 +1360,20 @@ export class WebServer {
                 }
 
                 // Generate a file name for a key without a certificate
-                if (krow.pairId == null) {
+                if (kRow.pairId == null) {
                     newFile = 'unknown_key';
                     result.name = newFile;
                 }
                 else {
-                    result.name = krow.pairCN + '_key';
+                    result.name = kRow.pairCN + '_key';
                 }
 
-                krow.name = newFile;
-                let newRecord: PrivateKeyRow & LokiObj = (this._privateKeys.insert(krow)) as PrivateKeyRow & LokiObj;
+                kRow.name = newFile;
+                let newRecord: PrivateKeyRow & LokiObj = (this._privateKeys.insert(kRow)) as PrivateKeyRow & LokiObj;
                 result.added.push({ type: CertTypes.key, id: newRecord.$loki });
                 let newName = WebServer._getKeyFilenameFromRow(newRecord);
-                await rename(filename, this._getKeysDir(newName));
-                logger.info(`Renamed ${path.basename(filename)} to ${newName}`)
+                await writeFile(this._getKeysDir(newName), input.pemString, { encoding: 'utf8' });
+                logger.info(`Written file ${newName}`);
 
                 resolve(result);
             }
@@ -1450,8 +1409,6 @@ export class WebServer {
                     logger.error(`Could not find file ${filename}`);
                 }
 
-                // let certTypes: CertTypes[] = [CertTypes.key];
-                // let certificatesupdated: number[] = [];
                 if (k.pairId) {
                     let cert = this._certificates.findOne({ $loki: k.pairId });
                     if (!cert) {
@@ -1461,7 +1418,6 @@ export class WebServer {
                         cert.havePrivateKey = false;
                         this._certificates.update(cert);
                         result.updated.push({type: cert.type, id: cert.$loki })
-                        // certificatesupdated.push(cert.$loki);
                     }
                 }
 
@@ -1475,34 +1431,6 @@ export class WebServer {
             }
         });
     }
-
-    // private async _getChain(c: CertificateRow & LokiObj): Promise<string> {
-    //     return new Promise(async (resolve, reject) => {
-    //         try {
-    //             let newFile = this._getWorkDir('temp_');
-    //             let i = 0;
-    //             while (await exists(newFile + i.toString())) {
-    //                 i++;
-    //             }
-
-    //             newFile += i.toString();
-    //             await copyFile(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(c)), newFile);
-
-    //             while (c.signedById != c.$loki) {
-    //                 if (c.signedById === null) {
-    //                     return reject(new CertError(404, 'Certificate chain is incomplete'));
-    //                 }
-    //                 c = this._certificates.findOne({ $loki: c.signedById});
-    //                 await appendFile(newFile, await readFile(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(c))));
-    //             }
-
-    //             resolve(newFile);
-    //         }
-    //         catch (err) {
-    //             reject(new CertError(500, err.message));
-    //         }
-    //     });
-    // }
 
     private async _getChain(c: CertificateRow & LokiObj): Promise<string> {
         return new Promise(async (resolve, reject) => {
@@ -1534,10 +1462,6 @@ export class WebServer {
         return path.join(this._privatekeysPath, filename);
     }
 
-    private _getWorkDir(filename: string): string {
-        return path.join(this._workPath, filename);
-    }
-
     private async _findSigner(certificate: pki.Certificate): Promise<CertificateRow & LokiObj> {
         return new Promise<CertificateRow & LokiObj>(async(resolve, _reject) => {
             let caList = this._certificates.find({ 'type': { '$in': [ CertTypes.root, CertTypes.intermediate ] }});
@@ -1565,6 +1489,7 @@ export class WebServer {
         return new Promise<OperationResultItem[]>(async (resolve, reject) => {
             let signeeList = this._certificates.find({ $and: [
                 { signedById: { $eq: null } }, 
+                { $loki: { $ne: id } },
                 { type: {  $in: [ CertTypes.leaf, CertTypes.intermediate ] }}
             ]});
             let retVal: OperationResultItem[] = [];
@@ -1587,8 +1512,10 @@ export class WebServer {
                         }
                     }
                     catch (err) {
-                        logger.debug('Verify correct error: ' + err.message);
-                        // verify should return false but appearently throws an exception - do nothing
+                        if (err.message != 'The parent certificate did not issue the given child certificate; the child certificate\'s issuer does not match the parent\'s subject.') {
+                            logger.debug('Verify correct error: ' + err.message);
+                        }
+                        // verify should return false but apparently throws an exception - do nothing
                     }
                 }
                 resolve(retVal);
