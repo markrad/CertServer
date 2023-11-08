@@ -141,7 +141,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
 
         for (let dir in types) {
             step = _step(`get empty ${types[dir]} list`);
-            res = await httpRequest('get', url + '/api/certlist?type=' + types[dir]);
+            res = await httpRequest('get', url + '/api/certList?type=' + types[dir]);
             assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
             assert.equal(res.body.files.length, 0, `Failed: Expected zero entries for ${types[dir]} request`);
             console.log(`Passed: zero entries returned for ${types[dir]}`);
@@ -149,7 +149,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         }
 
         step = _step('generate ca');
-        res = await httpRequest('post', url + '/api/createcacert', JSON.stringify(newCA));
+        res = await httpRequest('post', url + '/api/createCACert', JSON.stringify(newCA));
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode} ${res.body.error}`);
         await ew.EventWait();
         ew.EventReset();
@@ -171,7 +171,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         console.log('passed');
 
         step = _step('generate leaf');
-        res = await httpRequest('post', url + '/api/createleafcert', JSON.stringify(newLeaf));
+        res = await httpRequest('post', url + '/api/createLeafCert', JSON.stringify(newLeaf));
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         await ew.EventWait();
         ew.EventReset();
@@ -192,31 +192,31 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         console.log('passed');
 
         step = _step('get root certificate list');
-        res = await httpRequest('get', url + '/api/certlist?type=root');
+        res = await httpRequest('get', url + '/api/certList?type=root');
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body}`);
         assert.notEqual(res.body.files, null, 'Did not receive the files element');
         assert.equal(res.body.files.length, 1, `Files element is expected to be length 1 but received ${res.body.files.length}`);
         assert.equal(res.body.files[0].name, 'someName', `File has incorrect name ${res.body.files[0].name}`);
         assert.equal(res.body.files[0].type, 'root', `File has incorrect type ${res.body.files[0].type}`);
         assert.equal(res.body.files[0].id, 1, `File has incorrect id ${res.body.files[0].id}`);
-        assert.deepEqual(res.body.files[0].tags, [ ], 'Tags are incorreect');
+        assert.deepEqual(res.body.files[0].tags, [ ], 'Tags are incorrect');
         let rootId = res.body.files[0].id;
         console.log('passed');
 
         step = _step('get intermediate certificate list');
-        res = await httpRequest('get', url + '/api/certlist?type=intermediate');
+        res = await httpRequest('get', url + '/api/certList?type=intermediate');
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body}`);
         assert.notEqual(res.body.files, null, 'Did not receive the files element');
         assert.equal(res.body.files.length, 1, `Files element is expected to be length 1 but received ${res.body.files.length}`);
         assert.equal(res.body.files[0].name, 'intName', `File has incorrect name ${res.body.files[0].name}`);
         assert.equal(res.body.files[0].type, 'intermediate', `File has incorrect type ${res.body.files[0].type}`);
         assert.equal(res.body.files[0].id, 2, `File has incorrect id ${res.body.files[0].id}`);
-        assert.deepEqual(res.body.files[0].tags, [ 'tag1', 'tag2' ], 'Tags are incorreect');
+        assert.deepEqual(res.body.files[0].tags, [ 'tag1', 'tag2' ], 'Tags are incorrect');
         let intId = res.body.files[0].id;
         console.log('passed');
 
         step = _step('get leaf certificate list');
-        res = await httpRequest('get', url + '/api/certlist?type=leaf');
+        res = await httpRequest('get', url + '/api/certList?type=leaf');
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body}`);
         assert.notEqual(res.body.files, null, 'Did not receive the files element');
         assert.equal(res.body.files.length, 1, `Files element is expected to be length 1 but received ${res.body.files.length}`);
@@ -227,7 +227,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         console.log('passed');
 
         step = _step('get key list');
-        res = await httpRequest('get', url + '/api/keylist');
+        res = await httpRequest('get', url + '/api/keyList');
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body}`);
         assert.notEqual(res.body.files, null, 'Did not receive the files element');
         assert.equal(res.body.files.length, 3, `Files element is expected to be length 1 but received ${res.body.files.length}`);
@@ -240,17 +240,17 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         console.log('passed');
 
         step = _step('get certificate details by id');
-        res = await httpRequest('get', url + '/certdetails?id=2');
+        res = await httpRequest('get', url + '/certDetails?id=2');
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         assert.equal(res.body.certType, 'intermediate', `Wrong certificate type ${res.body.certType} returned`);
         assert.equal(res.body.id, 2, `Wrong id ${res.body.id} returned`);
         assert.equal(res.body.keyId, 2, `Wrong key id ${res.body.keyId} returned`);
         assert.equal(res.body.name, 'intName', `Wrong name ${res.body.name} returned`);
-        assert.deepEqual(res.body.tags, [ 'tag1', 'tag2' ], 'Tags are incorreect');
+        assert.deepEqual(res.body.tags, [ 'tag1', 'tag2' ], 'Tags are incorrect');
         console.log('passed');
 
         step = _step('get key details by id');
-        res = await httpRequest('get', url + '/keydetails?id=3');
+        res = await httpRequest('get', url + '/keyDetails?id=3');
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         console.log('passed');
 
@@ -258,7 +258,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         
         for (let dir in types) {
             step = _step(`get populated ${types[dir]} list`);
-            res = await httpRequest('get', url + '/certlist?type=' + types[dir]);
+            res = await httpRequest('get', url + '/certList?type=' + types[dir]);
             assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
             if (dir != '3') {
                 assert.equal(res.body.files.length, 1, `Failed: Expected one entry for ${types[dir]} request`);
@@ -272,40 +272,40 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         }
         
         step = _step('get root certificate file');
-        res = await httpRequest('get', url + '/api/getcertificatepem?id=' + rootId.toString());
+        res = await httpRequest('get', url + '/api/getCertificatePem?id=' + rootId.toString());
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         fs.writeFileSync(path.join(testPath, 'someName.pem'), res.body);
-        let rootcert = pki.certificateFromPem(res.body);
-        let rski = rootcert.getExtension('subjectKeyIdentifier');
+        let rootCert = pki.certificateFromPem(res.body);
+        let rski = rootCert.getExtension('subjectKeyIdentifier');
         console.log(JSON.stringify(rski, null, 4));
         console.log('passed');
         
         step = _step('get intermediate certificate file');
-        res = await httpRequest('get', url + '/api/getcertificatepem?id=' + intId.toString());
+        res = await httpRequest('get', url + '/api/getCertificatePem?id=' + intId.toString());
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         fs.writeFileSync(path.join(testPath, 'intName.pem'), res.body);
-        let intermediatecert = pki.certificateFromPem(res.body);
-        let iski = intermediatecert.getExtension('subjectKeyIdentifier');
-        let iaki = intermediatecert.getExtension('authorityKeyIdentifier');
+        let intermediateCert = pki.certificateFromPem(res.body);
+        let iski = intermediateCert.getExtension('subjectKeyIdentifier');
+        let iaki = intermediateCert.getExtension('authorityKeyIdentifier');
         assert.equal((rski as any).value.slice(1), (iaki as any).value.slice(3), 'Authority key identifier does not match parent\'s subject key identifier');
         console.log('passed');
         
         step = _step('get leaf certificate file');
-        res = await httpRequest('get', url + '/api/getcertificatepem?id=' + leafId.toString());
+        res = await httpRequest('get', url + '/api/getCertificatePem?id=' + leafId.toString());
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         fs.writeFileSync(path.join(testPath, 'leafName.pem'), res.body);
-        let leafcert = pki.certificateFromPem(res.body);
-        let laki = leafcert.getExtension('authorityKeyIdentifier');
+        let leafCert = pki.certificateFromPem(res.body);
+        let laki = leafCert.getExtension('authorityKeyIdentifier');
         assert.equal((iski as any).value.slice(1), (laki as any).value.slice(3), 'Authority key identifier does not match parent\'s subject key identifier');
         console.log('passed');
 
         step = _step('get intermediate key file');
-        res = await httpRequest('get', url + '/api/getkeypem?id=2');
+        res = await httpRequest('get', url + '/api/getKeyPem?id=2');
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         fs.writeFileSync(path.join(testPath, 'intName_key.pem'), res.body);
 
         step = _step('delete root certificate');
-        res = await httpRequest('delete', url + '/api/deletecert?name=someName');
+        res = await httpRequest('delete', url + '/api/deleteCert?name=someName');
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         await ew.EventWait();
         ew.EventReset();
@@ -313,7 +313,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         checkPacket(msg, '', 0, 2, 1);
         checkItems(msg.updated, [{ type: 4, id: 1 }, { type: 2, id: 2 }]);
         checkItems(msg.deleted, [{ type: 1, id: 1 }]);
-        res = await httpRequest('get', url + '/certdetails?id=2');
+        res = await httpRequest('get', url + '/certDetails?id=2');
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         assert.equal(res.body.signerId, null, 'Signed certificate still references nonexistent parent');
         // console.log(msg);
@@ -321,7 +321,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
 
         step = _step('Upload root certificate');
         let cert = fs.readFileSync(path.join(testPath, 'someName.pem'), { encoding: 'utf8' });
-        res = await httpRequest('post', url + '/api/uploadcert', cert, 'text/plain');
+        res = await httpRequest('post', url + '/api/uploadCert', cert, 'text/plain');
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode} ${res.body.error}`);
         await ew.EventWait();
         ew.EventReset();
@@ -329,13 +329,13 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
         checkPacket(msg, 'someName', 1, 2, 0);
         checkItems(msg.added, [{ type: 1, id: 4 }]);
         checkItems(msg.updated, [{ type: 2, id: 2 }, { type: 4, id: 1 }]);
-        res = await httpRequest('get', url + '/certdetails?id=2');
+        res = await httpRequest('get', url + '/certDetails?id=2');
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         assert.equal(res.body.signerId, 4, 'Signed certificate does not reference uploaded parent');
         console.log('passed')
 
         step = _step('delete intermediate key');
-        res = await httpRequest('delete', url + '/api/deletekey?name=intName_key');
+        res = await httpRequest('delete', url + '/api/deleteKey?name=intName_key');
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         await ew.EventWait();
         ew.EventReset();
