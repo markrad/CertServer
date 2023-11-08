@@ -25,162 +25,22 @@ import { ExtensionAuthorityKeyIdentifier } from './Extensions/ExtensionAuthority
 import { ExtensionSubjectKeyIdentifier } from './Extensions/ExtensionSubjectKeyIdentifier';
 import { ExtensionExtKeyUsage } from './Extensions/ExtensionExtKeyUsage';
 import { ExtensionSubjectAltName, ExtensionSubjectAltNameOptions } from './Extensions/ExtensionSubjectAltName';
-
-type Config = {
-    certServer: {
-        port: number,
-        root: string,
-        certificate?: string,
-        key?: string,
-        subject: {
-            C: string,
-            ST: string,
-            L: string,
-            O: string,
-            OU: string
-        }
-    }
-};
-
-enum CertTypes {
-    cert,
-    root,
-    intermediate,
-    leaf,
-    key, 
-}
-
-type CertificateSubject = {
-    C?: string,
-    ST?: string,
-    L?: string,
-    O?: string,
-    OU?: string,
-    CN: string
-}
-
-type CertificateRow = {
-    name: string, 
-    type: CertTypes, 
-    serialNumber: string, 
-    fingerprint: string,
-    fingerprint256: string,
-    publicKey: any, 
-    privateKey: string,
-    tags: string[],
-    signedById: number,
-    issuer: CertificateSubject,
-    subject: CertificateSubject,
-    notBefore: Date,
-    notAfter: Date,
-    havePrivateKey: boolean,
-};
-
-type PrivateKeyRow = {
-    name: string;
-    type: CertTypes,
-    n: jsbn.BigInteger,
-    e: jsbn.BigInteger,
-    // pairSerial: string,
-    pairId: number,
-    pairCN: string,
-    encrypted: boolean,
-};
-
-type DBVersionRow = {
-    version: number;
-}
-
-type CertificateLine = {
-    name: string,
-    type: string,
-    id: number,
-}
-
-type CertificateBrief = {
-    id: number,
-    certType: string,
-    name: string,
-    issuer: CertificateSubject,
-    subject: CertificateSubject,
-    validFrom: Date,
-    validTo: Date,
-    signer: string,
-    signerId: number,
-    keyPresent: string,
-    keyId: number,
-    serialNumber: string,
-    fingerprint: string,
-    fingerprint256: string,
-    signed: number[],
-    tags: string[],
-}
-
-type KeyBrief = {
-    id: number,
-    name: string,
-    certPair: string,
-    encrypted: boolean,
-}
-
-type GenerateCertRequest = {
-    country: string,
-    state: string,
-    location: string,
-    organization: string,
-    unit: string,
-    commonName: string,
-    validFrom: string,
-    validTo: string,
-}
-
-type GenerateChildCertRequest = GenerateCertRequest & {
-    password: string,
-    signer: string,
-    SANArray?: string[],
-}
-
-type OperationResultItem = {
-    type: CertTypes,
-    id: number
-}
-
-/**
- * Used to return database entries that have been added, deleted, or updated.
- * 
- * @member name: The common name of the certificate or key - will be deprecated
- * @member types Deprecated
- * @member added Array of certificates or keys added
- * @member updated Array of certificates or keys updated
- * @member deleted Array of certificates or keys deleted
- */
-type OperationResult = {
-    name: string,
-    added: OperationResultItem[],
-    updated: OperationResultItem[],
-    deleted: OperationResultItem[],
-}
-
-type QueryType = {
-} & ({ name: string} | { id: string });
-
-
-enum userAgentOS {
-    UNKNOWN,
-    WINDOWS,
-    MAC,
-    LINUX,
-    ANDROID,
-    IPHONE,
-}
-
-class CertError extends Error {
-    public status: number;
-    constructor(status: number, message: string) {
-        super(message);
-        this.status = status;
-    }
-}
+import { OperationResult } from './OperationResult';
+import { OperationResultItem } from './OperationResultItem';
+import { CertTypes } from './CertTypes';
+import { Config } from './Config';
+import { CertificateSubject } from './CertificateSubject';
+import { CertificateRow } from './CertificateRow';
+import { PrivateKeyRow } from './PrivateKeyRow';
+import { DBVersionRow } from './DBVersionRow';
+import { CertificateLine } from './CertificateLine';
+import { CertificateBrief } from './CertificateBrief';
+import { KeyBrief } from './KeyBrief';
+import { GenerateCertRequest } from './GenerateCertRequest';
+import { GenerateChildCertRequest } from './GenerateChildCertRequest';
+import { QueryType } from './QueryType';
+import { userAgentOS } from './userAgentOS';
+import { CertError } from './CertError';
 
 const logger = log4js.getLogger();
 logger.level = "debug";

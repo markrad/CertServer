@@ -60,29 +60,9 @@ const ExtensionAuthorityKeyIdentifier_1 = require("./Extensions/ExtensionAuthori
 const ExtensionSubjectKeyIdentifier_1 = require("./Extensions/ExtensionSubjectKeyIdentifier");
 const ExtensionExtKeyUsage_1 = require("./Extensions/ExtensionExtKeyUsage");
 const ExtensionSubjectAltName_1 = require("./Extensions/ExtensionSubjectAltName");
-var CertTypes;
-(function (CertTypes) {
-    CertTypes[CertTypes["cert"] = 0] = "cert";
-    CertTypes[CertTypes["root"] = 1] = "root";
-    CertTypes[CertTypes["intermediate"] = 2] = "intermediate";
-    CertTypes[CertTypes["leaf"] = 3] = "leaf";
-    CertTypes[CertTypes["key"] = 4] = "key";
-})(CertTypes || (CertTypes = {}));
-var userAgentOS;
-(function (userAgentOS) {
-    userAgentOS[userAgentOS["UNKNOWN"] = 0] = "UNKNOWN";
-    userAgentOS[userAgentOS["WINDOWS"] = 1] = "WINDOWS";
-    userAgentOS[userAgentOS["MAC"] = 2] = "MAC";
-    userAgentOS[userAgentOS["LINUX"] = 3] = "LINUX";
-    userAgentOS[userAgentOS["ANDROID"] = 4] = "ANDROID";
-    userAgentOS[userAgentOS["IPHONE"] = 5] = "IPHONE";
-})(userAgentOS || (userAgentOS = {}));
-class CertError extends Error {
-    constructor(status, message) {
-        super(message);
-        this.status = status;
-    }
-}
+const CertTypes_1 = require("./CertTypes");
+const userAgentOS_1 = require("./userAgentOS");
+const CertError_1 = require("./CertError");
 const logger = log4js.getLogger();
 logger.level = "debug";
 /**
@@ -215,10 +195,10 @@ class WebServer {
                 let userAgent = request.get('User-Agent');
                 let os;
                 if (request.query.os) {
-                    if (request.query.os.toUpperCase() in userAgentOS) {
+                    if (request.query.os.toUpperCase() in userAgentOS_1.userAgentOS) {
                         let work = request.query.os.toUpperCase();
-                        os = userAgentOS[work];
-                        logger.debug(`OS specified as ${userAgentOS[os]}`);
+                        os = userAgentOS_1.userAgentOS[work];
+                        logger.debug(`OS specified as ${userAgentOS_1.userAgentOS[os]}`);
                     }
                     else {
                         return response.status(400).json({ error: `OS invalid or unsupported ${request.query.os}` });
@@ -226,10 +206,10 @@ class WebServer {
                 }
                 else {
                     os = WebServer._guessOs(userAgent);
-                    logger.debug(`${userAgent} guessed to be ${userAgentOS[os]}`);
+                    logger.debug(`${userAgent} guessed to be ${userAgentOS_1.userAgentOS[os]}`);
                 }
                 let readable;
-                if (os == userAgentOS.LINUX || os == userAgentOS.MAC) {
+                if (os == userAgentOS_1.userAgentOS.LINUX || os == userAgentOS_1.userAgentOS.MAC) {
                     response.setHeader('content-disposition', `attachment; filename="${request.hostname}-${this._port}.sh"`);
                     readable = stream_1.Readable.from([
                         `function getcert(){ wget --content-disposition ${csHost({ protocol: this._certificate ? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getCertificatePem?id=$@}\n`,
@@ -237,7 +217,7 @@ class WebServer {
                         `function getchain(){ wget --content-disposition ${csHost({ protocol: this._certificate ? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/chainDownload?id=$@}\n`
                     ]);
                 }
-                else if (os == userAgentOS.WINDOWS) {
+                else if (os == userAgentOS_1.userAgentOS.WINDOWS) {
                     response.setHeader('content-disposition', `attachment; filename="${request.hostname}-${this._port}.ps1"`);
                     readable = stream_1.Readable.from([
                         `function Get-Filename {\n`,
@@ -294,7 +274,7 @@ class WebServer {
                     ]);
                 }
                 else {
-                    return response.status(400).json({ error: `No script for OS ${userAgentOS[os]}}` });
+                    return response.status(400).json({ error: `No script for OS ${userAgentOS_1.userAgentOS[os]}}` });
                 }
                 readable.pipe(response);
             });
@@ -439,7 +419,7 @@ class WebServer {
                     certResult.name = `${certResult.name}/${keyResult.name}`;
                     this._broadcast(certResult);
                     return response.status(200)
-                        .json({ message: `Certificate/Key ${certResult.name} added`, types: [CertTypes[CertTypes.root], CertTypes[CertTypes.key]].join(';') });
+                        .json({ message: `Certificate/Key ${certResult.name} added`, types: [CertTypes_1.CertTypes[CertTypes_1.CertTypes.root], CertTypes_1.CertTypes[CertTypes_1.CertTypes.key]].join(';') });
                 }
                 catch (err) {
                     return response.status(500).json({ error: err.message });
@@ -651,21 +631,21 @@ class WebServer {
                 next();
             });
             this._app.get('/api/certList', (request, response) => {
-                let type = CertTypes[request.query.type];
+                let type = CertTypes_1.CertTypes[request.query.type];
                 if (type == undefined) {
                     response.status(404).json({ error: `Directory ${request.query.type} not found` });
                 }
                 else {
                     let retVal = [];
-                    if (type != CertTypes.key) {
+                    if (type != CertTypes_1.CertTypes.key) {
                         retVal = this._certificates.chain().find({ type: type }).sort((l, r) => l.name.localeCompare(r.name)).data().map((entry) => {
                             var _a;
-                            return { name: entry.subject.CN, type: CertTypes[type].toString(), id: entry.$loki, tags: (_a = entry.tags) !== null && _a !== void 0 ? _a : [] };
+                            return { name: entry.subject.CN, type: CertTypes_1.CertTypes[type].toString(), id: entry.$loki, tags: (_a = entry.tags) !== null && _a !== void 0 ? _a : [] };
                         });
                     }
                     else {
                         retVal = this._privateKeys.chain().find().sort((l, r) => l.pairCN.localeCompare(r.pairCN)).data().map((entry) => {
-                            return { name: (entry.pairCN ? entry.pairCN + '_key' : entry.name), type: CertTypes[type].toString(), id: entry.$loki };
+                            return { name: (entry.pairCN ? entry.pairCN + '_key' : entry.name), type: CertTypes_1.CertTypes[type].toString(), id: entry.$loki };
                         });
                     }
                     response.status(200).json({ files: retVal });
@@ -720,7 +700,7 @@ class WebServer {
                 try {
                     let body = typeof request.body == 'string' ? JSON.parse(request.body) : request.body;
                     if (body.tags.match(/[<>\(\)\{\}\/]/) !== null)
-                        throw new CertError(400, 'Tags cannot contain < > / { } ( )');
+                        throw new CertError_1.CertError(400, 'Tags cannot contain < > / { } ( )');
                     let tags = body.tags.split(';').map((t) => t.trim()).filter((t) => t != '');
                     let result = this._resolveCertificateUpdate(request.query, (c) => {
                         c.tags = tags;
@@ -895,7 +875,7 @@ class WebServer {
                         }
                     }));
                     yield Promise.all(adding);
-                    let nonRoot = this._certificates.find({ '$and': [{ 'type': { '$ne': CertTypes.root } }, { signedById: null }] });
+                    let nonRoot = this._certificates.find({ '$and': [{ 'type': { '$ne': CertTypes_1.CertTypes.root } }, { signedById: null }] });
                     for (let i = 0; i < nonRoot.length; i++) {
                         let signer = yield this._findSigner(node_forge_1.pki.certificateFromPem(fs_1.default.readFileSync(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(nonRoot[i])), { encoding: 'utf8' })));
                         if (signer != null) {
@@ -949,14 +929,14 @@ class WebServer {
                     if (input.filename) {
                         logger.info(`Trying to add ${path_1.default.basename(input.filename)}`);
                         if (!(yield (0, exists_1.exists)(input.filename))) {
-                            reject(new CertError(404, `${path_1.default.basename(input.filename)} does not exist`));
+                            reject(new CertError_1.CertError(404, `${path_1.default.basename(input.filename)} does not exist`));
                         }
                         input.pemString = yield (0, promises_1.readFile)(input.filename, { encoding: 'utf8' });
                     }
                     let msg = node_forge_1.pem.decode(input.pemString)[0];
                     logger.debug(`Received ${msg.type}`);
                     if (msg.type != 'CERTIFICATE') {
-                        throw new CertError(400, 'Unsupported type ' + msg.type);
+                        throw new CertError_1.CertError(400, 'Unsupported type ' + msg.type);
                     }
                     let result = { name: '', added: [], updated: [], deleted: [] };
                     let c = node_forge_1.pki.certificateFromPem(input.pemString);
@@ -966,20 +946,20 @@ class WebServer {
                     // See if we already have this certificate
                     let fingerprint256 = new crypto_1.default.X509Certificate(input.pemString).fingerprint256;
                     if (this._certificates.findOne({ fingerprint256: fingerprint256 }) != null) {
-                        throw new CertError(409, `${c.subject.getField('CN').value} serial number ${c.serialNumber} is a duplicate - ignored`);
+                        throw new CertError_1.CertError(409, `${c.subject.getField('CN').value} serial number ${c.serialNumber} is a duplicate - ignored`);
                     }
                     // See if this is a root, intermediate, or leaf
                     let type;
                     if (c.isIssuer(c)) {
-                        type = CertTypes.root;
+                        type = CertTypes_1.CertTypes.root;
                     }
                     else {
                         let bc = c.getExtension('basicConstraints');
                         if ((bc != null) && ((_a = bc.cA) !== null && _a !== void 0 ? _a : false) == true && ((_b = bc.pathlenConstraint) !== null && _b !== void 0 ? _b : 1) > 0) {
-                            type = CertTypes.intermediate;
+                            type = CertTypes_1.CertTypes.intermediate;
                         }
                         else {
-                            type = CertTypes.leaf;
+                            type = CertTypes_1.CertTypes.leaf;
                         }
                         // See if any existing certificates signed this one
                         let signer = yield this._findSigner(c);
@@ -1016,7 +996,7 @@ class WebServer {
                         });
                     }
                     // Update any certificates signed by this one
-                    if (type != CertTypes.leaf) {
+                    if (type != CertTypes_1.CertTypes.leaf) {
                         // Update certificates that this one signed
                         let list = yield this._findSigned(c, newRecord.$loki);
                         result.updated = result.updated.concat(list);
@@ -1032,7 +1012,7 @@ class WebServer {
                             // keys[i].pairSerial = c.serialNumber;
                             keys[i].pairId = newRecord.$loki;
                             this._privateKeys.update(keys[i]);
-                            result.updated.push({ type: CertTypes.key, id: keys[i].$loki });
+                            result.updated.push({ type: CertTypes_1.CertTypes.key, id: keys[i].$loki });
                             break;
                         }
                     }
@@ -1065,7 +1045,7 @@ class WebServer {
         let s = this._certificates.find({ signedById: c.$loki }).map((r) => r.$loki);
         return {
             id: c.$loki,
-            certType: CertTypes[c.type],
+            certType: CertTypes_1.CertTypes[c.type],
             name: c.subject.CN,
             issuer: c.issuer,
             subject: c.subject,
@@ -1108,7 +1088,7 @@ class WebServer {
                         yield (0, promises_1.rename)(this._getKeysDir(WebServer._getKeyFilenameFromRow(key)), this._getKeysDir(unknownName));
                         key.name = WebServer._getDisplayName(unknownName);
                         this._privateKeys.update(key);
-                        result.updated.push({ type: CertTypes.key, id: key.$loki });
+                        result.updated.push({ type: CertTypes_1.CertTypes.key, id: key.$loki });
                     }
                     this._certificates.chain().find({ signedById: c.$loki }).update((cert) => {
                         if (c.$loki != cert.$loki) {
@@ -1142,7 +1122,7 @@ class WebServer {
                     if (input.filename) {
                         logger.info(`Trying to add ${path_1.default.basename(input.filename)}`);
                         if (!(yield (0, exists_1.exists)(input.filename))) {
-                            reject(new CertError(404, `${path_1.default.basename(input.filename)} does not exist`));
+                            reject(new CertError_1.CertError(404, `${path_1.default.basename(input.filename)} does not exist`));
                         }
                         input.pemString = yield (0, promises_1.readFile)(input.filename, { encoding: 'utf8' });
                     }
@@ -1159,7 +1139,7 @@ class WebServer {
                         if (!input.password) {
                             // TODO Fix lack of error message on web client
                             logger.warn(`Encrypted key requires password`);
-                            return reject(new CertError(400, (_a = 'Password is required for key ' + input.filename) !== null && _a !== void 0 ? _a : ''));
+                            return reject(new CertError_1.CertError(400, (_a = 'Password is required for key ' + input.filename) !== null && _a !== void 0 ? _a : ''));
                         }
                         k = node_forge_1.pki.decryptRsaPrivateKey(input.pemString, input.password);
                         encrypted = true;
@@ -1167,13 +1147,13 @@ class WebServer {
                     else {
                         k = node_forge_1.pki.privateKeyFromPem(input.pemString);
                     }
-                    let kRow = { e: k.e, n: k.n, pairId: null, pairCN: null, name: null, type: CertTypes.key, encrypted: encrypted };
+                    let kRow = { e: k.e, n: k.n, pairId: null, pairCN: null, name: null, type: CertTypes_1.CertTypes.key, encrypted: encrypted };
                     let keys = this._privateKeys.find();
                     let publicKey = node_forge_1.pki.setRsaPublicKey(k.n, k.e);
                     // See if we already have this key
                     for (let i = 0; i < keys.length; i++) {
                         if (WebServer._isIdenticalKey(node_forge_1.pki.setRsaPublicKey(keys[i].n, keys[i].e), publicKey)) {
-                            reject(new CertError(409, `Key already present: ${keys[i].name}`));
+                            reject(new CertError_1.CertError(409, `Key already present: ${keys[i].name}`));
                         }
                     }
                     // See if this is the key pair for a certificate
@@ -1198,7 +1178,7 @@ class WebServer {
                     }
                     kRow.name = newFile;
                     let newRecord = (this._privateKeys.insert(kRow));
-                    result.added.push({ type: CertTypes.key, id: newRecord.$loki });
+                    result.added.push({ type: CertTypes_1.CertTypes.key, id: newRecord.$loki });
                     let newName = WebServer._getKeyFilenameFromRow(newRecord);
                     yield (0, promises_1.writeFile)(this._getKeysDir(newName), input.pemString, { encoding: 'utf8' });
                     logger.info(`Written file ${newName}`);
@@ -1244,7 +1224,7 @@ class WebServer {
                         result.updated.push({ type: cert.type, id: cert.$loki });
                     }
                 }
-                result.deleted.push({ type: CertTypes.key, id: k.$loki });
+                result.deleted.push({ type: CertTypes_1.CertTypes.key, id: k.$loki });
                 this._privateKeys.remove(k);
                 resolve(result);
             }
@@ -1261,7 +1241,7 @@ class WebServer {
                     file = yield (0, promises_1.readFile)(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(c)), { encoding: 'utf8' });
                     while (c.signedById != c.$loki) {
                         if (c.signedById === null) {
-                            return reject(new CertError(404, 'Certificate chain is incomplete'));
+                            return reject(new CertError_1.CertError(404, 'Certificate chain is incomplete'));
                         }
                         c = this._certificates.findOne({ $loki: c.signedById });
                         file += yield (0, promises_1.readFile)(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(c)), { encoding: 'utf8' });
@@ -1269,7 +1249,7 @@ class WebServer {
                     resolve(file);
                 }
                 catch (err) {
-                    reject(new CertError(500, err.message));
+                    reject(new CertError_1.CertError(500, err.message));
                 }
             }));
         });
@@ -1283,7 +1263,7 @@ class WebServer {
     _findSigner(certificate) {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, _reject) => __awaiter(this, void 0, void 0, function* () {
-                let caList = this._certificates.find({ 'type': { '$in': [CertTypes.root, CertTypes.intermediate] } });
+                let caList = this._certificates.find({ 'type': { '$in': [CertTypes_1.CertTypes.root, CertTypes_1.CertTypes.intermediate] } });
                 for (let i = 0; i < caList.length; i++) {
                     try {
                         let c = yield this._pkiCertFromPem((caList[i]));
@@ -1309,7 +1289,7 @@ class WebServer {
                 let signeeList = this._certificates.find({ $and: [
                         { signedById: { $eq: null } },
                         { $loki: { $ne: id } },
-                        { type: { $in: [CertTypes.leaf, CertTypes.intermediate] } }
+                        { type: { $in: [CertTypes_1.CertTypes.leaf, CertTypes_1.CertTypes.intermediate] } }
                     ] });
                 let retVal = [];
                 try {
@@ -1367,31 +1347,31 @@ class WebServer {
     _resolveCertificateQuery(query) {
         let c;
         if ('name' in query && 'id' in query)
-            throw new CertError(422, 'Name and id are mutually exclusive');
+            throw new CertError_1.CertError(422, 'Name and id are mutually exclusive');
         if (!('name' in query) && !('id' in query))
-            throw new CertError(400, 'Name or id must be specified');
+            throw new CertError_1.CertError(400, 'Name or id must be specified');
         let selector = ('name' in query) ? { name: query.name } : { $loki: parseInt(query.id) };
         c = this._certificates.find(selector);
         if (c.length == 0) {
-            throw new CertError(404, `No certificate for ${JSON.stringify(query)} found`);
+            throw new CertError_1.CertError(404, `No certificate for ${JSON.stringify(query)} found`);
         }
         else if (c.length > 1) {
-            throw new CertError(400, `Multiple certificates match the CN ${JSON.stringify(query)} - use id instead`);
+            throw new CertError_1.CertError(400, `Multiple certificates match the CN ${JSON.stringify(query)} - use id instead`);
         }
         return c[0];
     }
     _resolveCertificateUpdate(query, updater) {
         if ('name' in query && 'id' in query)
-            throw new CertError(422, 'Name and id are mutually exclusive');
+            throw new CertError_1.CertError(422, 'Name and id are mutually exclusive');
         if (!('name' in query) && !('id' in query))
-            throw new CertError(400, 'Name or id must be specified');
+            throw new CertError_1.CertError(400, 'Name or id must be specified');
         let selector = ('name' in query) ? { name: query.name } : { $loki: parseInt(query.id) };
         let c = this._certificates.chain().find(selector);
         if (c.count() == 0) {
-            throw new CertError(404, `No certificate for ${JSON.stringify(query)} found`);
+            throw new CertError_1.CertError(404, `No certificate for ${JSON.stringify(query)} found`);
         }
         else if (c.count() > 1) {
-            throw new CertError(400, `Multiple certificates match the CN ${JSON.stringify(query)} - use id instead`);
+            throw new CertError_1.CertError(400, `Multiple certificates match the CN ${JSON.stringify(query)} - use id instead`);
         }
         let result = { name: null, added: [], updated: [], deleted: [] };
         let cd = c.data()[0];
@@ -1404,19 +1384,19 @@ class WebServer {
         let k;
         let selector;
         if (query.name && query.id)
-            throw new CertError(422, 'Name and id are mutually exclusive');
+            throw new CertError_1.CertError(422, 'Name and id are mutually exclusive');
         if (!query.name && !query.id)
-            throw new CertError(400, 'Name or id must be specified');
+            throw new CertError_1.CertError(400, 'Name or id must be specified');
         if (query.name)
             selector = { name: query.name };
         else if (query.id)
             selector = { $loki: parseInt(query.id) };
         k = this._privateKeys.find(selector);
         if (k.length == 0) {
-            throw new CertError(404, `No key for ${JSON.stringify(query)} found`);
+            throw new CertError_1.CertError(404, `No key for ${JSON.stringify(query)} found`);
         }
         else if (k.length > 1) {
-            throw new CertError(400, `Multiple keys match the CN ${JSON.stringify(query)} - use id instead`);
+            throw new CertError_1.CertError(400, `Multiple keys match the CN ${JSON.stringify(query)} - use id instead`);
         }
         return k[0];
     }
@@ -1444,23 +1424,23 @@ class WebServer {
     }
     static _guessOs(userAgent) {
         if (userAgent === null || userAgent === '')
-            return userAgentOS.UNKNOWN;
+            return userAgentOS_1.userAgentOS.UNKNOWN;
         let ua = userAgent.toLowerCase();
         if (ua.includes('windows'))
-            return userAgentOS.WINDOWS;
+            return userAgentOS_1.userAgentOS.WINDOWS;
         if (ua.includes('linux'))
-            return userAgentOS.LINUX;
+            return userAgentOS_1.userAgentOS.LINUX;
         if (ua.includes('curl'))
-            return userAgentOS.LINUX; // Best guess
+            return userAgentOS_1.userAgentOS.LINUX; // Best guess
         if (ua.includes('mac'))
-            return userAgentOS.MAC;
+            return userAgentOS_1.userAgentOS.MAC;
         if (ua.includes('x11'))
-            return userAgentOS.LINUX;
+            return userAgentOS_1.userAgentOS.LINUX;
         if (ua.includes('iphone'))
-            return userAgentOS.IPHONE;
+            return userAgentOS_1.userAgentOS.IPHONE;
         if (ua.includes('android'))
-            return userAgentOS.ANDROID;
-        return userAgentOS.UNKNOWN;
+            return userAgentOS_1.userAgentOS.ANDROID;
+        return userAgentOS_1.userAgentOS.UNKNOWN;
     }
     static _isValidRNASequence(rnas) {
         for (let r in rnas) {
