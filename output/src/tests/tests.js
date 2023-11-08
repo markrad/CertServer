@@ -23,14 +23,6 @@ const eventWaiter_1 = require("../utility/eventWaiter");
 const testPath = path_1.default.join(__dirname, '../testdata');
 const testConfig = path_1.default.join(testPath, 'testconfig.yml');
 const url = 'http://localhost:9997';
-var CertTypes;
-(function (CertTypes) {
-    CertTypes[CertTypes["cert"] = 0] = "cert";
-    CertTypes[CertTypes["root"] = 1] = "root";
-    CertTypes[CertTypes["intermediate"] = 2] = "intermediate";
-    CertTypes[CertTypes["leaf"] = 3] = "leaf";
-    CertTypes[CertTypes["key"] = 4] = "key";
-})(CertTypes || (CertTypes = {}));
 const config = `certServer:
   root: ${testPath}
   port: 9997       
@@ -54,7 +46,7 @@ const newCA = {
     validFrom: new Date().toISOString(),
     validTo: then.toISOString(),
 };
-var newInt = {
+const newInt = {
     country: 'intCountry',
     state: 'intState',
     location: 'intLocation',
@@ -65,7 +57,7 @@ var newInt = {
     validTo: then.toISOString(),
     signer: '1',
 };
-var newLeaf = {
+const newLeaf = {
     country: 'leafCountry',
     state: 'leafState',
     location: 'leafLocation',

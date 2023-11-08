@@ -8,6 +8,9 @@ import { pki } from 'node-forge';
 import WebSocket from 'ws';
 
 import { EventWaiter } from '../utility/eventWaiter';
+import { OperationResult } from '../OperationResult';
+import { OperationResultItem } from '../OperationResultItem';
+
 
 const testPath = path.join(__dirname, '../testdata');
 const testConfig = path.join(testPath, 'testconfig.yml');
@@ -19,28 +22,7 @@ type response = {
     body: any,
 }
 
-enum CertTypes {
-    cert,
-    root,
-    intermediate,
-    leaf,
-    key, 
-}
-
-type OperationResultItem = {
-    type: CertTypes,
-    id: number
-}
-
-type OperationResultEx2 = {
-    name: string,
-    types: CertTypes[],
-    added: OperationResultItem[],
-    updated: OperationResultItem[],
-    deleted: OperationResultItem[],
-}
-
-const config = `certServer:
+const config: string = `certServer:
   root: ${testPath}
   port: 9997       
   certificate: ''  
@@ -53,7 +35,8 @@ const config = `certServer:
     OU: TestUnit`;
 
 let then = new Date();
-then.setFullYear(then.getFullYear() + 1);
+    then.setFullYear(then.getFullYear() + 1);
+
 const newCA = {
     country: 'someCountry',
     state: 'someState',
@@ -65,7 +48,7 @@ const newCA = {
     validTo: then.toISOString(),
 }
 
-var newInt = {
+const newInt = {
     country: 'intCountry',
     state: 'intState',
     location: 'intLocation',
@@ -77,7 +60,7 @@ var newInt = {
     signer: '1',
 }
 
-var newLeaf = {
+const newLeaf = {
     country: 'leafCountry',
     state: 'leafState',
     location: 'leafLocation',
@@ -396,7 +379,7 @@ const types: string[] = [ 'root', 'intermediate', 'leaf', 'key'];
     }
 })();
 
-function checkPacket(packet: OperationResultEx2, name: string, added: number, updated: number, deleted: number): void {
+function checkPacket(packet: OperationResult, name: string, added: number, updated: number, deleted: number): void {
     assert.equal(packet.name, name, `Failed: Incorrect certificate/key names - expected ${name}, received ${packet.name}`);
     assert.equal(packet.added.length, added, `Incorrect added length - expected ${added}, received ${packet.added.length}`);
     assert.equal(packet.updated.length, updated, `Incorrect updated length - expected ${updated}, received ${packet.updated.length}`);
