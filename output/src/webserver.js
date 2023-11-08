@@ -124,7 +124,6 @@ class WebServer {
         }
         this._certificatesPath = path_1.default.join(this._dataPath, 'certificates');
         this._privatekeysPath = path_1.default.join(this._dataPath, 'privatekeys');
-        this._workPath = path_1.default.join(this._dataPath, 'work');
         this._dbPath = path_1.default.join(this._dataPath, 'db');
         if (!(0, node_fs_1.existsSync)(this._dataPath))
             (0, node_fs_1.mkdirSync)(this._dataPath, { recursive: true });
@@ -132,8 +131,6 @@ class WebServer {
             (0, node_fs_1.mkdirSync)(this._certificatesPath);
         if (!(0, node_fs_1.existsSync)(this._privatekeysPath))
             (0, node_fs_1.mkdirSync)(this._privatekeysPath);
-        if (!(0, node_fs_1.existsSync)(this._workPath))
-            (0, node_fs_1.mkdirSync)(this._workPath);
         if (!(0, node_fs_1.existsSync)(this._dbPath))
             (0, node_fs_1.mkdirSync)(this._dbPath);
         // this._cache = new CertificateCache(this._certificatesPath, 10 * 60 * 60);

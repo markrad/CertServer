@@ -205,7 +205,6 @@ export class WebServer {
     private _dataPath: string;
     private _certificatesPath: string;
     private _privatekeysPath: string;
-    private _workPath: string;
     private _dbPath: string;
     private _app: Express.Application = Express();
     private _ws = new WsServer.Server({ noServer: true });
@@ -241,7 +240,6 @@ export class WebServer {
 
         this._certificatesPath = path.join(this._dataPath, 'certificates');
         this._privatekeysPath = path.join(this._dataPath, 'privatekeys');
-        this._workPath = path.join(this._dataPath, 'work');
         this._dbPath = path.join(this._dataPath, 'db');
 
         if (!existsSync(this._dataPath))
@@ -250,8 +248,6 @@ export class WebServer {
             mkdirSync(this._certificatesPath);
         if (!existsSync(this._privatekeysPath)) 
             mkdirSync(this._privatekeysPath);
-        if (!existsSync(this._workPath)) 
-            mkdirSync(this._workPath);
         if (!existsSync(this._dbPath)) 
             mkdirSync(this._dbPath);
 
