@@ -118,10 +118,10 @@ let webServer: ChildProcessWithoutNullStreams;
 let ws: WebSocket;
 let ew: EventWaiter;
 let res: Response;
-const wsQueue: string[] = [];
+const wsQueue: string[] = [];       // Used to pass data from WebSocket on message function to main thread
 let msg: any;
-let rski: any;
-let iski: any;
+let rski: {};
+let iski: {};
 
 async function setup():  Promise<boolean> {
     if (!fs.existsSync(testPath)) fs.mkdirSync(testPath);
@@ -150,7 +150,6 @@ async function connectWebSocket(): Promise<boolean> {
     });
     ws.on('message', (data) => {
         let dataString = data.toString();
-        // console.log('message: ' + dataString);
         if (dataString != 'Connected') {
             wsQueue.push(dataString);
             ew.EventSet();

@@ -106,7 +106,7 @@ let webServer;
 let ws;
 let ew;
 let res;
-const wsQueue = [];
+const wsQueue = []; // Used to pass data from WebSocket on message function to main thread
 let msg;
 let rski;
 let iski;
@@ -140,7 +140,6 @@ function connectWebSocket() {
         });
         ws.on('message', (data) => {
             let dataString = data.toString();
-            // console.log('message: ' + dataString);
             if (dataString != 'Connected') {
                 wsQueue.push(dataString);
                 ew.EventSet();
