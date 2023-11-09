@@ -480,6 +480,7 @@ async function runTests() {
             }
         }
         console.error(`${failedCount.length} test${failedCount.length == 1? '' : 's'} failed`);
+        process.exit(4);
     }
     else {
         console.log('All tests passed');
