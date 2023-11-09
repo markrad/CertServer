@@ -17,8 +17,16 @@ export class EventWaiter {
         });
     }
 
-    async EventWait() {
-        return this._promise;
+    async EventWait(timeout?: number): Promise<void> {
+        if (!timeout) {
+            return this._promise;
+        }
+        else {
+            return Promise.race([
+                this._promise,
+                new Promise<void>((_resolve, reject) => setTimeout(() => reject(new Error('Timed out')))),
+            ]);
+        }
     }
 
     EventSet() {
