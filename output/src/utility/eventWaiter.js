@@ -27,9 +27,17 @@ class EventWaiter {
             this._rejectPtr = reject;
         });
     }
-    EventWait() {
+    EventWait(timeout) {
         return __awaiter(this, void 0, void 0, function* () {
-            return this._promise;
+            if (!timeout) {
+                return this._promise;
+            }
+            else {
+                return Promise.race([
+                    this._promise,
+                    new Promise((_resolve, reject) => setTimeout(() => reject(new Error('Timed out')))),
+                ]);
+            }
         });
     }
     EventSet() {
