@@ -65,8 +65,7 @@ class EventWaiter {
      * @param version This value is returned by EventReset. Use it to ensure you set the current event rather than one that timed out.
      */
     EventSet(version) {
-        if (version && version == this._version) {
-            console.log(`${new Date().toTimeString()} set`);
+        if ((version && version == this._version) || !version) {
             this._resolved = true;
             this._resolvePtr();
         }
@@ -100,33 +99,37 @@ class EventWaiter {
     }
 }
 exports.EventWaiter = EventWaiter;
-function test() {
-    return __awaiter(this, void 0, void 0, function* () {
-        let ew = new EventWaiter();
-        // Fails
-        try {
-            let version = ew.EventReset();
-            console.log(`${new Date().toTimeString()} should fail`);
-            setTimeout(() => ew.EventSet(version), 5100);
-            yield ew.EventWait(5000);
-            console.log(new Date().toTimeString() + ' done');
-        }
-        catch (err) {
-            console.error(new Date().toTimeString() + ' ' + err.message);
-        }
-        // Works
-        try {
-            let version = ew.EventReset();
-            console.log(new Date().toTimeString() + ' should work');
-            setTimeout(() => ew.EventSet(version), 4900);
-            yield ew.EventWait(5000);
-            console.log(new Date().toTimeString() + ' done');
-        }
-        catch (err) {
-            console.error(new Date().toTimeString() + ' ' + err.message);
-        }
-    });
+/*
+async function test() {
+    let ew = new EventWaiter();
+
+    // Fails
+    try {
+        let version = ew.EventReset();
+        console.log(`${new Date().toTimeString()} should fail`);
+        setTimeout(() => ew.EventSet(version), 5100);
+        await ew.EventWait(5000);
+        console.log(new Date().toTimeString() + ' done')
+    }
+    catch (err) {
+        console.error(new Date().toTimeString() + ' ' + err.message);
+    }
+
+    // Works
+    try {
+        let version = ew.EventReset();
+        console.log(new Date().toTimeString() + ' should work');
+        setTimeout(() => ew.EventSet(version), 4900);
+        await ew.EventWait(5000);
+        console.log(new Date().toTimeString() + ' done')
+    }
+    catch (err) {
+        console.error(new Date().toTimeString() + ' ' + err.message);
+    }
+
 }
+
 console.log(new Date().toTimeString() + ' start');
-test();
+// test();
+*/ 
 //# sourceMappingURL=eventWaiter.js.map

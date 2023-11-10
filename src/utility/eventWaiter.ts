@@ -55,8 +55,7 @@ export class EventWaiter {
      * @param version This value is returned by EventReset. Use it to ensure you set the current event rather than one that timed out.
      */
     EventSet(version?: number): void {
-        if (version && version == this._version) {
-            console.log(`${new Date().toTimeString()} set`)
+        if ((version && version == this._version) || !version) {
             this._resolved = true;
             this._resolvePtr();
         }
@@ -93,7 +92,7 @@ export class EventWaiter {
         return this._rejected;
     }
 }
-
+/*
 async function test() {
     let ew = new EventWaiter();
 
@@ -124,4 +123,5 @@ async function test() {
 }
 
 console.log(new Date().toTimeString() + ' start');
-test();
+// test();
+*/
