@@ -220,9 +220,9 @@ export class WebServer {
             if (os == userAgentOS.LINUX || os == userAgentOS.MAC) {
                 response.setHeader('content-disposition', `attachment; filename="${request.hostname}-${this._port}.sh"`);
                 readable = Readable.from([
-                    `function getcert(){ wget --content-disposition ${csHost({ protocol: this._certificate? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getCertificatePem?id=$@}\n`,
-                    `function getkey(){ wget --content-disposition ${csHost({ protocol: this._certificate? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getKeyPem?id=$@}\n`,
-                    `function getchain(){ wget --content-disposition ${csHost({ protocol: this._certificate? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/chainDownload?id=$@}\n`
+                    `function getcert(){ wget --content-disposition ${csHost({ protocol: this._certificate? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getCertificatePem?id=$@; }\n`,
+                    `function getkey(){ wget --content-disposition ${csHost({ protocol: this._certificate? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getKeyPem?id=$@; }\n`,
+                    `function getchain(){ wget --content-disposition ${csHost({ protocol: this._certificate? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/chainDownload?id=$@; }\n`
                 ]);
             }
             else if (os == userAgentOS.WINDOWS) {
