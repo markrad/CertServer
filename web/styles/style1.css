@@ -256,7 +256,12 @@ button.button2Red:hover {
 }
 
 #tagChooserValue {
-    width: 90%;
+    width: calc(100% - 130px);
+}
+
+#tagCaseLabel {
+    margin-left: 4px;
+    font-size: small;
 }
 
 .modalLabel {

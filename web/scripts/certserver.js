@@ -551,11 +551,13 @@ function togglePane(id) {
 
 // Search tags and hide those that don't match
 function searchTags() {
-    let filter = $('#tagChooserValue');
-    let lines = $('.certLine');
+    // let filter = $('#tagChooserValue');
+    // let useCase = $('#tagCaseLabelCBox').is(':checked');
+    let r = new RegExp($('#tagChooserValue').val(), $('#tagCaseLabelCBox').is(':checked')? 'i' : '');
     $('.certLine').each((i, line) => {
         let tags = $(line).find('.certTags');
-        if (tags.text().match(filter.val()) == null) {
+        if (r.exec(tags.text()) == null) {
+        // if (tags.text().match(filter.val()) == null) {
             $(line).hide();
             let details = $(line).find('.certDetails');
             let arrow = $(line).find('.certArrow');

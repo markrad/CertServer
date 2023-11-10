@@ -153,6 +153,8 @@ block layout-content
     form#tagChooser(class='slideForm topSlide')
       span.tagChooserValue 
         input#tagChooserValue(type='text' name='tagChooserInput' title='Tag Chooser Input' oninput='searchTags()')
+        label#tagCaseLabel(for='Case Sensitivity') Ignore Case: 
+        input#tagCaseLabelCBox(type='checkbox' checked onclick='searchTags()')
     .Certs 
       .Title
         h3 Root Certificates
