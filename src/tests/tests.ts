@@ -227,8 +227,8 @@ async function getRootCertificateList(): Promise<boolean> {
     assert.equal(res.body.files[0].name, 'someName', `File has incorrect name ${res.body.files[0].name}`);
     assert.equal(res.body.files[0].type, 'root', `File has incorrect type ${res.body.files[0].type}`);
     assert.equal(res.body.files[0].id, 1, `File has incorrect id ${res.body.files[0].id}`);
+    assert.equal(res.body.files[0].keyId, 1, `File has missing or incorrect key pair id ${res.body.files[0].keyId}`);
     assert.deepEqual(res.body.files[0].tags, [ ], 'Tags are incorrect');
-    // let rootId = res.body.files[0].id;
     console.log('passed');
     return true;
 }
@@ -241,8 +241,8 @@ async function getIntermediateCertificateList(): Promise<boolean> {
     assert.equal(res.body.files[0].name, 'intName', `File has incorrect name ${res.body.files[0].name}`);
     assert.equal(res.body.files[0].type, 'intermediate', `File has incorrect type ${res.body.files[0].type}`);
     assert.equal(res.body.files[0].id, 2, `File has incorrect id ${res.body.files[0].id}`);
+    assert.equal(res.body.files[0].keyId, 2, `File has missing or incorrect key pair id ${res.body.files[0].keyId}`);
     assert.deepEqual(res.body.files[0].tags, [ 'tag1', 'tag2' ], 'Tags are incorrect');
-    // let intId = res.body.files[0].id;
     console.log('passed');
     return true;
 }
@@ -255,7 +255,7 @@ async function getLeafCertificateList(): Promise<boolean> {
     assert.equal(res.body.files[0].name, 'leafName', `File has incorrect name ${res.body.files[0].name}`);
     assert.equal(res.body.files[0].type, 'leaf', `File has incorrect type ${res.body.files[0].type}`);
     assert.equal(res.body.files[0].id, 3, `File has incorrect id ${res.body.files[0].id}`);
-    // let leafId = res.body.files[0].id;
+    assert.equal(res.body.files[0].keyId, 3, `File has missing or incorrect key pair id ${res.body.files[0].keyId}`);
     console.log('passed');
     return true;
 }
