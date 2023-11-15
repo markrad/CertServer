@@ -15,5 +15,9 @@ export type CertificateRow = {
     subject: CertificateSubject;
     notBefore: Date;
     notAfter: Date;
+    // TODO - Deprecate this
+    /** Not used - will be deprecated */
     havePrivateKey: boolean;
+    /** $loki value of key pair */
+    keyId: number;
 };
