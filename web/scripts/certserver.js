@@ -551,13 +551,10 @@ function togglePane(id) {
 
 // Search tags and hide those that don't match
 function searchTags() {
-    // let filter = $('#tagChooserValue');
-    // let useCase = $('#tagCaseLabelCBox').is(':checked');
     let r = new RegExp($('#tagChooserValue').val(), $('#tagCaseLabelCBox').is(':checked')? 'i' : '');
     $('.certLine').each((i, line) => {
         let tags = $(line).find('.certTags');
         if (r.exec(tags.text()) == null) {
-        // if (tags.text().match(filter.val()) == null) {
             $(line).hide();
             let details = $(line).find('.certDetails');
             let arrow = $(line).find('.certArrow');
@@ -590,14 +587,12 @@ function showError(error, message) {
 }
 
 function createCACertResponse(result) {
-    // BUG click issue
-    $('#generateCAReset').click();
+    $('#generateCAReset').trigger('click');
     showMessage(result.message);
 }
 
 function createIntermediateCertResponse(result) {
-    // BUG click issue
-    $('#generateIntermediateReset').click();
+    $('#generateIntermediateReset').trigger('click');
     showMessage(result.message);
     $('#newIntermediate').dialog('close');
 }
@@ -608,8 +603,7 @@ function resetIntermediateForm() {
 }
 
 function updateTagsDisplay(result) {
-    // BUG click issue
-    $('tagsCancelButton').click();
+    $('tagsCancelButton').trigger('click');
     showMessage(result.message);
     $('#tagsEdit').dialog('close');
 }
@@ -619,8 +613,7 @@ function tagsCancel() {
 }
 
 function createLeafCertResponse(result) {
-    // BUG click issue
-    $('#generateLeafReset').click();
+    $('#generateLeafReset').trigger('click');
     showMessage(result.message);
     $('#newLeaf').dialog('close');
 }
