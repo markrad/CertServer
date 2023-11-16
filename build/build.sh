@@ -21,6 +21,7 @@ function help() {
 }
 
 LGREEN='\033[1;32m'
+LRED='\033[1;31m'
 RESET='\033[0m'
 field=99
 # hadrepo=0
@@ -107,11 +108,16 @@ then
 fi
 newver=$(IFS="." ; echo "${parts[*]}")
 
-echo This will update the version from $version to $newver and push a new tag
-read -p "$(echo -e Do you wish to continue? ${LGREEN}Yes${RESET} or No [${LGREEN}Y/${RESET}N])" response
+echo -e "This will update the version from ${LGREEN}${version}${RESET} to ${LRED}${newver}${RESET} and push a new tag"
+read -p "$(echo -e Do you wish to continue? ${LGREEN}Yes${RESET} or No [${LGREEN}Y/${RESET}N] ) " response
 
-if [ $response != "Y" ] && [ $response != "y" ]
+if [ "$response" != "Y" ] && [ "$response" != "y" ] && [ "$response" != "" ]
 then
+    if [ "$response" != "N" ] && [ "$response" != "n" ]
+    then    
+        echo Invalid response $response
+    fi
+
     echo Exiting
     exit 4
 fi
@@ -123,10 +129,10 @@ testrc=$?
 
 if [ $testrc -ne 0 ]
 then
-    echo Tests failed - exiting
+    echo -e ${LRED}Tests failed - exiting${RESET}
     exit 4
 else
-    echo Tests complete
+    echo ${LGREEN}Tests complete${RESET}
 fi
 
 echo Updating
