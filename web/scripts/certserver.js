@@ -85,28 +85,36 @@ function buildKeyDetail(detail) {
     return detailHTML({ id: detail.id, name: detail.name, certPair: detail.certPair, encrypted: result.encrypted? 'yes' : 'no' });
 }
 
+function keyHide(details, arrow) {
+    details.slideUp(400, () => {
+        details.html('');
+        arrow.text('>');
+    });
+}
+
+async function keyShow(details, arrow, id) {
+    arrow.text('˅');
+    try {
+        result = await getKeyDetails({ id: id });
+        let content = buildKeyDetail(result);
+        details.html(content);
+        console.log('success');
+        details.slideDown(500);           // &#9650
+    }
+    catch (err) {
+        showError(err.error, err.message);
+    };
+}
+
 async function keyClick(id) {
     let line = $('.keyLine#k' + id);
     let details = line.find('.keyDetails');
     let arrow = line.find('.keyArrow');
     if (details.is(':hidden') == false) {
-        details.slideUp(400, () => {
-            details.html('');
-            arrow.text('>');
-        });
+        keyHide(details, arrow);
     }
     else {
-        arrow.text('˅');
-        try {
-            result = await getKeyDetails({ id: id });
-            let content = buildKeyDetail(result);
-            details.html(content);
-            console.log('success');
-            details.slideDown(500);           // &#9650
-        }
-        catch (err) {
-            showError(err.error, err.message);
-        };
+        keyShow(details, arrow, id);
     };
 }
 
@@ -207,11 +215,11 @@ function buildCertList(target, files) {
 
 // Builds HTML for a certificate in the UI
 function buildCertEntry(file) {
-    let listEntryHTML = ({ id, name, tags }) => `
+    let listEntryHTML = ({ id, name, tags, keyId }) => `
         <li class="certLine" id="c${id}">
         <span onclick="certClick('${id}')">
             <span class="certArrow">˃</span>
-            <span class="idLine">
+            <span class="idLine" data-keyid="${keyId}">
                 <span class="idValue">${id}</span>
             </span>
             <span class="certValue">
@@ -227,7 +235,7 @@ function buildCertEntry(file) {
         </div>
         </li>
     `;
-    return listEntryHTML({ id: file.id, name: file.name, tags: `${file.tags.join(';')}` });
+    return listEntryHTML({ id: file.id, name: file.name, keyId: file.keyId, tags: `${file.tags.join(';')}` });
 }
 
 // Build the certificate detail HTML
@@ -551,10 +559,12 @@ function togglePane(id) {
 
 // Search tags and hide those that don't match
 function searchTags() {
-    let r = new RegExp($('#tagChooserValue').val(), $('#tagCaseLabelCBox').is(':checked')? 'i' : '');
+    let filter = $('#tagChooserValue').val();
+    let keyIds = [];
+    let r = new RegExp(filter, $('#tagCaseLabelCBox').is(':checked')? 'i' : '');
     $('.certLine').each((i, line) => {
         let tags = $(line).find('.certTags');
-        if (r.exec(tags.text()) == null) {
+        if (filter.length > 0 && r.exec(tags.text()) == null) {
             $(line).hide();
             let details = $(line).find('.certDetails');
             let arrow = $(line).find('.certArrow');
@@ -562,8 +572,28 @@ function searchTags() {
         }
         else {
             $(line).show();
+            let keyId = $(line).find('.idLine').data('keyid');
+            if (keyId != null) {
+                keyIds.push(keyId);
+            }
         }
     });
+    $('.keyLine').each((i, line) => {
+        if (keyIds.includes(parseInt($(line).attr('id').slice(1)))) {
+            $(line).show();
+        }
+        else {
+            $(line).hide();
+            let details = $(line).find('.keyDetails');
+            let arrow = $(line).find('keyArrow');
+            keyHide(details, arrow);
+        }
+    });
+}
+
+function tagChooserSubmit() {
+    console.log('tag submit');
+    return false;
 }
 
 // Show an informational message box
