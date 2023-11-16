@@ -20,7 +20,7 @@ function help() {
     exit 4
 }
 
-LGREEN='\033[0;31m'
+LGREEN='\033[1;32m'
 RESET='\033[0m'
 field=99
 # hadrepo=0
@@ -108,7 +108,7 @@ fi
 newver=$(IFS="." ; echo "${parts[*]}")
 
 echo This will update the version from $version to $newver and push a new tag
-read -p "$(echo -e Do you wish to continue? ${LGREEN}Yes - y${RESET} No - n)" response
+read -p "$(echo -e Do you wish to continue? ${LGREEN}Yes${RESET} or No [${LGREEN}Y/${RESET}N])" response
 
 if [ $response != "Y" ] && [ $response != "y" ]
 then
