@@ -150,7 +150,11 @@ block layout-content
       div.SubmitButton
         input.button2#generateCAReset(type="reset", value="Reset" title="Reset")
         input.button2#generateCAButton.SubmitButton(type="submit" title="submit", value="Generate")
-    form#tagChooser(class='slideForm topSlide')
+    //- span.tagChooserValue 
+      input#tagChooserValue(type='text' name='tagChooserInput' title='Tag Chooser Input' oninput='searchTags()')
+      label#tagCaseLabel(for='Case Sensitivity') Ignore Case: 
+      input#tagCaseLabelCBox(type='checkbox' checked onclick='searchTags()')
+    form#tagChooser(class='slideForm topSlide' onsubmit='tagChooserSubmit()')
       span.tagChooserValue 
         input#tagChooserValue(type='text' name='tagChooserInput' title='Tag Chooser Input' oninput='searchTags()')
         label#tagCaseLabel(for='Case Sensitivity') Ignore Case: 
