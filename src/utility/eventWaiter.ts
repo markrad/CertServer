@@ -15,6 +15,7 @@ export class EventWaiter {
      * @constructor
      */
     constructor() {
+        // TODO: Drive version change from set or reject functions
         this.EventReset();
     }
 
@@ -43,6 +44,7 @@ export class EventWaiter {
             return this._promise;
         }
         else {
+            // TODO: Don't return race, but reject when timer expires
             return Promise.race([
                 this._promise,
                 new Promise<void>((_resolve, reject) => setTimeout(() => reject(new Error('Timed out')), timeout)),

@@ -26,6 +26,7 @@ class EventWaiter {
         this._resolved = false;
         this._rejected = false;
         this._version = 0;
+        // TODO: Drive version change from set or reject functions
         this.EventReset();
     }
     /**
@@ -53,6 +54,7 @@ class EventWaiter {
                 return this._promise;
             }
             else {
+                // TODO: Don't return race, but reject when timer expires
                 return Promise.race([
                     this._promise,
                     new Promise((_resolve, reject) => setTimeout(() => reject(new Error('Timed out')), timeout)),
