@@ -10,7 +10,6 @@ export type CertificateBrief = {
     validTo: Date;
     signer: string;
     signerId: number;
-    keyPresent: string;
     keyId: number;
     serialNumber: string;
     fingerprint: string;

@@ -41,7 +41,6 @@ const path_1 = __importDefault(require("path"));
 const http_1 = __importDefault(require("http"));
 const https_1 = __importDefault(require("https"));
 const fs_1 = __importDefault(require("fs"));
-//import * as fspromises from 'fs/promises'
 const promises_1 = require("fs/promises");
 const crypto_1 = __importDefault(require("crypto"));
 const node_forge_1 = require("node-forge");
@@ -1055,7 +1054,6 @@ class WebServer {
             serialNumber: c.serialNumber == null ? '' : c.serialNumber.match(/.{1,2}/g).join(':'),
             signer: c2 ? c2.subject.CN : null,
             signerId: c2 ? c2.$loki : null,
-            keyPresent: c.keyId != null ? 'yes' : 'no',
             keyId: c.keyId,
             fingerprint: c.fingerprint,
             fingerprint256: c.fingerprint256,

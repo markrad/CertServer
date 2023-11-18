@@ -321,7 +321,7 @@ function buildCertDetail(detail) {
         id: detail.id,
         name: detail.name,
         certType: detail.certType,
-        withKeyPresent: detail.keyPresent == 'yes'? ' with private key' : '',
+        withKeyPresent: detail.keyId != null? ' with private key' : '',
         serialNumber: detail.serialNumber,
         fingerprint: detail.fingerprint,
         fingerprint256: detail.fingerprint256,
@@ -340,7 +340,7 @@ function buildCertDetail(detail) {
         validFrom: detail.validFrom,
         validTo: detail.validTo,
         signer: detail.signer,
-        keyPresent: detail.keyPresent,
+        keyPresent: detail.keyId != null? 'yes' : 'no',
         tags: detail.tags.length != 0? detail.tags.join(';') : '',
     });
 }

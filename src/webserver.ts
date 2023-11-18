@@ -3,8 +3,7 @@ import path from 'path';
 import http from 'http';
 import https from 'https';
 import fs from 'fs';
-//import * as fspromises from 'fs/promises'
-import { readFile, writeFile, /*appendFile, copyFile,*/ unlink, rename } from 'fs/promises'
+import { readFile, writeFile, unlink, rename } from 'fs/promises'
 import crypto from 'crypto';
 
 import { jsbn, pki, pem, util, random, md } from 'node-forge'; 
@@ -955,6 +954,7 @@ export class WebServer {
                     input.pemString = await readFile(input.filename, { encoding: 'utf8' });
         
                 }
+
                 let msg = pem.decode(input.pemString)[0];
                 logger.debug(`Received ${msg.type}`);
 
@@ -1093,7 +1093,6 @@ export class WebServer {
             serialNumber: c.serialNumber == null? '' : c.serialNumber.match(/.{1,2}/g).join(':'),  // Hacky fix for dud entries in db
             signer: c2? c2.subject.CN : null,
             signerId: c2? c2.$loki : null,
-            keyPresent: c.keyId != null? 'yes' : 'no',      // TODO: Deprecate this and do it in the client
             keyId: c.keyId,
             fingerprint: c.fingerprint,
             fingerprint256: c.fingerprint256,
