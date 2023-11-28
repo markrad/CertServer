@@ -450,7 +450,7 @@ class WebServer {
                         return response.status(400).json({ error: errString });
                     }
                     const cRow = this._certificates.findOne({ $loki: parseInt(body.signer) });
-                    const kRow = this._privateKeys.findOne({ pairId: cRow.$loki });
+                    const kRow = this._privateKeys.findOne({ $loki: cRow.keyId });
                     if (!cRow) {
                         return response.status(404).json({ error: 'Could not find signing certificate' });
                     }
@@ -459,15 +459,7 @@ class WebServer {
                     }
                     const c = yield this._pkiCertFromPem(cRow);
                     // const c = pki.certificateFromPem(fs.readFileSync(path.join(this._certificatesPath, WebServer._getCertificateFilenameFromRow(cRow)), { encoding: 'utf8' }));
-                    let k;
-                    if (c) {
-                        if (body.password) {
-                            k = node_forge_1.pki.decryptRsaPrivateKey(yield (0, promises_1.readFile)(path_1.default.join(this._privatekeysPath, WebServer._getKeyFilenameFromRow(kRow)), { encoding: 'utf8' }), body.password);
-                        }
-                        else {
-                            k = node_forge_1.pki.privateKeyFromPem(yield (0, promises_1.readFile)(path_1.default.join(this._privatekeysPath, WebServer._getKeyFilenameFromRow(kRow)), { encoding: 'utf8' }));
-                        }
-                    }
+                    const k = yield (this._pkiKeyFromPem(kRow, body.password));
                     // Create an empty Certificate
                     let cert = node_forge_1.pki.createCertificate();
                     // const ski: any = c.getExtension({ name: 'subjectKeyIdentifier' });
@@ -643,7 +635,12 @@ class WebServer {
                         });
                     }
                     else {
-                        retVal = this._privateKeys.chain().find().sort((l, r) => l.pairCN.localeCompare(r.pairCN)).data().map((entry) => {
+                        retVal = this._privateKeys.chain().find().sort((l, r) => {
+                            // Circumvent bug that caused broken keys
+                            let lStr = l.pairCN ? l.pairCN : '';
+                            let rStr = r.pairCN ? r.pairCN : '';
+                            return lStr.localeCompare(rStr);
+                        }).data().map((entry) => {
                             return { name: (entry.pairCN ? entry.pairCN + '_key' : entry.name), type: CertTypes_1.CertTypes[type].toString(), id: entry.$loki };
                         });
                     }
@@ -1082,6 +1079,7 @@ class WebServer {
                     let key = this._privateKeys.findOne({ $loki: c.keyId });
                     if (key) {
                         key.pairId = null;
+                        key.pairCN = 'Standalone key';
                         let unknownName = WebServer._getKeyFilename('unknown_key', key.$loki);
                         yield (0, promises_1.rename)(this._getKeysDir(WebServer._getKeyFilenameFromRow(key)), this._getKeysDir(unknownName));
                         key.name = WebServer._getDisplayName(unknownName);
@@ -1409,6 +1407,31 @@ class WebServer {
                 try {
                     let filename = this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(c));
                     resolve(node_forge_1.pki.certificateFromPem(yield (0, promises_1.readFile)(filename, { encoding: 'utf8' })));
+                }
+                catch (err) {
+                    reject(err);
+                }
+            }));
+        });
+    }
+    _pkiKeyFromPem(k, password) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    let filename = this._getKeysDir(WebServer._getKeyFilenameFromRow(k));
+                    let p = yield (0, promises_1.readFile)(filename, { encoding: 'utf8' });
+                    let msg = node_forge_1.pem.decode(p)[0];
+                    if (msg.type.startsWith('ENCRYPTED')) {
+                        if (password) {
+                            resolve(node_forge_1.pki.decryptRsaPrivateKey(p, password));
+                        }
+                        else {
+                            throw new CertError_1.CertError(400, 'No password provided for encrypted key');
+                        }
+                    }
+                    else {
+                        resolve(node_forge_1.pki.privateKeyFromPem(p));
+                    }
                 }
                 catch (err) {
                     reject(err);

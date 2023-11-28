@@ -456,7 +456,7 @@ export class WebServer {
                     return response.status(400).json({ error: errString })
                 }
                 const cRow = this._certificates.findOne({ $loki: parseInt(body.signer) });
-                const kRow = this._privateKeys.findOne({ pairId: cRow.$loki });
+                const kRow = this._privateKeys.findOne({ $loki: cRow.keyId });
 
                 if (!cRow) {
                     return response.status(404).json({ error: 'Could not find signing certificate'});
@@ -465,18 +465,9 @@ export class WebServer {
                     return response.status(404).json({ error: 'Could not find signing certificate\'s private key'});
                 }
 
-                const c = await this._pkiCertFromPem(cRow);
+                const c: pki.Certificate = await this._pkiCertFromPem(cRow);
                 // const c = pki.certificateFromPem(fs.readFileSync(path.join(this._certificatesPath, WebServer._getCertificateFilenameFromRow(cRow)), { encoding: 'utf8' }));
-                let k: pki.PrivateKey;
-
-                if (c) {
-                    if (body.password) {
-                        k = pki.decryptRsaPrivateKey(await readFile(path.join(this._privatekeysPath, WebServer._getKeyFilenameFromRow(kRow)), { encoding: 'utf8' }), body.password);
-                    }
-                    else {
-                        k = pki.privateKeyFromPem(await readFile(path.join(this._privatekeysPath, WebServer._getKeyFilenameFromRow(kRow)), { encoding: 'utf8' }));
-                    }
-                }
+                const k: pki.PrivateKey = await(this._pkiKeyFromPem(kRow, body.password));
 
                 // Create an empty Certificate
                 let cert = pki.createCertificate();
@@ -656,7 +647,12 @@ export class WebServer {
                     });
                 }
                 else {
-                    retVal = this._privateKeys.chain().find().sort((l, r) => l.pairCN.localeCompare(r.pairCN)).data().map((entry) => { 
+                    retVal = this._privateKeys.chain().find().sort((l, r) => { 
+                        // Circumvent bug that caused broken keys
+                        let lStr = l.pairCN? l.pairCN : '';
+                        let rStr = r.pairCN? r.pairCN : '';
+                        return lStr.localeCompare(rStr);
+                    }).data().map((entry) => { 
                         return { name: (entry.pairCN? entry.pairCN + '_key' : entry.name), type: CertTypes[type].toString(), id: entry.$loki };
                     });
                 }
@@ -1123,6 +1119,7 @@ export class WebServer {
                 let key = this._privateKeys.findOne({ $loki: c.keyId });
                 if (key) {
                     key.pairId = null;
+                    key.pairCN = 'Standalone key';
                     let unknownName = WebServer._getKeyFilename('unknown_key', key.$loki);
                     await rename(this._getKeysDir(WebServer._getKeyFilenameFromRow(key)), this._getKeysDir(unknownName));
                     key.name = WebServer._getDisplayName(unknownName);
@@ -1477,7 +1474,31 @@ export class WebServer {
         return new Promise<pki.Certificate>(async (resolve, reject) => {
             try {
                 let filename = this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(c));
-                resolve(pki.certificateFromPem(await readFile(filename, {encoding: 'utf8'})));
+                resolve(pki.certificateFromPem(await readFile(filename, { encoding: 'utf8' })));
+            }
+            catch (err) {
+                reject(err);
+            }
+        });
+    }
+
+    private async _pkiKeyFromPem(k: PrivateKeyRow & LokiObj, password?: string): Promise<pki.PrivateKey> {
+        return new Promise<pki.PrivateKey>(async (resolve, reject) => {
+            try {
+                let filename = this._getKeysDir(WebServer._getKeyFilenameFromRow(k));
+                let p = await readFile(filename, { encoding: 'utf8' });
+                let msg = pem.decode(p)[0];
+                if(msg.type.startsWith('ENCRYPTED')) {
+                    if (password) {
+                        resolve(pki.decryptRsaPrivateKey(p, password));
+                    }
+                    else {
+                        throw new CertError(400, 'No password provided for encrypted key');
+                    }
+                }
+                else {
+                    resolve(pki.privateKeyFromPem(p));
+                }
             }
             catch (err) {
                 reject(err);
