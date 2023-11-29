@@ -381,14 +381,16 @@ class WebServer {
                         OU: body.unit,
                         CN: body.commonName
                     };
-                    let errString = '';
+                    let errString = [];
                     if (!subject.CN)
-                        errString += 'Common name is required\n';
+                        errString.push('Common name is required');
                     if (!validTo)
-                        errString += 'Valid to is required\n';
-                    errString += WebServer._isValidRNASequence([body.country, body.state, body.location, body.unit, body.commonName]);
-                    if (errString) {
-                        return response.status(400).json({ error: errString });
+                        errString.push('Valid to is required');
+                    if (body.country.length > 0 && body.country.length != 2)
+                        errString.push('Country code must be omitted or have two characters');
+                    errString.push(WebServer._isValidRNASequence([body.country, body.state, body.location, body.unit, body.commonName]));
+                    if (errString.length > 0) {
+                        return response.status(400).json({ error: errString.join('\n') });
                     }
                     // Create an empty Certificate
                     let cert = node_forge_1.pki.createCertificate();
@@ -438,16 +440,18 @@ class WebServer {
                         OU: body.unit,
                         CN: body.commonName
                     };
-                    let errString = '';
+                    let errString = [];
                     if (!subject.CN)
-                        errString += 'Common name is required\n';
+                        errString.push('Common name is required');
                     if (!validTo)
-                        errString += 'Valid to is required\n';
+                        errString.push('Valid to is required');
                     if (!body.signer)
-                        errString += 'Signing certificate is required';
-                    errString += WebServer._isValidRNASequence([body.country, body.state, body.location, body.unit, body.commonName]);
-                    if (errString) {
-                        return response.status(400).json({ error: errString });
+                        errString.push('Signing certificate is required');
+                    if (body.country.length > 0 && body.country.length != 2)
+                        errString.push('Country code must be omitted or have two characters');
+                    errString.push(WebServer._isValidRNASequence([body.country, body.state, body.location, body.unit, body.commonName]));
+                    if (errString.length > 0) {
+                        return response.status(400).json({ error: errString.join('\n') });
                     }
                     const cRow = this._certificates.findOne({ $loki: parseInt(body.signer) });
                     const kRow = this._privateKeys.findOne({ $loki: cRow.keyId });
@@ -528,16 +532,18 @@ class WebServer {
                         OU: body.unit,
                         CN: body.commonName
                     };
-                    let errString = '';
+                    let errString = [];
                     if (!subject.CN)
-                        errString += 'Common name is required\n';
+                        errString.push('Common name is required');
                     if (!validTo)
-                        errString += 'Valid to is required\n';
+                        errString.push('Valid to is required');
                     if (!body.signer)
-                        errString += 'Signing certificate is required\n';
-                    errString += WebServer._isValidRNASequence([body.country, body.state, body.location, body.unit, body.commonName]);
-                    if (errString) {
-                        return response.status(400).json({ error: errString });
+                        errString.push('Signing certificate is required');
+                    if (body.country.length > 0 && body.country.length != 2)
+                        errString.push('Country code must be omitted or have two characters');
+                    errString.push(WebServer._isValidRNASequence([body.country, body.state, body.location, body.unit, body.commonName]));
+                    if (errString.length > 0) {
+                        return response.status(400).json({ error: errString.join('\n') });
                     }
                     const cRow = this._certificates.findOne({ $loki: parseInt(body.signer) });
                     const kRow = this._privateKeys.findOne({ pairId: cRow.$loki });

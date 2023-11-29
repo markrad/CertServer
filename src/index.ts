@@ -1,6 +1,7 @@
 import path from 'path';
 import deepmerge from 'deepmerge';
 import { WebServer } from './webserver';
+import { error } from 'jquery';
 
 // const ROOT_DIRECTORY = '/workspaces/typescript-node/data';
 // const ROOT_DIRECTORY = path.join(__dirname, '../data');
@@ -13,7 +14,7 @@ const defaultConfig: any = {
         port: 4141,
         root: './data',
         subject: {
-            C: 'USA',
+            C: 'US',
             ST: 'Washington',
             L: 'Redmond',
             O: 'None',
@@ -35,6 +36,10 @@ try {
             break;
         default:
             throw 'Invalid number of arguments - only a config file path is allowed'
+    }
+
+    if (config.C.length != 2) {
+        throw new Error(`Invalid country code ${config.C} - must be two characters`);
     }
 
     const webServer = WebServer.createWebServer(config);

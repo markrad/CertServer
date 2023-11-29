@@ -29,7 +29,7 @@ certServer:
   certificate: null,
   key: null,
   subject:
-    C: USA,
+    C: US,
     ST: Washington,
     L: Redmond,
     O: None,
