@@ -1,7 +1,6 @@
 import path from 'path';
 import deepmerge from 'deepmerge';
 import { WebServer } from './webserver';
-import { error } from 'jquery';
 
 // const ROOT_DIRECTORY = '/workspaces/typescript-node/data';
 // const ROOT_DIRECTORY = path.join(__dirname, '../data');
