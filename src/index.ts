@@ -37,7 +37,7 @@ try {
             throw 'Invalid number of arguments - only a config file path is allowed'
     }
 
-    if (config.C.length != 2) {
+    if (config.certServer.subject.C.length != 2) {
         throw new Error(`Invalid country code ${config.C} - must be two characters`);
     }
 
