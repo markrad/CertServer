@@ -10,9 +10,9 @@
     "noUnusedParameters": true,
     "forceConsistentCasingInFileNames": true,
     "allowJs": false,
-    "checkJs": false, 
+    "checkJs": false,
     "outDir": "./output/src",
     "skipLibCheck": true,
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "src/webservertypes/**/*"],
 }

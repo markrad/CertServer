@@ -53,15 +53,15 @@ const stream_1 = require("stream");
 const log4js = __importStar(require("log4js"));
 const eventWaiter_1 = require("./utility/eventWaiter");
 const exists_1 = require("./utility/exists");
-const ExtensionBasicConstraints_1 = require("./Extensions/ExtensionBasicConstraints");
-const ExtensionKeyUsage_1 = require("./Extensions/ExtensionKeyUsage");
-const ExtensionAuthorityKeyIdentifier_1 = require("./Extensions/ExtensionAuthorityKeyIdentifier");
-const ExtensionSubjectKeyIdentifier_1 = require("./Extensions/ExtensionSubjectKeyIdentifier");
-const ExtensionExtKeyUsage_1 = require("./Extensions/ExtensionExtKeyUsage");
-const ExtensionSubjectAltName_1 = require("./Extensions/ExtensionSubjectAltName");
-const CertTypes_1 = require("./CertTypes");
-const userAgentOS_1 = require("./userAgentOS");
-const CertError_1 = require("./CertError");
+const ExtensionBasicConstraints_1 = require("./extensions/ExtensionBasicConstraints");
+const ExtensionKeyUsage_1 = require("./extensions/ExtensionKeyUsage");
+const ExtensionAuthorityKeyIdentifier_1 = require("./extensions/ExtensionAuthorityKeyIdentifier");
+const ExtensionSubjectKeyIdentifier_1 = require("./extensions/ExtensionSubjectKeyIdentifier");
+const ExtensionExtKeyUsage_1 = require("./extensions/ExtensionExtKeyUsage");
+const ExtensionSubjectAltName_1 = require("./extensions/ExtensionSubjectAltName");
+const CertTypes_1 = require("./webservertypes/CertTypes");
+const userAgentOS_1 = require("./webservertypes/userAgentOS");
+const CertError_1 = require("./webservertypes/CertError");
 const logger = log4js.getLogger();
 logger.level = "debug";
 /**
@@ -388,7 +388,9 @@ class WebServer {
                         errString.push('Valid to is required');
                     if (body.country.length > 0 && body.country.length != 2)
                         errString.push('Country code must be omitted or have two characters');
-                    errString.push(WebServer._isValidRNASequence([body.country, body.state, body.location, body.unit, body.commonName]));
+                    let rc = WebServer._isValidRNASequence([body.country, body.state, body.location, body.unit, body.commonName]);
+                    if (!rc.valid)
+                        errString.push(rc.message);
                     if (errString.length > 0) {
                         return response.status(400).json({ error: errString.join('\n') });
                     }
@@ -449,7 +451,9 @@ class WebServer {
                         errString.push('Signing certificate is required');
                     if (body.country.length > 0 && body.country.length != 2)
                         errString.push('Country code must be omitted or have two characters');
-                    errString.push(WebServer._isValidRNASequence([body.country, body.state, body.location, body.unit, body.commonName]));
+                    let rc = WebServer._isValidRNASequence([body.country, body.state, body.location, body.unit, body.commonName]);
+                    if (!rc.valid)
+                        errString.push(rc.message);
                     if (errString.length > 0) {
                         return response.status(400).json({ error: errString.join('\n') });
                     }
@@ -541,7 +545,9 @@ class WebServer {
                         errString.push('Signing certificate is required');
                     if (body.country.length > 0 && body.country.length != 2)
                         errString.push('Country code must be omitted or have two characters');
-                    errString.push(WebServer._isValidRNASequence([body.country, body.state, body.location, body.unit, body.commonName]));
+                    let rc = WebServer._isValidRNASequence([body.country, body.state, body.location, body.unit, body.commonName]);
+                    if (!rc.valid)
+                        errString.push(rc.message);
                     if (errString.length > 0) {
                         return response.status(400).json({ error: errString.join('\n') });
                     }
@@ -1505,10 +1511,10 @@ class WebServer {
     static _isValidRNASequence(rnas) {
         for (let r in rnas) {
             if (!/^[a-z A-Z 0-9'\=\(\)\+\,\-\.\/\:\?]*$/.test(rnas[r])) {
-                return 'Subject contains an invalid character\n';
+                return { valid: false, message: 'Subject contains an invalid character' };
             }
         }
-        return '';
+        return { valid: true };
     }
     static _isSignedBy(cert, keyn, keye) {
         let publicKey = node_forge_1.pki.setRsaPublicKey(keyn, keye);

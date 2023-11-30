@@ -17,29 +17,29 @@ import * as log4js from 'log4js';
 
 import { EventWaiter } from './utility/eventWaiter';
 import { exists } from './utility/exists';
-import { ExtensionParent } from './Extensions/ExtensionParent';
-import { ExtensionBasicConstraints } from './Extensions/ExtensionBasicConstraints';
-import { ExtensionKeyUsage } from './Extensions/ExtensionKeyUsage';
-import { ExtensionAuthorityKeyIdentifier } from './Extensions/ExtensionAuthorityKeyIdentifier';
-import { ExtensionSubjectKeyIdentifier } from './Extensions/ExtensionSubjectKeyIdentifier';
-import { ExtensionExtKeyUsage } from './Extensions/ExtensionExtKeyUsage';
-import { ExtensionSubjectAltName, ExtensionSubjectAltNameOptions } from './Extensions/ExtensionSubjectAltName';
-import { OperationResult } from './OperationResult';
-import { OperationResultItem } from './OperationResultItem';
-import { CertTypes } from './CertTypes';
-import { Config } from './Config';
-import { CertificateSubject } from './CertificateSubject';
-import { CertificateRow } from './CertificateRow';
-import { PrivateKeyRow } from './PrivateKeyRow';
-import { DBVersionRow } from './DBVersionRow';
-import { CertificateLine } from './CertificateLine';
-import { CertificateBrief } from './CertificateBrief';
-import { KeyBrief } from './KeyBrief';
-import { GenerateCertRequest } from './GenerateCertRequest';
-import { GenerateChildCertRequest } from './GenerateChildCertRequest';
-import { QueryType } from './QueryType';
-import { userAgentOS } from './userAgentOS';
-import { CertError } from './CertError';
+import { ExtensionParent } from './extensions/ExtensionParent';
+import { ExtensionBasicConstraints } from './extensions/ExtensionBasicConstraints';
+import { ExtensionKeyUsage } from './extensions/ExtensionKeyUsage';
+import { ExtensionAuthorityKeyIdentifier } from './extensions/ExtensionAuthorityKeyIdentifier';
+import { ExtensionSubjectKeyIdentifier } from './extensions/ExtensionSubjectKeyIdentifier';
+import { ExtensionExtKeyUsage } from './extensions/ExtensionExtKeyUsage';
+import { ExtensionSubjectAltName, ExtensionSubjectAltNameOptions } from './extensions/ExtensionSubjectAltName';
+import { OperationResult } from './webservertypes/OperationResult';
+import { OperationResultItem } from './webservertypes/OperationResultItem';
+import { CertTypes } from './webservertypes/CertTypes';
+import { Config } from './webservertypes/Config';
+import { CertificateSubject } from './webservertypes/CertificateSubject';
+import { CertificateRow } from './webservertypes/CertificateRow';
+import { PrivateKeyRow } from './webservertypes/PrivateKeyRow';
+import { DBVersionRow } from './webservertypes/DBVersionRow';
+import { CertificateLine } from './webservertypes/CertificateLine';
+import { CertificateBrief } from './webservertypes/CertificateBrief';
+import { KeyBrief } from './webservertypes/KeyBrief';
+import { GenerateCertRequest } from './webservertypes/GenerateCertRequest';
+import { GenerateChildCertRequest } from './webservertypes/GenerateChildCertRequest';
+import { QueryType } from './webservertypes/QueryType';
+import { userAgentOS } from './webservertypes/userAgentOS';
+import { CertError } from './webservertypes/CertError';
 
 const logger = log4js.getLogger();
 logger.level = "debug";
@@ -391,7 +391,8 @@ export class WebServer {
                 if (!subject.CN) errString.push('Common name is required');
                 if (!validTo) errString.push('Valid to is required');
                 if (body.country.length > 0 && body.country.length != 2) errString.push('Country code must be omitted or have two characters');
-                errString.push(WebServer._isValidRNASequence([ body.country, body.state, body.location, body.unit, body.commonName ]));
+                let rc: { valid: boolean, message?: string } = WebServer._isValidRNASequence([ body.country, body.state, body.location, body.unit, body.commonName ]);
+                if (!rc.valid) errString.push(rc.message);
 
                 if (errString.length > 0) {
                     return response.status(400).json({ error: errString.join('\n') })
@@ -455,7 +456,8 @@ export class WebServer {
                 if (!validTo) errString.push('Valid to is required');
                 if (!body.signer) errString.push('Signing certificate is required');
                 if (body.country.length > 0 && body.country.length != 2) errString.push('Country code must be omitted or have two characters');
-                errString.push(WebServer._isValidRNASequence([ body.country, body.state, body.location, body.unit, body.commonName ]));
+                let rc: { valid: boolean, message?: string } = WebServer._isValidRNASequence([ body.country, body.state, body.location, body.unit, body.commonName ]);
+                if (!rc.valid) errString.push(rc.message);
 
                 if (errString.length > 0) {
                     return response.status(400).json({ error: errString.join('\n') })
@@ -550,7 +552,8 @@ export class WebServer {
                 if (!validTo) errString.push('Valid to is required');
                 if (!body.signer) errString.push('Signing certificate is required');
                 if (body.country.length > 0 && body.country.length != 2) errString.push('Country code must be omitted or have two characters');
-                errString.push(WebServer._isValidRNASequence([ body.country, body.state, body.location, body.unit, body.commonName ]));
+                let rc: { valid: boolean, message?: string } = WebServer._isValidRNASequence([ body.country, body.state, body.location, body.unit, body.commonName ]);
+                if (!rc.valid) errString.push(rc.message);
 
                 if (errString.length > 0) {
                     return response.status(400).json({ error: errString.join('\n') })
@@ -1568,13 +1571,13 @@ export class WebServer {
         if (ua.includes('android')) return userAgentOS.ANDROID;
         return userAgentOS.UNKNOWN;
     }
-    private static _isValidRNASequence(rnas: string[]): string {
+    private static _isValidRNASequence(rnas: string[]): { valid: boolean, message?: string } {
         for (let r in rnas) {
             if (!/^[a-z A-Z 0-9'\=\(\)\+\,\-\.\/\:\?]*$/.test(rnas[r])) {
-                return 'Subject contains an invalid character\n';
+                return { valid: false, message: 'Subject contains an invalid character' };
             }
         }
-        return '';
+        return { valid: true };
     }
 
     private static _isSignedBy(cert: pki.Certificate, keyn: jsbn.BigInteger, keye: jsbn.BigInteger): boolean {

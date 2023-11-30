@@ -31,6 +31,7 @@
         "simplesort",
         "testdata",
         "webserver",
+        "webservertypes",
         "wsonclose",
         "wsonerror",
         "wsonmessage",

@@ -8,8 +8,8 @@ import { pki } from 'node-forge';
 import WebSocket from 'ws';
 
 import { EventWaiter } from '../utility/eventWaiter';
-import { OperationResult } from '../OperationResult';
-import { OperationResultItem } from '../OperationResultItem';
+import { OperationResult } from '../webservertypes/OperationResult';
+import { OperationResultItem } from '../webservertypes/OperationResultItem';
 
 
 const testPath = path.join(__dirname, '../testdata');
