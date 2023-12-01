@@ -29,7 +29,7 @@ const config = `certServer:
   certificate: ''  
   key: ''          
   subject:         
-    C: TestCountry
+    C: US
     ST: TestState
     L: TestCity
     O: TestOrg
@@ -37,7 +37,7 @@ const config = `certServer:
 let then = new Date();
 then.setFullYear(then.getFullYear() + 1);
 const newCA = {
-    country: 'someCountry',
+    country: 'US',
     state: 'someState',
     location: 'someLocation',
     organization: 'someOrg',
@@ -47,7 +47,7 @@ const newCA = {
     validTo: then.toISOString(),
 };
 const newInt = {
-    country: 'intCountry',
+    country: 'US',
     state: 'intState',
     location: 'intLocation',
     organization: 'intOrg',
@@ -58,7 +58,7 @@ const newInt = {
     signer: '1',
 };
 const newLeaf = {
-    country: 'leafCountry',
+    country: 'US',
     state: 'leafState',
     location: 'leafLocation',
     organization: 'leafOrg',
@@ -202,7 +202,7 @@ function createLeafCertificate() {
 }
 function addTagsToIntermediate() {
     return __awaiter(this, void 0, void 0, function* () {
-        res = yield httpRequest('post', url + '/api/updateCertTag?id=2', JSON.stringify({ tags: 'tag1 ; tag2' }));
+        res = yield httpRequest('post', url + '/api/updateCertTag?id=2', JSON.stringify({ tags: ['tag1', 'tag2'] }));
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         yield ew.EventWait();
         ew.EventReset();

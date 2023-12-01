@@ -28,7 +28,7 @@ const config: string = `certServer:
   certificate: ''  
   key: ''          
   subject:         
-    C: TestCountry
+    C: US
     ST: TestState
     L: TestCity
     O: TestOrg
@@ -38,7 +38,7 @@ let then = new Date();
     then.setFullYear(then.getFullYear() + 1);
 
 const newCA = {
-    country: 'someCountry',
+    country: 'US',
     state: 'someState',
     location: 'someLocation',
     organization: 'someOrg',
@@ -49,7 +49,7 @@ const newCA = {
 }
 
 const newInt = {
-    country: 'intCountry',
+    country: 'US',
     state: 'intState',
     location: 'intLocation',
     organization: 'intOrg',
@@ -61,7 +61,7 @@ const newInt = {
 }
 
 const newLeaf = {
-    country: 'leafCountry',
+    country: 'US',
     state: 'leafState',
     location: 'leafLocation',
     organization: 'leafOrg',
@@ -208,7 +208,7 @@ async function createLeafCertificate(): Promise<boolean> {
 }
 
 async function addTagsToIntermediate(): Promise<boolean> {
-    res = await httpRequest('post', url + '/api/updateCertTag?id=2', JSON.stringify({ tags: 'tag1 ; tag2' }));
+    res = await httpRequest('post', url + '/api/updateCertTag?id=2', JSON.stringify({ tags: [ 'tag1', 'tag2' ] }));
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
     await ew.EventWait();
     ew.EventReset();
