@@ -516,12 +516,40 @@ async function getName(type, id) {
     });
 }
 
+function resetTagForm() {
+    $('#tagsEdit').dialog('close');
+}
+
+function tagsAddLast(tagArray) {
+    let lastLine = `
+        <span id="tagLast">
+            <input class="text ui-widget-content ui-corner-all tags" id="tagValueLast" type="text" name="lastTag" value="">
+            </input>
+            <input class="tagButton" type="button" title="tagEdit" value="✔" onclick="tagAdd('tagArray')"></input>
+        </span>`;
+    tagArray.append(lastLine);
+}
 // Open the certificate tags dialog box
 function tagsEdit(id) {
+    let line = ({ tagValue, tagIndex }) => `
+        <span id="tag${tagIndex}">
+            <input class="text ui-widget-content ui-corner-all tags" id="tagValue${tagIndex}"type="text" name="tags" value="${tagValue}">
+            </input>
+            <input class="tagButton" type="button" title="tagEdit" value="✘" onclick="tagDelete('${tagIndex}')">
+        </span>`;
+
     let entry = $('#' + id);
     let dialog = $('#tagsEdit');
     $('#certificateId').val(id.substring(1));
-    $('#tags').val(entry.find('.certTagsValue').text());
+    let tagArray = $('#tagArray');
+    tagArray.empty();
+    let tags = entry.find('.certTagsValue').text().split(';');
+    for (let tagI in tags) {
+        let newInput = line({ tagValue: `${tags[tagI]}`, tagIndex: `${tagI.toString().padStart(3, '0')}` });
+        tagArray.append(newInput);
+    }
+    tagsAddLast(tagArray);
+    tagArray.data('highValue', tags.length.toString());
     dialog.dialog('open');
 }
 
@@ -638,8 +666,25 @@ function updateTagsDisplay(result) {
     $('#tagsEdit').dialog('close');
 }
 
-function tagsCancel() {
-    $(this).dialog('close');
+function tagDelete(tagIndex) {
+    console.log('tagDelete ' + tagIndex);
+    $(`#tag${tagIndex}`).remove();
+}
+
+function tagAdd(tagArrayId) {
+    let tagArray = $(`#${tagArrayId}`);
+    let tagLast = tagArray.find('#tagLast');
+    let highValue = parseInt(tagArray.data('highValue'));
+    let id = highValue.toString().padStart(3, '0');
+    let tagInput = tagLast.find('#tagValueLast');
+    let tagButton = tagLast.find('.tagButton');
+    tagLast.prop('id', 'tag' + id);
+    tagInput.prop('name', 'tags');
+    tagInput.prop('id', 'tagValue' + id);
+    tagButton.val('✘');
+    tagButton.attr('onclick', `tagDelete('${id}')`);
+    tagsAddLast(tagArray);
+    tagArray.data('highValue', `${(++highValue)}`);
 }
 
 function createLeafCertResponse(result) {

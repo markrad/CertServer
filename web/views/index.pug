@@ -5,12 +5,16 @@ block layout-content
   div#tagsEdit(title='Edit Tags')
     form#tagsEditForm(action="/updateCertTag", method="post", encType="application/x-www-form-urlencoded")
       fieldset 
-        label(for='tags') Tags: 
-        input(type='text' name='tags' id='tags' value='' class='text ui-widget-content ui-corner-all tags')
-        span#tagsEditButtons.tagsEditButtons
-          input#tagsCancelButton.tagButton(title='TagsCancel' type='reset' value='✘' onclick='tagsCancel()')
-          input#tagsUpdateButton.tagButton(name='TagsUpdate' type='submit' value='✔')
+        div Tags:
+        div#tagArray
+        //-   input(type='text' name='tags' id='tags' value='' class='text ui-widget-content ui-corner-all tags')
+        //- span#tagsEditButtons.tagsEditButtons
+        //-   input#tagsCancelButton.tagButton(title='TagsCancel' type='reset' value='✘' onclick='tagsCancel()')
+        //-   input#tagsUpdateButton.tagButton(name='TagsUpdate' type='submit' value='✔')
         input#certificateId(type='text' name='toTag' value='' class='hidden')
+        div#tagButtons
+          input.button3#tagReset(type="button" title="reset", onclick="resetTagForm()", value="Cancel")
+          input.button3#tagSubmit.SubmitButton(type="submit" title="submit", value="OK")
   div#newIntermediate(title='** Title **')
     form#newIntermediateForm(action="/createIntermediateCert", method="post", encType="application/x-www-form-urlencoded")
       fieldset

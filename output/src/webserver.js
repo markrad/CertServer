@@ -706,12 +706,14 @@ class WebServer {
             this._app.post('/api/updateCertTag', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 var _j;
                 try {
-                    let body = typeof request.body == 'string' ? JSON.parse(request.body) : request.body;
-                    if (body.tags.match(/[<>\(\)\{\}\/]/) !== null)
-                        throw new CertError_1.CertError(400, 'Tags cannot contain < > / { } ( )');
-                    let tags = body.tags.split(';').map((t) => t.trim()).filter((t) => t != '');
+                    let tags = typeof request.body == 'string' ? JSON.parse(request.body) : request.body;
+                    let cleanedTags = tags.tags.map((t) => t.trim()).filter((t) => t != '');
+                    for (let tag in cleanedTags) {
+                        if (tag.match(/[;<>\(\)\{\}\/]/) !== null)
+                            throw new CertError_1.CertError(400, 'Tags cannot contain ; < > / { } ( )');
+                    }
                     let result = this._resolveCertificateUpdate(request.query, (c) => {
-                        c.tags = tags;
+                        c.tags = cleanedTags;
                     });
                     this._broadcast(result);
                     return response.status(200).json({ message: `Certificate tags updated` });
