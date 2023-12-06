@@ -653,7 +653,11 @@ class WebServer {
                             let rStr = r.pairCN ? r.pairCN : '';
                             return lStr.localeCompare(rStr);
                         }).data().map((entry) => {
-                            return { name: (entry.pairCN ? entry.pairCN + '_key' : entry.name), type: CertTypes_1.CertTypes[type].toString(), id: entry.$loki };
+                            return {
+                                name: (entry.pairCN ? entry.pairCN + (entry.pairId == null ? '_orphanedkey' : '_key') : entry.name),
+                                type: CertTypes_1.CertTypes[type].toString(),
+                                id: entry.$loki
+                            };
                         });
                     }
                     response.status(200).json({ files: retVal });
