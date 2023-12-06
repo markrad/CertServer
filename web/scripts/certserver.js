@@ -626,20 +626,38 @@ function tagChooserSubmit() {
 
 // Show an informational message box
 function showMessage(msg) {
-    $.magnificPopup.open({
-        items: {
-            src: `<div class="white-popup">${msg}</div>`,
-            type: 'inline'
+    $('#messageDialogMessage').text(msg);
+    $('#messageDialog').dialog({
+        title: 'Informational',
+        resizable: false,
+        maxheight: 260,
+        modal: true,
+        classes: {
+            'ui-dialog': 'ui-state-default'
+        },
+        buttons: {
+            "Ok": function() {
+                $(this).dialog('close');
+            }
         }
     });
 }
 
 // Show an error message box
 function showError(error, message) {
-    $.magnificPopup.open({
-        items: {
-            src: `<div class="error-popup">${error}: ${message}</div>`,
-            type: 'inline'
+    $('#messageDialogMessage').text(`${error}: ${message}`);
+    $('#messageDialog').dialog({
+        title: 'Error',
+        resizable: false,
+        maxheight: 260,
+        modal: true,
+        classes: {
+            'ui-dialog': 'ui-state-error'
+        },
+        buttons: {
+            "Ok": function() {
+                $(this).dialog('close');
+            }
         }
     });
 }

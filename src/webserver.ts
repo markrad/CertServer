@@ -395,7 +395,7 @@ export class WebServer {
                 if (!rc.valid) errString.push(rc.message);
 
                 if (errString.length > 0) {
-                    return response.status(400).json({ error: errString.join('\n') })
+                    return response.status(400).json({ error: errString.join('; ') })
                 }
 
                 // Create an empty Certificate
