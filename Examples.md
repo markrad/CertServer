@@ -5,7 +5,7 @@ Examples of what certificates are needed by various Azure IoT and DPS, and how t
 ### Top-level Certificate
 Generate an overall self-signed certificate that is the ultimate parent of all other certificates. This is intended to represent the trusted root certificate used to sign the certificate you would purchase from a certificate vendor. One of these is adequate, and it should be trusted by your devices.
 ### Webserver TLS Certificate
-Sign a leaf certificate with the top-level certificate and use that certificate and its private key to add TLS to a resource. This application has the option to run in TLS mode. See the configuration settings. This certificate pair could also be used to docker registry container for example.
+Sign a leaf certificate with the top-level certificate and use that certificate and its private key to add TLS to a resource. This application has the option to run in TLS mode. See the configuration settings. This certificate pair could also be used to docker registry container for example. Note that the certificate's common name (CN) must be identical to the host name. For example, if you host a web server on a machine that is reached by a DNS name of *mywebserver.lan* then that will need to be the common name. You can also add alternative names such as *localhost* or an IP address.
 ## Azure IoT and DPS Scenarios
 All of the certificates generated for IoT and DPS scenarios are chained from a single certificate. That certificate is signed by the top-level certificate described above. For the remainder of the documentation, this certificate will be referred to as **_CertTestRoot_**.
 ### CertTestRoot
@@ -59,29 +59,53 @@ identity_pk = "file://</path/to/private_key>"               # Private key
 identity_cert = "file://</path/to/certificate_full_chain>"  # Leaf full chain
 ```
 Edge devices do not support X.509 CA authentication.
-### Other Edge Miscellany
-Edge uses certificates in two other places. One set, if not provided, will be generated. These are known as quick start certificates. Generating you own has two advantages. First it will stop the warning being generated in the `iotedge check` output, and it will enable a nested Edge scenario.
+#### Certificate Hierarchy for Above
+```
+Root
+└──	CertTestRoot (CA)
+    └── IoT Hub Root (CA)
+         ├─	Device X.509 (leaf) - device only since Edge does not support X.509 CA authentication
+         └─ Device self-signed (leaf) - device or Edge
+```
+### Nested Edge
+To set up a nested Edge one needs to generate certificates to use when signing device certificates. These certificate will be automatically generated if not provided. These are known as quick start certificates. Providing those certificates has some advantages:
+- It will stop the warning message in the `iotedge check` output.
+- Edge will not need to be restarted when the quick start certificates expire.
+- The Edge instance can be used as a parent to a nested Edge instance.
 
-To set this up you will first need to sign a new CA intermediate certificate with CertTestRoot. Take that certificate's full chain and its private key and add it to the config.toml as 
+The certificate and key can be signed with the CertTestRoot. These are then provided in Edges config.toml file:
 ```toml
 [edge_ca]
 cert = "file://</path/to/certificate_full_chain>"  # Intermediate full chain
 pk = "file://</path/to/private_key>"               # Private key
 ```
-This certificate will be used to sign a certificate with a CN that matches the hostname specified in the config. It is important that the hostname is resolvable by DNS in transparent gateway scenarios or the TLS negotiation will fail. 
-
-A downstream device that receives this certificate must trust the root of the chain which, in this example, will be the signer of CertTestRoot that was created at the very beginning. The Microsoft IoT device SDKs provide various mechanisms to accomplish that though simply adding it to the trusted root store will often work.
-
-In a nested Edge scenario, the edgeHub and edgeAgent containers will also need to trust that certificate. To do this, you need to add the root certificate to the Edge trust bundle. This file can contain multiple certificates concatenated together as required. Either create this file with the root in it or append the root to the end of an existing file. In the config.toml you specify:
+To establish a connection between a downstream nested Edge and this one, the top level certificate in the full chain from the certificate generated for the parent will need to be copied to the child and referenced in the *trust_bundle_cert* parameter. For example:
 ```toml
-trust_bundle_cert = "file//</your/trust/bundle>"
+hostname = "<machine hostname>"
+parent_hostname = "<hostname of the parent edge>"
+trust_bundle_cert = "file:/</path/to/root/CA.pem>"
 ```
-### Certificate Hierarchy for Above
+To complete a nested Edge installation, there are other actions that need to be taken but they are not certificate related.
+
+#### Certificate Hierarchy for Above
 ```
-Root
+Root (CA) - Specified in trust_bundle_cert in child
 └──	CertTestRoot (CA)
-    └── IoT Hub Root (CA)
-         ├─	Device X.509 (leaf)
-         ├─	Device self-signed (leaf)
-         └─ Intermediate certificate (CA) for Edge CA
+    └─ Intermediate certificate (CA) specified in [edge_ca] on parent with the corresponding key
 ```
+## Sample Client Device Implementations
+The sample clients can by found [here](./devicesamples/).
+
+There are only two samples. One is a device that connects to the IoT hub via DPS and the other is a device that connects directly to the IoT hub. The different scenarios are entirely driven by the launch.json file. It is recommended that you run them from Visual Studio Code.
+
+### Hub Samples
+The launch.json contains four variations with a block comment describing the required environment variables.
+
+The self-signed and CA signed X.509 authentication use identical environment variables. The difference is in the certificates themselves. 
+
+Similarly, the self-signed and CA signed X.509 authentication via an upstream Edge device use idenitcal environment variables. Again the difference is in the certificates themselves.
+
+A shared access signature version is provided for completeness. 
+
+### DPS Samples
+Only one launch is contained in the launch.json file. It uses a full chain device certificate and its associated key. A block comment is provided to describe the environment variables.
