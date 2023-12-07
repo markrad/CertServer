@@ -1,0 +1,87 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+
+    // Envrionment variables
+    // HOSTNAME             Required - hub or transparent gateway hostname
+    // DEVICE_ID            Required - device identity as specified on the hub
+    // Either
+    //  CERTIFICATE_FILE    Certificate for CA or self signed authentication
+    //  KEY_FILE            Key for above
+    // Or
+    //  SHARED_ACCESS_KEY   Key for SAS authentication
+    // CA_FILE              Optional - additional certificate to trust (typically for gateway scenarios)
+    // PROTOCOL             Optional - AMQP | AMQPWS | MQTT | MQTTWS - defaults to MQTT
+    "version": "0.2.0",
+    "configurations": [
+        {
+            // Self-signed device
+            "type": "node",
+            "request": "launch",
+            "name": "Self signed device",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}/index.js",
+            "env": {
+                "CERTFICATE_FILE": "<self-signed device certificate pem>",
+                "KEY_FILE": "<key in pem for above>",
+                "HOST_NAME": "<hub name>.azure-devices.net",
+                "DEVICE_ID": "<device id>",
+                "PROTOCOL": "MqttWs"
+            }
+        },
+        {
+            // CA signed device
+            "type": "node",
+            "request": "launch",
+            "name": "CA signed device",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}/index.js",
+            "env": {
+                "CERTFICATE_FILE": "<CA signed device certificate pem>",
+                "KEY_FILE": "<Key for above pem>",
+                "HOST_NAME": "<hub name>.azure-devices.net",
+                "DEVICE_ID": "<device id>",
+                "PROTOCOL": "amqpws"
+            }
+        },
+        {
+            // Self-signed or CA signed X.509 via Edge transparent gateway
+            "type": "node",
+            "request": "launch",
+            "name": "X509 device via parent",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}/index.js",
+            "env": {
+                "NEW_ENV": "true",
+                "CERTFICATE_FILE": "self or CA signed device certificate pem>",
+                "KEY_FILE": "<Key for above pem>",
+                "CA_FILE": "<certificate to trust from the upstream Edge>",
+                "HOST_NAME": "<hostname of upstream Edge>",
+                "DEVICE_ID": "<device id>"
+            }
+        },
+        {
+            // Symetric key (for the sake of completeness)
+            "type": "node",
+            "request": "launch",
+            "name": "Symetric key device",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}/index.js",
+            "env": {
+                "HOST_NAME": "<hub name>.azure-devices.net",
+                "SHARED_ACCESS_KEY": "<Primary or secondary key>",
+                "DEVICE_ID": "<device id>"
+            }
+        },
+    ]
+}
+

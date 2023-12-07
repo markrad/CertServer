@@ -1,0 +1,30 @@
+{
+    "name": "dpscerttest",
+    "version": "0.0.1",
+    "description": "DPS Certificate Examples",
+    "author": "Mark Radbourne",
+    "license": "MIT",
+    "dependencies": {
+      "async": "^3.2.3",
+      "es5-ext": "0.10.53",
+      "azure-iot-device": "1.18.3",
+      "azure-iot-device-amqp": "1.14.3",
+      "azure-iot-device-http": "1.14.3",
+      "azure-iot-device-mqtt": "1.16.3",
+      "azure-iot-provisioning-device": "1.9.1",
+      "azure-iot-provisioning-device-amqp": "1.9.1",
+      "azure-iot-provisioning-device-http": "1.9.1",
+      "azure-iot-provisioning-device-mqtt": "1.8.1",
+      "azure-iot-security-symmetric-key": "1.8.2",
+      "azure-iot-security-tpm": "1.9.2",
+      "azure-iot-security-x509": "1.8.2",
+      "rhea": "^1.0.15"
+    },
+    "scripts": {
+      "npmlockrefresh": "npm i --package-lock-only"
+    },
+    "engines": {
+      "node": ">= 14.0.0"
+    }
+  }
+  

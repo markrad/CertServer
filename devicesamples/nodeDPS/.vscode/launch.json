@@ -1,0 +1,35 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+
+    // Envrionment variables
+    // PROVISIONING_HOST            Required - Typically global.azure-devices-provisioning.net
+    // PROVISIONING_IDSCOPE         Required - DPS scope id
+    // PROVISIONING_REGISTRATION_ID Required - Device id
+    // CERTIFICATE_FILE             Required - Full chain of device's certificate file in pem format
+    // KEY_FILE                     Required - Device certificate's key file in pem format
+    // PROTOCOL                     Optional - AMQP | AMQPWS | MQTT | MQTTWS - defaults to MQTT
+    "version": "0.2.0",
+    "configurations": [
+        {
+            // Enrolls with DPS via an X.509 enrollment group
+            "name": "DPS X.509 Authentication",
+            "program": "${workspaceFolder}/index.js",
+            "request": "launch",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "type": "node",
+            "env": {
+                // "PROVISIONING_HOST": "g2-cert-dps.azure-devices-provisioning.net",
+                "PROVISIONING_HOST": "global.azure-devices-provisioning.net",
+                "PROVISIONING_IDSCOPE": "<idscope>",
+                "PROVISIONING_REGISTRATION_ID": "<device id>",
+                "CERTIFICATE_FILE": "<device certificate full chain pem>",
+                "KEY_FILE": "<device key pem for above>",
+                "PROTOCOL": "MQTT"
+            }
+        }
+    ]
+}
