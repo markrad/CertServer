@@ -310,11 +310,61 @@ export class WebServer {
                 return response.status(400).json({ error: 'No file selected' });
             }
             try {
-                let result: OperationResult = await this._tryAddCertificate({ pemString: request.files.certFile.data.toString() });
-                this._broadcast(result);
+                let mergeResults: (accumulator: OperationResult, next: OperationResult) => OperationResult = (accumulator: OperationResult, next: OperationResult) => {
+                    let i: string;
+                    for (i in next.added) {
+                        if (!accumulator.added.some((a) => a.type == next.added[i].type && a.id == next.added[i].id)) {
+                            accumulator.added.push(next.added[i]);
+                        }
+                        if (!accumulator.updated.some((a) => a.type == next.updated[i].type && a.id == next.updated[i].id)) {
+                            accumulator.updated.push(next.updated[i]);
+                        }
+                        if (!accumulator.deleted.some((a) => a.type == next.deleted[i].type && a.id == next.deleted[i].id)) {
+                            accumulator.deleted.push(next.deleted[i]);
+                        }
+                    }
+
+                    return accumulator;
+                }
+                let files: any = request.files.certFile;
+                if (!Array.isArray(files)) {
+                    files = [ files ];
+                }
+
+                let result: OperationResult = { name: 'multiple', added: [], updated: [], deleted: [] };
+                type message = { level: number, message: string };
+                let messages: message[] = [];
+
+                for (let i in files) {
+                    let msg = pem.decode(files[i].data)[0];
+                    logger.debug(`Received ${msg.type}`);
+                    try {
+                        let oneRes: OperationResult = null;
+                        if (msg.type.includes('CERTIFICATE')) {
+                            oneRes = await this._tryAddCertificate({ filename: files[i].name, pemString: files[i].data.toString() });
+                            messages.push({ level: 0, message: `Key ${files[i].name} uploaded` });
+                        }
+                        else if (msg.type.includes('KEY')) {
+                            oneRes = await this._tryAddKey({ filename: files[i].name, pemString: files[i].data.toString() });
+                            messages.push({ level: 0 , message: `Certificate ${files[i].name} uploaded` });
+                        }
+                        else {
+                            throw new CertError(409, `File ${files[i].name} is not a certificate or a key`);
+                        }
+                        result = mergeResults(result, oneRes);
+                    }
+                    catch (err) {
+                        messages.push({ level: 1, message: err.message });
+                    }
+                }
+
+                if (result.added.length + result.updated.length + result.deleted.length > 0) {
+                    this._broadcast(result);
+                }
+                return response.status(200).json(messages);
             }
             catch (err) {
-                logger.error(`Upload certificate failed: ${err.message}`);
+                logger.error(`Upload files failed: ${err.message}`);
                 return response.status(err.status?? 500).json({ error: err.message });
             }
         }));
@@ -959,13 +1009,12 @@ export class WebServer {
     private async _tryAddCertificate(input: { filename: string, pemString?: string } | { filename?: string, pemString: string }): Promise<OperationResult> {
         return new Promise<OperationResult>(async (resolve, reject) => {
             try {
-                if (input.filename) {
+                if (!input.pemString) {
                     logger.info(`Trying to add ${path.basename(input.filename)}`);
                     if (!await exists(input.filename)) {
                         reject(new CertError(404, `${path.basename(input.filename)} does not exist`));
                     }
                     input.pemString = await readFile(input.filename, { encoding: 'utf8' });
-        
                 }
 
                 let msg = pem.decode(input.pemString)[0];
@@ -1172,7 +1221,7 @@ export class WebServer {
     private async _tryAddKey(input: { filename: string, pemString?: string, password?: string } | { filename?: string, pemString: string, password?: string }): Promise<OperationResult> {
         return new Promise<OperationResult>(async (resolve, reject) => {
             try {
-                if (input.filename) {
+                if (!input.pemString) {
                     logger.info(`Trying to add ${path.basename(input.filename)}`);
                     if (!await exists(input.filename)) {
                         reject(new CertError(404, `${path.basename(input.filename)} does not exist`));
@@ -1191,9 +1240,8 @@ export class WebServer {
                 let encrypted: boolean = false;
                 if (msg.type == 'ENCRYPTED PRIVATE KEY') {
                     if (!input.password) {
-                        // TODO Fix lack of error message on web client
                         logger.warn(`Encrypted key requires password`); 
-                        return reject(new CertError(400, 'Password is required for key ' + input.filename?? ''));
+                        return reject(new CertError(400, 'Password is required for key ' + (input.filename?? 'no name')));
                     }
                     k = pki.decryptRsaPrivateKey(input.pemString , input.password);
                     encrypted = true;

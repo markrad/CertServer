@@ -303,11 +303,56 @@ class WebServer {
                     return response.status(400).json({ error: 'No file selected' });
                 }
                 try {
-                    let result = yield this._tryAddCertificate({ pemString: request.files.certFile.data.toString() });
-                    this._broadcast(result);
+                    let mergeResults = (accumulator, next) => {
+                        let i;
+                        for (i in next.added) {
+                            if (!accumulator.added.some((a) => a.type == next.added[i].type && a.id == next.added[i].id)) {
+                                accumulator.added.push(next.added[i]);
+                            }
+                            if (!accumulator.updated.some((a) => a.type == next.updated[i].type && a.id == next.updated[i].id)) {
+                                accumulator.updated.push(next.updated[i]);
+                            }
+                            if (!accumulator.deleted.some((a) => a.type == next.deleted[i].type && a.id == next.deleted[i].id)) {
+                                accumulator.deleted.push(next.deleted[i]);
+                            }
+                        }
+                        return accumulator;
+                    };
+                    let files = request.files.certFile;
+                    if (!Array.isArray(files)) {
+                        files = [files];
+                    }
+                    let result = { name: 'multiple', added: [], updated: [], deleted: [] };
+                    let messages = [];
+                    for (let i in files) {
+                        let msg = node_forge_1.pem.decode(files[i].data)[0];
+                        logger.debug(`Received ${msg.type}`);
+                        try {
+                            let oneRes = null;
+                            if (msg.type.includes('CERTIFICATE')) {
+                                oneRes = yield this._tryAddCertificate({ filename: files[i].name, pemString: files[i].data.toString() });
+                                messages.push({ level: 0, message: `Key ${files[i].name} uploaded` });
+                            }
+                            else if (msg.type.includes('KEY')) {
+                                oneRes = yield this._tryAddKey({ filename: files[i].name, pemString: files[i].data.toString() });
+                                messages.push({ level: 0, message: `Certificate ${files[i].name} uploaded` });
+                            }
+                            else {
+                                throw new CertError_1.CertError(409, `File ${files[i].name} is not a certificate or a key`);
+                            }
+                            result = mergeResults(result, oneRes);
+                        }
+                        catch (err) {
+                            messages.push({ level: 1, message: err.message });
+                        }
+                    }
+                    if (result.added.length + result.updated.length + result.deleted.length > 0) {
+                        this._broadcast(result);
+                    }
+                    return response.status(200).json(messages);
                 }
                 catch (err) {
-                    logger.error(`Upload certificate failed: ${err.message}`);
+                    logger.error(`Upload files failed: ${err.message}`);
                     return response.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).json({ error: err.message });
                 }
             })));
@@ -940,7 +985,7 @@ class WebServer {
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
                 var _a, _b;
                 try {
-                    if (input.filename) {
+                    if (!input.pemString) {
                         logger.info(`Trying to add ${path_1.default.basename(input.filename)}`);
                         if (!(yield (0, exists_1.exists)(input.filename))) {
                             reject(new CertError_1.CertError(404, `${path_1.default.basename(input.filename)} does not exist`));
@@ -1132,7 +1177,7 @@ class WebServer {
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
                 var _a;
                 try {
-                    if (input.filename) {
+                    if (!input.pemString) {
                         logger.info(`Trying to add ${path_1.default.basename(input.filename)}`);
                         if (!(yield (0, exists_1.exists)(input.filename))) {
                             reject(new CertError_1.CertError(404, `${path_1.default.basename(input.filename)} does not exist`));
@@ -1150,9 +1195,8 @@ class WebServer {
                     let encrypted = false;
                     if (msg.type == 'ENCRYPTED PRIVATE KEY') {
                         if (!input.password) {
-                            // TODO Fix lack of error message on web client
                             logger.warn(`Encrypted key requires password`);
-                            return reject(new CertError_1.CertError(400, (_a = 'Password is required for key ' + input.filename) !== null && _a !== void 0 ? _a : ''));
+                            return reject(new CertError_1.CertError(400, 'Password is required for key ' + ((_a = input.filename) !== null && _a !== void 0 ? _a : 'no name')));
                         }
                         k = node_forge_1.pki.decryptRsaPrivateKey(input.pemString, input.password);
                         encrypted = true;

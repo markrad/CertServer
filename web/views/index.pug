@@ -2,9 +2,11 @@ extends layout
 
 block layout-content
   script(type="text/javascript").
+  
   div#messageDialog.hidden
-    p
-      span#messageDialogMessage
+    div#messageDialogMessage
+    //- p
+    //-   span#messageDialogMessage
   div#tagsEdit(title='Edit Tags')
     form#tagsEditForm(action="/updateCertTag", method="post", encType="application/x-www-form-urlencoded")
       fieldset 
@@ -99,7 +101,7 @@ block layout-content
       .Upload
         | Upload a certificate:&nbsp;
         span.UploadInput
-          input#certUpload(type="file", name="certFile", accept=".pem,.crt", title="Upload file")
+          input#certUpload(type="file", multiple, name="certFile", accept=".pem,.crt", title="Upload file")
         div.SubmitButton
           input#fileCertReset(type="reset")
           button#uploadCertButton.SubmitButton(type="button", onClick="uploadCert()" title="submit", value="Upload") Upload

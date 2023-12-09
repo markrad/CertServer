@@ -490,7 +490,7 @@ function uploadCert(e) {
             },
             success: async (result, status) => {
                 document.getElementById('uploadCertForm').reset();
-                showMessage('File uploaded');
+                showMultiMessage(result);
             }
         });
     }
@@ -637,6 +637,34 @@ function showMessage(msg) {
         },
         buttons: {
             "Ok": function() {
+                $(this).dialog('close');
+            }
+        }
+    });
+}
+
+function showMultiMessage(messages) {
+    let msg = $('#messageDialogMessage');
+    for (let i in messages) {
+        if (messages[i].level == 0) {
+            msg.append(`<p class="msg-good-color">${messages[i].message}</p>`);
+        }
+        else {
+            msg.append(`<p class="msg-error-color">${messages[i].message}</p>`);
+        }
+    }
+    $('#messageDialog').dialog({
+        title: 'Upload Results',
+        resizable: false,
+        maxheight: 260,
+        maxWidth: 1000,
+        modal: true,
+        classes: {
+            'ui-dialog': 'ui-state-default'
+        },
+        buttons: {
+            "Ok": function() {
+                msg.empty();
                 $(this).dialog('close');
             }
         }

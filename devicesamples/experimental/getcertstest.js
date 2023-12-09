@@ -1,4 +1,4 @@
-let { getCerts, getTrust } = require('./getcerts');
+const { getCerts, getTrust } = require('./getcerts');
 
 const server = 'http://mrubu2204dt.lan:4141';
 getCerts(server, 24, 23)

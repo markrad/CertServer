@@ -296,6 +296,18 @@ button.button2Red:hover {
     border: 5px red solid;
 }
 
+.msg-error-color {
+    color: red;
+    border-bottom: 2px solid black;
+    padding-bottom: 5px;
+}
+
+.msg-good-color {
+    color: black;
+    border-bottom: 2px solid black;
+    padding-bottom: 5px;
+}
+
 .intButtons {
     padding-top: 10px;
 }
