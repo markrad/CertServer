@@ -290,6 +290,10 @@ button.button1 {
     width: 140pt;
 }
 
+span.button1Arrow {
+    float: right
+}
+
 button.button1:hover {
     background-color: rgb(64, 167, 64);
 }

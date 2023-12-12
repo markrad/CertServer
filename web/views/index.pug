@@ -92,10 +92,16 @@ block layout-content
      h1.Banner 
       | Local Certificate Manager
       span.sub #{version}
-    button(type='button' class='button1' onclick='togglePane(\'#uploadCertForm\')') Upload pem Files
+    button(type='button' class='button1' onclick='togglePane($(this), \'#uploadCertForm\')') 
+      span.button1Text Upload pem Files
+      span.button1Arrow >
     //- button(type='button' class='button1' onclick='togglePane(\'#uploadKeyForm\')') Upload Key
-    button(type='button' class='button1' onclick='togglePane(\'#generateCertForm\')') Generate New CA
-    button(type='button' class='button2 button3'  onclick='togglePane(\'#tagChooser\')') Tags Filter
+    button(type='button' class='button1' onclick='togglePane($(this), \'#generateCertForm\')')
+      span.button1Text Generate New CA
+      span.button1Arrow >
+    button(type='button' class='button2 button3'  onclick='togglePane($(this), \'#tagChooser\')')
+      span.button1Text Tags Filter
+      span.button1Arrow >
     //- form#uploadCertForm(action="/uploadCert", method="post", encType="multipart/form-data" class='slideForm') 
     form#uploadCertForm(method="post", encType="multipart/form-data" class='slideForm topSlide') 
       .Upload

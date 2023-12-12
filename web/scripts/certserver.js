@@ -571,15 +571,19 @@ function newLeafDialog(id, name) {
 }
 
 // Slide top panes in or out of view
-function togglePane(id) {
-    // FUTURE Add chevrons
+function togglePane(button, id) {
+    let arrow = button.find('.button1Arrow');
     let p = $(id);
     if (p.is(':visible')) {
+        arrow.text('>');
         p.slideUp(500);
     }
     else {
         $('.topSlide').each(function(_i, form) {
-            if (`#${form.id}` != id) $(form).slideUp(500);
+            if (`#${form.id}` != id) {
+                arrow.text('˅')
+                $(form).slideUp(500);
+            }
         });
         p.slideDown(500);
     }
