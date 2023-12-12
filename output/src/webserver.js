@@ -744,6 +744,8 @@ class WebServer {
             }));
             this._app.post('/api/uploadCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 var _f;
+                // FUTURE Allow multiple concatenated pem files
+                // FUTURE Merge uploadCert and uploadKey into uploadFile
                 if (request.headers['content-type'] != 'text/plain') {
                     return response.status(400).json({ error: 'Content-Type must be text/plain' });
                 }
