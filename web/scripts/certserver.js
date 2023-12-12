@@ -167,36 +167,36 @@ function keyDelete(id) {
 }
 
 // Upload a new key
-function uploadKey(e) {
-    var data = new FormData();
-    var files = $('#keyUpload');
-    if (files[0].files.length == 0) {
-        alert('No files chosen');
-    }
-    else {
-        for (let i = 0; i < files[0].files.length; i++) {
-            data.append('keyFile', files[0].files[i]);
-        }
+// function uploadKey(e) {
+//     var data = new FormData();
+//     var files = $('#keyUpload');
+//     if (files[0].files.length == 0) {
+//         alert('No files chosen');
+//     }
+//     else {
+//         for (let i = 0; i < files[0].files.length; i++) {
+//             data.append('keyFile', files[0].files[i]);
+//         }
 
-        let url = `/uploadKey${$('#keyPasswordValue').val() == '' ? '' : `?password=${$('#keyPasswordValue').val()}`}`;
+//         let url = `/uploadKey${$('#keyPasswordValue').val() == '' ? '' : `?password=${$('#keyPasswordValue').val()}`}`;
 
-        $.ajax({
-            url: url,
-            method: 'POST',
-            processData: false,
-            contentType: false,
-            data: data,
-            error: (xhr, _msg, err) => {
-                document.getElementById('uploadKeyForm').reset();
-                showError(err, JSON.parse(xhr.responseText).error);
-            },
-            success: async (_result, _status) => {
-                document.getElementById('uploadKeyForm').reset();
-                showMessage('Key uploaded');
-            }
-        });
-    }
-}
+//         $.ajax({
+//             url: url,
+//             method: 'POST',
+//             processData: false,
+//             contentType: false,
+//             data: data,
+//             error: (xhr, _msg, err) => {
+//                 document.getElementById('uploadKeyForm').reset();
+//                 showError(err, JSON.parse(xhr.responseText).error);
+//             },
+//             success: async (_result, _status) => {
+//                 document.getElementById('uploadKeyForm').reset();
+//                 showMessage('Key uploaded');
+//             }
+//         });
+//     }
+// }
 
 // Adds certificates to the section passed
 function buildCertList(target, files) {
