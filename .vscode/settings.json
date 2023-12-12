@@ -29,6 +29,7 @@
         "orphanedkey",
         "pathlen",
         "privatekeys",
+        "pushcert",
         "rnas",
         "rski",
         "simplesort",
