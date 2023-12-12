@@ -132,7 +132,7 @@ then
     echo -e ${LRED}Tests failed - exiting${RESET}
     exit 4
 else
-    echo ${LGREEN}Tests complete${RESET}
+    echo -e ${LGREEN}Tests complete${RESET}
 fi
 
 echo Updating
