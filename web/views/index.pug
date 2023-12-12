@@ -92,29 +92,29 @@ block layout-content
      h1.Banner 
       | Local Certificate Manager
       span.sub #{version}
-    button(type='button' class='button1' onclick='togglePane(\'#uploadCertForm\')') Upload Certificate
-    button(type='button' class='button1' onclick='togglePane(\'#uploadKeyForm\')') Upload Key
+    button(type='button' class='button1' onclick='togglePane(\'#uploadCertForm\')') Upload pem Files
+    //- button(type='button' class='button1' onclick='togglePane(\'#uploadKeyForm\')') Upload Key
     button(type='button' class='button1' onclick='togglePane(\'#generateCertForm\')') Generate New CA
     button(type='button' class='button2 button3'  onclick='togglePane(\'#tagChooser\')') Tags Filter
     //- form#uploadCertForm(action="/uploadCert", method="post", encType="multipart/form-data" class='slideForm') 
     form#uploadCertForm(method="post", encType="multipart/form-data" class='slideForm topSlide') 
       .Upload
-        | Upload a certificate:&nbsp;
+        | Upload certificates and keys:
         span.UploadInput
           input#certUpload(type="file", multiple, name="certFile", accept=".pem,.crt", title="Upload file")
         div.SubmitButton
           input#fileCertReset(type="reset")
           button#uploadCertButton.SubmitButton(type="button", onClick="uploadCert()" title="submit", value="Upload") Upload
-    form#uploadKeyForm(method="post", encType="multipart/form-data" class='slideForm topSlide')
-      .Upload
-        | Upload a key:&nbsp;
-        span.UploadInput
-          input#keyUpload(type="file", name="keyFile", accept=".pem,.crt,.key", title="Upload file")
-        div.SubmitButton
-          input#fileKeyReset(type="reset")
-          button#uploadKeyButton.SubmitButton(type="button", onClick="uploadKey()" title="submit", value="Upload") Upload
-          label#keyPasswordLabel(for='Optional Key Password') Optional Key Password:
-          input#keyPasswordValue(type='text' name='keyPasswordValue' value='' class='text ui-widget-content ui-corner-all')
+    //- form#uploadKeyForm(method="post", encType="multipart/form-data" class='slideForm topSlide')
+    //-   .Upload
+    //-     | Upload a key:&nbsp;
+    //-     span.UploadInput
+    //-       input#keyUpload(type="file", name="keyFile", accept=".pem,.crt,.key", title="Upload file")
+    //-     div.SubmitButton
+    //-       input#fileKeyReset(type="reset")
+    //-       button#uploadKeyButton.SubmitButton(type="button", onClick="uploadKey()" title="submit", value="Upload") Upload
+    //-       label#keyPasswordLabel(for='Optional Key Password') Optional Key Password:
+    //-       input#keyPasswordValue(type='text' name='keyPasswordValue' value='' class='text ui-widget-content ui-corner-all')
     form#generateCertForm(action="/createCACert" method="post" class='slideForm topSlide' encType="application/x-www-form-urlencoded") This will generate a private key and self-signed root CA pair
       .Country 
         span.SubjectTitle

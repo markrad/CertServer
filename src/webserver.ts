@@ -302,9 +302,11 @@ export class WebServer {
             request.query['id'] = request.body.toTag;
             next();
         });
+        /***
+         * Upload pem format files. These can be key, a certificate, or a file that
+         * contains keys or certificates.
+         */
         this._app.post('/uploadCert', (async (request: any, response) => {
-            // FUTURE Allow multiple files to be submitted
-            // FUTURE: Allow chain style files to be submitted
             // FUTURE: Allow der and pfx files to be submitted
             if (!request.files || Object.keys(request.files).length == 0) {
                 return response.status(400).json({ error: 'No file selected' });
@@ -336,25 +338,28 @@ export class WebServer {
                 let messages: message[] = [];
 
                 for (let i in files) {
-                    let msg = pem.decode(files[i].data)[0];
-                    logger.debug(`Received ${msg.type}`);
-                    try {
-                        let oneRes: OperationResult = null;
-                        if (msg.type.includes('CERTIFICATE')) {
-                            oneRes = await this._tryAddCertificate({ filename: files[i].name, pemString: files[i].data.toString() });
-                            messages.push({ level: 0, message: `Key ${files[i].name} uploaded` });
+                    let msg: pem.ObjectPEM[] = pem.decode(files[i].data);
+
+                    for (let j in msg) {
+                        logger.debug(`Received ${msg[j].type}`);
+                        try {
+                            let oneRes: OperationResult = null;
+                            if (msg[j].type.includes('CERTIFICATE')) {
+                                oneRes = await this._tryAddCertificate({ filename: files[i].name, pemString: pem.encode(msg[j], { maxline: 64 }) });
+                                messages.push({ level: 0, message: `Certificate ${files[i].name} uploaded` });
+                            }
+                            else if (msg[j].type.includes('KEY')) {
+                                oneRes = await this._tryAddKey({ filename: files[i].name, pemString: files[i].data.toString() });
+                                messages.push({ level: 0 , message: `Key ${files[i].name} uploaded` });
+                            }
+                            else {
+                                throw new CertError(409, `File ${files[i].name} is not a certificate or a key`);
+                            }
+                            result = mergeResults(result, oneRes);
                         }
-                        else if (msg.type.includes('KEY')) {
-                            oneRes = await this._tryAddKey({ filename: files[i].name, pemString: files[i].data.toString() });
-                            messages.push({ level: 0 , message: `Certificate ${files[i].name} uploaded` });
+                        catch (err) {
+                            messages.push({ level: 1, message: err.message });
                         }
-                        else {
-                            throw new CertError(409, `File ${files[i].name} is not a certificate or a key`);
-                        }
-                        result = mergeResults(result, oneRes);
-                    }
-                    catch (err) {
-                        messages.push({ level: 1, message: err.message });
                     }
                 }
 
@@ -386,18 +391,18 @@ export class WebServer {
                 response.status(err.status ?? 500).json({ error: err.message })
             }
         });
-        this._app.post('/uploadKey', async (request: any, response) => {
-            if (!request.files || Object.keys(request.files).length == 0) {
-                return response.status(400).json({ error: 'No file selected' });
-            }
-            try {
-                let result: OperationResult = await this._tryAddKey({ pemString: request.files.keyFile.data.toString(), password: request.query.password });
-                this._broadcast(result);
-            }
-            catch (err) {
-                return response.status(err.status ?? 500).json({ error: err.message });
-            }
-        });
+        // this._app.post('/uploadKey', async (request: any, response) => {
+        //     if (!request.files || Object.keys(request.files).length == 0) {
+        //         return response.status(400).json({ error: 'No file selected' });
+        //     }
+        //     try {
+        //         let result: OperationResult = await this._tryAddKey({ pemString: request.files.keyFile.data.toString(), password: request.query.password });
+        //         this._broadcast(result);
+        //     }
+        //     catch (err) {
+        //         return response.status(err.status ?? 500).json({ error: err.message });
+        //     }
+        // });
         this._app.delete('/deleteKey', ((request, _response, next: NextFunction) => {
             request.url = '/api/deleteKey';
             next();
