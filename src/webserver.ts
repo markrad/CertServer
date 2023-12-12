@@ -221,7 +221,9 @@ export class WebServer {
                 readable = Readable.from([
                     `function getcert(){ wget --content-disposition ${csHost({ protocol: this._certificate? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getCertificatePem?id=$@; }\n`,
                     `function getkey(){ wget --content-disposition ${csHost({ protocol: this._certificate? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getKeyPem?id=$@; }\n`,
-                    `function getchain(){ wget --content-disposition ${csHost({ protocol: this._certificate? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/chainDownload?id=$@; }\n`
+                    `function getchain(){ wget --content-disposition ${csHost({ protocol: this._certificate? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/chainDownload?id=$@; }\n`,
+                    `function pushcert(){ curl -X POST -H "Content-Type: text/plain" --data-binary @$@ ${csHost({ protocol: this._certificate? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/uploadCert; }\n`,
+                    `function pushkey(){ curl -X POST -H "Content-Type: text/plain" --data-binary @$@ ${csHost({ protocol: this._certificate? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/uploadKey; }\n`
                 ]);
             }
             else if (os == userAgentOS.WINDOWS) {
@@ -278,7 +280,21 @@ export class WebServer {
                         `$uri = "getKeyPem?id=$keyId"\n`,
                         `Get-File $uri\n`,
                     `}\n`,
-                ]);
+                    `function Push-CertPem {\n`,
+                        `param (\n`,
+                            `$certName\n`,
+                        `)\n`,
+                        `$uri = Get-URIPrefix + "/api/uploadCert"\n`,
+                        `Invoke-RestMethod -Method Post -Uri $uri -InFile $certName -ContentType 'text/plain'\n`,
+                    `}\n`,
+                    `function Push-KeyPem {\n`,
+                        `param (\n`,
+                            `$keyName\n`,
+                        `)\n`,
+                        `$uri = Get-URIPrefix + "/api/uploadKey"\n`,
+                        `Invoke-RestMethod -Method Post -Uri $uri -InFile $keyName -ContentType 'text/plain'\n`,
+                    `}\n`,
+        ]);
             }
             else {
                 return response.status(400).json({ error: `No script for OS ${userAgentOS[os]}}` });
@@ -746,7 +762,7 @@ export class WebServer {
         });
         this._app.post('/api/uploadCert', async (request: any, response) => {
             if (request.headers['content-type'] != 'text/plain') {
-                return response.status(400).json({ error: 'Content-Encoding must be text/plain' });
+                return response.status(400).json({ error: 'Content-Type must be text/plain' });
             }
             if (!(request.body as string).includes('\n')) {
                 return response.status(400).json({ error: 'Certificate must be in standard 64 byte line length format - try --data-binary with curl' });
