@@ -367,7 +367,7 @@ async function certShow(id, details, arrow) {
         let content = buildCertDetail(result);
         details.html(content);
         if (result.certType == 'root') details.find('.' + 'certBtnDownloadChain').hide();
-        if (result.keyPresent == 'no' || result.certType == 'leaf') details.find('.' + 'certOptionalButtons').hide();
+        if (result.keyId == null || result.certType == 'leaf') details.find('.' + 'certOptionalButtons').hide();
         [
             [result.subject.C, 'certInfoSubjectC'],
             [result.subject.ST, 'certInfoSubjectST'],
