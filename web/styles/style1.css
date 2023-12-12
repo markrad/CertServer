@@ -57,6 +57,10 @@ ul.CertTable {
     display: none;
 } */
 
+.SubmitButton {
+    margin-left: 5px;
+}
+
 span.UploadButton {
     margin-left: 4px;
 }
@@ -205,6 +209,70 @@ div.keyInfo {
     font-family: monospace;
     margin-left: 25px;
     margin-bottom: 10px;
+}
+
+input[type=file]::file-selector-button {
+    background-color: rgb(34, 116, 34);
+    border: none;
+    /* padding: 8px 8px; */
+    text-align: center;
+    display: inline-block;
+    font-size: 12pt;
+    margin-left: 4px;
+    /* margin: 4px 4px; */
+    /* transition-duration: 0.4s; */
+    cursor: pointer;
+    color: whitesmoke;
+    border-radius: 2px;
+    width: 80pt;
+}
+
+input[type=file]::file-selector-button:hover {
+    background-color: rgb(64, 167, 64);
+}
+
+#uploadCertButton {
+    background-color: rgb(34, 116, 34);
+    border: none;
+    /* padding: 8px 8px; */
+    text-align: center;
+    display: inline-block;
+    font-size: 12pt;
+    margin-left: 4px;
+    /* margin: 4px 4px; */
+    /* transition-duration: 0.4s; */
+    cursor: pointer;
+    color: whitesmoke;
+    border-radius: 2px;
+    width: 80pt;
+}
+
+#uploadCertButton:hover {
+    background-color: rgb(64, 167, 64);
+}
+
+#fileCertReset {
+    background-color: rgb(34, 116, 34);
+    border: none;
+    /* padding: 8px 8px; */
+    text-align: center;
+    display: inline-block;
+    font-size: 12pt;
+    margin-left: 4px;
+    /* margin: 4px 4px; */
+    /* transition-duration: 0.4s; */
+    cursor: pointer;
+    color: whitesmoke;
+    border-radius: 2px;
+    width: 80pt;
+}
+
+#fileCertReset:hover {
+    background-color: rgb(64, 167, 64);
+}
+
+#certUpload {
+    width: 50%;
 }
 
 button.button1 {
