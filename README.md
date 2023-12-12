@@ -64,6 +64,9 @@ docker run \
  -v /some/path/config.yml:/config/config.yml 
  -v /some/path/data:/path/specified/in/config
 ```
+## Code Samples
+Code samples to connect to an IoT hub or a DPS with self-signed or CA authentication are provided [here](./devicesamples/). Further documentation for these samples and setting up IoT Edge certificates can be found [here](./Examples.md).
+ 
 ## REST API
 
 A REST API is also available since your host may not be capable of running a web browser. In most cases you can use the name of the certificate or key, but, since they are not guaranteed to be unique, you can also use the id displayed next to each certificate and key.

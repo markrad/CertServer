@@ -98,12 +98,20 @@ The sample clients can by found [here](./devicesamples/).
 
 There are only two samples. One is a device that connects to the IoT hub via DPS and the other is a device that connects directly to the IoT hub. The different scenarios are entirely driven by the launch.json file. It is recommended that you run them from Visual Studio Code.
 
+### Cloning Just the Device Samples
+It is not necessary to clone the entire repository just to acquire the device samples. The git sparse repository clone allows this. Use the following commands to accomplish this:
+```bash
+git clone --filter=blob:none --sparse https://github.com/markrad/certserver.git
+git sparse-checkout add devicesamples
+```
+These commands will only checkout the certserver\devicesamples tree.
+
 ### Hub Samples
 The launch.json contains four variations with a block comment describing the required environment variables.
 
 The self-signed and CA signed X.509 authentication use identical environment variables. The difference is in the certificates themselves. 
 
-Similarly, the self-signed and CA signed X.509 authentication via an upstream Edge device use idenitcal environment variables. Again the difference is in the certificates themselves.
+Similarly, the self-signed and CA signed X.509 authentication via an upstream Edge device use identical environment variables. Again the difference is in the certificates themselves.
 
 A shared access signature version is provided for completeness. 
 
