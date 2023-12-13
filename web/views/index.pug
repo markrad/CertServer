@@ -174,23 +174,23 @@ block layout-content
         input#tagChooserValue(type='text' name='tagChooserInput' title='Tag Chooser Input' oninput='searchTags()')
         label#tagCaseLabel(for='Case Sensitivity') Ignore Case: 
         input#tagCaseLabelCBox(type='checkbox' checked onclick='searchTags()')
-    .Certs 
-      .Title
-        h3 Root Certificates
-        #rootCert.CertList
-          ul#rootList.CertTable
-    .Certs 
-      .Title 
-        h3 Intermediate Certificates 
-        .CertList
-          ul#intermediateList.CertTable 
-    .Certs 
-      .Title 
+    .certs-view
+      .view-pane
+        h3#view-title Root Certificates
+        .view-content
+          ul#rootList.view-table
+    .certs-view 
+      .view-pane 
+        h3#view-title Intermediate Certificates 
+        .view-content
+          ul#intermediateList.view-table 
+    .certs-view 
+      .view-pane
         h3 Leaf Certificates 
-        .CertList
-          ul#leafList.CertTable
-    .Keys 
-      .Title 
+        .view-content
+          ul#leafList.view-table
+    .keys-view 
+      .view-pane
         h3 Private Keys 
-        .CertList
-          ul#keyList.CertTable
+        .view-content
+          ul#keyList.view-table

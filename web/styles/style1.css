@@ -2,7 +2,7 @@ h1 {
     font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
 }
 
-div.Certs {
+div.certs-view {
     /* height: 100%; */
     border: 1px black solid;
     padding-left: 5px;
@@ -11,7 +11,7 @@ div.Certs {
     margin-bottom: 5px;
 }
 
-div.Keys {
+div.keys-view {
     border: 1px black solid;
     padding-left: 5px;
     padding-bottom: 5px;
@@ -19,11 +19,11 @@ div.Keys {
     margin-bottom: 5px;
 }
 
-div.CertList {
+div.view-content {
     border: 3px;
 }
 
-ul.CertTable {
+ul.view-table {
     list-style-type: none;
     padding-left: 5px;
 }
@@ -155,17 +155,17 @@ span.certDownloadBtn {
     cursor: pointer;
 }
 
-div.certDetails {
+div.cert-details {
     display: none;
 }
 
-div.certInfo {
+div.cert-container {
     font-family: monospace;
     margin-left: 25px;
     margin-bottom: 10px;
 }
 
-span.certPrivateKey {
+span.cert-info-type-key {
     color: red;
 }
 
@@ -182,7 +182,7 @@ span.keyArrow {
     /* padding-right: 10pt; */
 }
 
-span.keyLine {
+span.key-line {
     font-family: 'Courier New', Courier, monospace;
     cursor: pointer;
     word-wrap: break-word;
