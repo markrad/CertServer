@@ -30,6 +30,7 @@
         "pathlen",
         "privatekeys",
         "pushcert",
+        "pushkey",
         "rnas",
         "rski",
         "simplesort",
