@@ -28,7 +28,7 @@ ul.view-table {
     padding-left: 5px;
 }
 
-.slideForm {
+.slide-form {
     display: none;
     border: 1px black solid;
     padding: 5px 5px 5px 5px;
@@ -88,7 +88,7 @@ button#uploadButton {
     font-size: 12pt;
 }
 
-span.idLine {
+span.cert-line-id {
     font-family: 'Courier New', Courier, monospace;
     font-size: smaller;
     font-weight: bolder;
@@ -98,18 +98,18 @@ span.idLine {
     /* padding-left: 10%; */
 }
 
-span.idValue {
+span.cert-line-id-value {
     width: 5%;
 }
 
-span.certArrow {
+span.cert-line-arrow {
     font-family: 'Courier New', Courier, monospace;
     cursor: pointer;
     float: left;
     padding-right: 5pt;
 }
 
-span.certValue {
+span.cert-line-info {
     font-family: 'Courier New', Courier, monospace;
     cursor: pointer;
     word-wrap: break-word;
@@ -117,15 +117,15 @@ span.certValue {
     width: 95%
 }
 
-span.CertTagsOuter {
+span.cert-line-tags-container {
     float: right;
 }
 
-span.certValueKey {
+span.cert-value-key {
     background-color: lightpink;
 }
 
-span.certValueSigner {
+span.cert-value-signer {
     background-color: #66CD66;
     /* color: #98FB98;
     color: #76EE76;
@@ -134,7 +134,7 @@ span.certValueSigner {
     color: #2E8B57; */
 }
 
-span.certValueSigned {
+span.cert-value-signed {
     background-color: #7AC5CD;
 }
 
@@ -169,14 +169,14 @@ span.cert-info-type-key {
     color: red;
 }
 
-button.certTagsEdit {
+button.cert-info-tags-edit {
     font-size: 7pt;
     font-style: italic;
     font-weight: 900;
     color: orangered;
 }
 
-span.keyArrow {
+span.key-line-arrow {
     font-family:'Courier New', Courier, monospace;
     cursor: pointer;
     /* padding-right: 10pt; */
@@ -201,7 +201,7 @@ span.keyDownloadBtn {
     cursor: pointer;
 }
 
-div.keyDetails {
+div.key-details {
     display: none;
 }
 

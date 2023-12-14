@@ -1,4 +1,7 @@
-// TODO Clean up this code
+// TODO Clean up this code - WIP
+
+// BUG Tags dialog is flawed if there are no tags
+// BUG Appears that a self-signed certificate does not highlight itself it has not signed anything else
 
 const typeLookup = [
     '',
@@ -47,15 +50,15 @@ function buildKeyEntry(file) {
     let listEntryHTML = ({ id, name }) => `
         <li class="key-line" id="k${id}">
         <span onclick="keyClick('${id}')">
-            <span class="keyArrow">></span>
-            <span class="idLine">
-                <span class="idValue">${id}</span>
+            <span class="key-line-arrow">></span>
+            <span class="cert-line-id">
+                <span class="cert-line-id-value">${id}</span>
             </span>
-            <span class="certValue">
-                <span class="certName">${name}</span>
+            <span class="cert-line-info">
+                <span class="cert-line-name">${name}</span>
             </span>
         </span>
-        <div class="keyDetails">
+        <div class="key-details">
         </div>
         </li>
     `;
@@ -108,8 +111,8 @@ async function keyShow(details, arrow, id) {
 
 async function keyClick(id) {
     let line = $('.key-line#k' + id);
-    let details = line.find('.keyDetails');
-    let arrow = line.find('.keyArrow');
+    let details = line.find('.key-details');
+    let arrow = line.find('.key-line-arrow');
     if (details.is(':hidden') == false) {
         keyHide(details, arrow);
     }
@@ -139,7 +142,7 @@ async function getKeyDetails({ id }) {
 
 // Call the server to download the key
 function keyDownload(id) {
-    let filename = $(`#k${id} .certValue`).text() + '.pem';
+    let filename = $(`#k${id} .cert-line-info`).text() + '.pem';
     let fileLocation = '/api/getKeyPem?id=' + id;
     const anchor = $('<a>', { href: fileLocation, download: filename })[0];
     $('body').append(anchor);
@@ -149,7 +152,7 @@ function keyDownload(id) {
 
 // Call the server to delete a key
 function keyDelete(id) {
-    let keyName = $(`#k${id} .certValue`).text();
+    let keyName = $(`#k${id} .cert-line-info`).text();
     if (confirm(`This will delete ${keyName}. \n\nDo you wish to continue?`)) {
         $.ajax({
             url: '/deleteKey?id=' + id,
@@ -218,16 +221,16 @@ function buildCertEntry(file) {
     let listEntryHTML = ({ id, name, tags, keyId }) => `
         <li class="cert-line" id="c${id}">
         <span onclick="certClick('${id}')">
-            <span class="certArrow">˃</span>
-            <span class="idLine" data-keyid="${keyId}">
-                <span class="idValue">${id}</span>
+            <span class="cert-line-arrow">˃</span>
+            <span class="cert-line-id" data-keyid="${keyId}">
+                <span class="cert-line-id-value">${id}</span>
             </span>
-            <span class="certValue">
-                <span class="certName">${name}</span>
-                <span class="CertTagsOuter">
-                    <span class="certTagsL">[</span>
-                    <span class="cert-info-tags">${tags}</span>
-                    <span class="certTagsR">]</span>
+            <span class="cert-line-info">
+                <span class="cert-line-name">${name}</span>
+                <span class="cert-line-tags-container">
+                    <span class="cert-line-tags-l">[</span>
+                    <span class="cert-line-tags-value">${tags}</span>
+                    <span class="cert-line-tags-r">]</span>
                 </span>
             </span>
         </span>
@@ -280,40 +283,40 @@ function buildCertDetail(detail) {
             <span class="cert-info-type-label">Type:&nbsp;</span>
             <span class="cert-info-type-value">${certType}</span>
             <span class="cert-info-type-key">${withKeyPresent}</span></div>
-        <div class="certInfoSerial">Serial Number: ${serialNumber}</div>  
-        <div class="certFingerprint">FingerPrint: ${fingerprint}</div>
-        <div class="certFingerprint256">FingerPrint256: ${fingerprint256}</div>
-        <div class="certInfoSubject">Subject:&nbsp;
-            <span class="certInfoSubjectC">C=${subjectC};&nbsp;</span>
-            <span class="certInfoSubjectST">ST=${subjectST};&nbsp;</span>
-            <span class="certInfoSubjectL">L=${subjectL};&nbsp;</span>
-            <span class="certInfoSubjectO">O=${subjectO};&nbsp;</span>
-            <span class="certInfoSubjectOU">OU=${subjectOU}; </span>
-            <span class="certInfoSubjectCN">CN=${subjectCN}</span>
+        <div class="cert-info-serial">Serial Number: ${serialNumber}</div>  
+        <div class="cert-info-fingerprint">FingerPrint: ${fingerprint}</div>
+        <div class="cert-info-fingerprint256">FingerPrint256: ${fingerprint256}</div>
+        <div class="cert-info-subject">Subject:&nbsp;
+            <span class="cert-info-subject-c">C=${subjectC};&nbsp;</span>
+            <span class="cert-info-subject-st">ST=${subjectST};&nbsp;</span>
+            <span class="cert-info-subject-l">L=${subjectL};&nbsp;</span>
+            <span class="cert-info-subject-o">O=${subjectO};&nbsp;</span>
+            <span class="cert-info-subject-ou">OU=${subjectOU}; </span>
+            <span class="cert-info-subject-cn">CN=${subjectCN}</span>
         </div>
-        <div class="certInfoIssuer">&nbsp;Issuer:&nbsp;
-            <span class="certInfoIssuerC">C=${issuerC};&nbsp;</span>
-            <span class="certInfoIssuerST">ST=${issuerST};&nbsp;</span>
-            <span class="certInfoIssuerL">L=${issuerL};&nbsp;</span>
-            <span class="certInfoIssuerO">O=${issuerO};&nbsp;</span>
-            <span class="certInfoIssuerOU">OU=${issuerOU};&nbsp;</span>
-            <span class="certInfoIssuerCN">CN=${issuerCN}</span>
+        <div class="cert-info-issuer">&nbsp;Issuer:&nbsp;
+            <span class="cert-info-issuer-c">C=${issuerC};&nbsp;</span>
+            <span class="cert-info-issuer-st">ST=${issuerST};&nbsp;</span>
+            <span class="cert-info-issuer-l">L=${issuerL};&nbsp;</span>
+            <span class="cert-info-issuer-o">O=${issuerO};&nbsp;</span>
+            <span class="cert-info-issuer-ou">OU=${issuerOU};&nbsp;</span>
+            <span class="cert-info-issuer-cn">CN=${issuerCN}</span>
         </div>
-        <div class="certInfoFrom">Valid from: ${validFrom}</div>
-        <div class="certInfoTo">Valid to: ${validTo}</div>
-        <div class="certInfoSigner">
-            <span class="certInfoSignerLabel">Signed by:&nbsp;</span>
-            <span class="certInfoSignerValue">${signer}</span>
+        <div class="cert-info-valid-from">Valid from: ${validFrom}</div>
+        <div class="cert-info-valid-to">Valid to: ${validTo}</div>
+        <div class="cert-info-signer">
+            <span class="cert-info-signer-label">Signed by:&nbsp;</span>
+            <span class="cert-info-signer-value">${signer}</span>
         </div>
-        <div class="certInfoKey">
-            <span class="certInfoKeyLabel">Key Present:&nbsp;</span>
-            <span class="certInfoKeyValue">${keyPresent}</span> 
+        <div class="cert-info-key">
+            <span class="cert-info-key-label">Key Present:&nbsp;</span>
+            <span class="cert-info-key-value">${keyPresent}</span> 
         </div>
-        <div class="CertTags">
-            <span class="certTagsLabel">Tags: [</span>
-            <span class="certTagsValue">${tags}</span>
-            <span class="certTagsEnd">]</span>
-            <button class="certTagsEdit" onClick=tagsEdit('c${id}')>🖉</button>
+        <div class="cert-info-tags">
+            <span class="cert-info-tags-label">Tags: [</span>
+            <span class="cert-info-tags-value">${tags}</span>
+            <span class="cert-info-tags-end">]</span>
+            <button class="cert-info-tags-edit" onClick=tagsEdit('c${id}')>🖉</button>
         </div>
         </div>
     `;
@@ -347,9 +350,9 @@ function buildCertDetail(detail) {
 
 // Hide the certificate detail
 function certHide(details, arrow) {
-    $('.certValueKey').removeClass('certValueKey');
-    $('.certValueSigner').removeClass('certValueSigner');
-    $('.certValueSigned').removeClass('certValueSigned');
+    $('.cert-value-key').removeClass('cert-value-key');
+    $('.cert-value-signer').removeClass('cert-value-signer');
+    $('.cert-value-signed').removeClass('cert-value-signed');
     details.slideUp(400, () => {
         details.text('');
         arrow.text('>');
@@ -358,9 +361,9 @@ function certHide(details, arrow) {
 
 // Show the certificate detail
 async function certShow(id, details, arrow) {
-    $('.certValueKey').removeClass('certValueKey');
-    $('.certValueSigner').removeClass('certValueSigner');
-    $('.certValueSigned').removeClass('certValueSigned');
+    $('.cert-value-key').removeClass('cert-value-key');
+    $('.cert-value-signer').removeClass('cert-value-signer');
+    $('.cert-value-signed').removeClass('cert-value-signed');
     arrow.text('˅');
     try {
         var result = await getCertDetails({ id: id});
@@ -369,19 +372,19 @@ async function certShow(id, details, arrow) {
         if (result.certType == 'root') details.find('.' + 'certBtnDownloadChain').hide();
         if (result.keyId == null || result.certType == 'leaf') details.find('.' + 'cert-info-optional-buttons').hide();
         [
-            [result.subject.C, 'certInfoSubjectC'],
-            [result.subject.ST, 'certInfoSubjectST'],
-            [result.subject.L, 'certInfoSubjectL'],
-            [result.subject.O, 'certInfoSubjectO'],
-            [result.subject.OU, 'certInfoSubjectOU'],
-            [result.subject.CN, 'certInfoSubjectCN'],
-            [result.issuer.C, 'certInfoIssuerC'],
-            [result.issuer.ST, 'certInfoIssuerST'],
-            [result.issuer.L, 'certInfoIssuerL'],
-            [result.issuer.O, 'certInfoIssuerO'],
-            [result.issuer.OU, 'certInfoIssuerOU'],
-            [result.issuer.CN, 'certInfoIssuerCN'],
-            [result.signed, 'certInfoSigner'], 
+            [result.subject.C, 'cert-info-subject-c'],
+            [result.subject.ST, 'cert-info-subject-st'],
+            [result.subject.L, 'cert-info-subject-l'],
+            [result.subject.O, 'cert-info-subject-o'],
+            [result.subject.OU, 'cert-info-subject-ou'],
+            [result.subject.CN, 'cert-info-subject-cn'],
+            [result.issuer.C, 'cert-info-issuer-c'],
+            [result.issuer.ST, 'cert-info-issuer-st'],
+            [result.issuer.L, 'cert-info-issuer-l'],
+            [result.issuer.O, 'cert-info-issuer-o'],
+            [result.issuer.OU, 'cert-info-issuer-ou'],
+            [result.issuer.CN, 'cert-info-issuer-cn'],
+            [result.signed, 'cert-info-signer'], 
         ].forEach((entry) => {
             if (entry[0] == null) {
                 let t = details.find('.' + entry[1]);
@@ -392,18 +395,18 @@ async function certShow(id, details, arrow) {
         let now = new Date();
 
         if (new Date(result.validTo) < now) {
-            details.find('.certInfoTo').addClass('certOutOfValidity');
+            details.find('.cert-info-valid-to').addClass('certOutOfValidity');
         }
 
         if (new Date(result.validFrom) > now) {
-            details.find('.certInfoFrom').addClass('certOutOfValidity');
+            details.find('.cert-info-valid-from').addClass('certOutOfValidity');
         }
 
         details.slideDown(500);
 
-        $(`#k${result.keyId}`).find('.certValue').addClass('certValueKey');
-        $(`#c${result.signerId}`).find('.certValue').addClass('certValueSigner');
-        result.signed.forEach((s) => $(`#c${s}`).find('.certValue').addClass('certValueSigned'));
+        $(`#k${result.keyId}`).find('.cert-line-info').addClass('cert-value-key');
+        $(`#c${result.signerId}`).find('.cert-line-info').addClass('cert-value-signer');
+        result.signed.forEach((s) => $(`#c${s}`).find('.cert-line-info').addClass('cert-value-signed'));
     }
     catch ({ error, message }) {
         showError(error, message);
@@ -414,7 +417,7 @@ async function certShow(id, details, arrow) {
 async function certClick(id) {
     let line = $('.cert-line#c' + id);
     let details = line.find('.cert-details');
-    let arrow = line.find('.certArrow');
+    let arrow = line.find('.cert-line-arrow');
     if (details.is(':hidden') == false) {
         certHide(details, arrow);
     }
@@ -543,7 +546,7 @@ function tagsEdit(id) {
     $('#certificateId').val(id.substring(1));
     let tagArray = $('#tagArray');
     tagArray.empty();
-    let tags = entry.find('.certTagsValue').text().split(';');
+    let tags = entry.find('.cert-info-tags-value').text().split(';');
     for (let tagI in tags) {
         let newInput = line({ tagValue: `${tags[tagI]}`, tagIndex: `${tagI.toString().padStart(3, '0')}` });
         tagArray.append(newInput);
@@ -579,7 +582,7 @@ function togglePane(button, id) {
         p.slideUp(500);
     }
     else {
-        $('.topSlide').each(function(_i, form) {
+        $('.top-slide').each(function(_i, form) {
             if (`#${form.id}` != id) {
                 arrow.text('˅')
                 $(form).slideUp(500);
@@ -595,16 +598,16 @@ function searchTags() {
     let keyIds = [];
     let r = new RegExp(filter, $('#tagCaseLabelCBox').is(':checked')? 'i' : '');
     $('.cert-line').each((i, line) => {
-        let tags = $(line).find('.cert-info-tags');
+        let tags = $(line).find('.cert-line-tags-value');
         if (filter.length > 0 && r.exec(tags.text()) == null) {
             $(line).hide();
             let details = $(line).find('.cert-details');
-            let arrow = $(line).find('.certArrow');
+            let arrow = $(line).find('.cert-line-arrow');
             certHide(details, arrow);
         }
         else {
             $(line).show();
-            let keyId = $(line).find('.idLine').data('keyid');
+            let keyId = $(line).find('.cert-line-id').data('keyid');
             if (keyId != null) {
                 keyIds.push(keyId);
             }
@@ -616,8 +619,8 @@ function searchTags() {
         }
         else {
             $(line).hide();
-            let details = $(line).find('.keyDetails');
-            let arrow = $(line).find('keyArrow');
+            let details = $(line).find('.key-details');
+            let arrow = $(line).find('key-line-arrow');
             keyHide(details, arrow);
         }
     });
@@ -806,7 +809,7 @@ function processUpdates(changePacket) {
         }
 
         $(`#${typeLookup[change.type]}List li`).each(function() {
-            let span = $(this).find('span.certName');
+            let span = $(this).find('span.cert-line-name');
             certs.push({ parent: $(this), span: span.text() });
         });
         if (certs.length == 0) {
@@ -827,7 +830,7 @@ function processUpdates(changePacket) {
 
     changeJSON.updated.forEach(async (change) => {
         let idName = change.type == 4? '#k' : '#c';
-        let name = $(`${idName}${change.id} .certValue`);
+        let name = $(`${idName}${change.id} .cert-line-info`);
         if (change.type == 4) {
             let keyDetails = await getKeyDetails({ id: change.id });
             if (keyDetails.name != name.text()) {
@@ -837,7 +840,7 @@ function processUpdates(changePacket) {
             }
 
             let details = null;
-            if ((details =  $(`#id_${change.type}_${change.id} .keyDetails`))) {
+            if ((details = $(`#id_${change.type}_${change.id} .key-details`))) {
                 $(`${idName}${change.id} .keyNameValue`).text(keyDetails.name);
                 $(`${idName}${change.id} .keyPairValue`).text(keyDetails.certPair);
             }
@@ -847,11 +850,11 @@ function processUpdates(changePacket) {
             if (info.length > 0) {
                 try {
                     let result = await getCertDetails({ id: change.id });
-                    $(`${idName}${change.id} .cert-info-tags`).text(`${result.tags.join(';')}`);
+                    $(`${idName}${change.id} .cert-line-tags-value`).text(`${result.tags.join(';')}`);
                     $(`${idName}${change.id} .cert-info-type-key`).text(result.keyPresent == 'yes'? ' with private key' : '');
-                    $(`${idName}${change.id} .certInfoSignerValue`).text(result.signer);
-                    $(`${idName}${change.id} .certInfoKeyValue`).text(result.keyPresent);
-                    $(`${idName}${change.id} .certTagsValue`).text(result.tags.join(';'));
+                    $(`${idName}${change.id} .cert-info-signer-value`).text(result.signer);
+                    $(`${idName}${change.id} .cert-info-key-value`).text(result.keyPresent);
+                    $(`${idName}${change.id} .cert-info-tags-value`).text(result.tags.join(';'));
                     if (result.keyPresent == 'no') $(`${idName}${change.id} .cert-info-optional-buttons`).hide();
                     else $(`${idName}${change.id} .cert-info-optional-buttons`).show();
                 }

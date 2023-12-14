@@ -5,17 +5,11 @@ block layout-content
   
   div#messageDialog.hidden
     div#messageDialogMessage
-    //- p
-    //-   span#messageDialogMessage
   div#tagsEdit(title='Edit Tags')
     form#tagsEditForm(action="/updateCertTag", method="post", encType="application/x-www-form-urlencoded")
       fieldset 
         div Tags:
         div#tagArray
-        //-   input(type='text' name='tags' id='tags' value='' class='text ui-widget-content ui-corner-all tags')
-        //- span#tagsEditButtons.tagsEditButtons
-        //-   input#tagsCancelButton.tagButton(title='TagsCancel' type='reset' value='✘' onclick='tagsCancel()')
-        //-   input#tagsUpdateButton.tagButton(name='TagsUpdate' type='submit' value='✔')
         input#certificateId(type='text' name='toTag' value='' class='hidden')
         div#tagButtons
           input.button3#tagReset(type="button" title="reset", onclick="resetTagForm()", value="Cancel")
@@ -84,7 +78,6 @@ block layout-content
         input#LeafValidTo(type='text' name='validTo')
         input#leafSigner(type='text' name='signer' value='' class='hidden')
         div.intButtons
-          //- input.button2#generateLeafReset(type="reset", value="Reset" title="Reset")
           input.button2#generateLeafReset(type="button", value="Reset" title="Reset" onClick="resetLeafForm()")
           input.button2#generateLeafButton.SubmitButton(type="submit" title="submit", value="Generate")
   div.View
@@ -95,15 +88,13 @@ block layout-content
     button(type='button' class='button1' onclick='togglePane($(this), \'#uploadCertForm\')') 
       span.button1Text Upload pem Files
       span.button1Arrow >
-    //- button(type='button' class='button1' onclick='togglePane(\'#uploadKeyForm\')') Upload Key
     button(type='button' class='button1' onclick='togglePane($(this), \'#generateCertForm\')')
       span.button1Text Generate New CA
       span.button1Arrow >
     button(type='button' class='button2 button3'  onclick='togglePane($(this), \'#tagChooser\')')
       span.button1Text Tags Filter
       span.button1Arrow >
-    //- form#uploadCertForm(action="/uploadCert", method="post", encType="multipart/form-data" class='slideForm') 
-    form#uploadCertForm(method="post", encType="multipart/form-data" class='slideForm topSlide') 
+    form#uploadCertForm(method="post", encType="multipart/form-data" class='slide-form top-slide') 
       .Upload
         | Upload certificates and keys:
         span.UploadInput
@@ -111,17 +102,7 @@ block layout-content
         div.SubmitButton
           input#fileCertReset(type="reset")
           button#uploadCertButton.SubmitButton(type="button", onClick="uploadCert()" title="submit", value="Upload") Upload
-    //- form#uploadKeyForm(method="post", encType="multipart/form-data" class='slideForm topSlide')
-    //-   .Upload
-    //-     | Upload a key:&nbsp;
-    //-     span.UploadInput
-    //-       input#keyUpload(type="file", name="keyFile", accept=".pem,.crt,.key", title="Upload file")
-    //-     div.SubmitButton
-    //-       input#fileKeyReset(type="reset")
-    //-       button#uploadKeyButton.SubmitButton(type="button", onClick="uploadKey()" title="submit", value="Upload") Upload
-    //-       label#keyPasswordLabel(for='Optional Key Password') Optional Key Password:
-    //-       input#keyPasswordValue(type='text' name='keyPasswordValue' value='' class='text ui-widget-content ui-corner-all')
-    form#generateCertForm(action="/createCACert" method="post" class='slideForm topSlide' encType="application/x-www-form-urlencoded") This will generate a private key and self-signed root CA pair
+    form#generateCertForm(action="/createCACert" method="post" class='slide-form top-slide' encType="application/x-www-form-urlencoded") This will generate a private key and self-signed root CA pair
       .Country 
         span.SubjectTitle
           | Country:
@@ -165,11 +146,7 @@ block layout-content
       div.SubmitButton
         input.button2#generateCAReset(type="reset", value="Reset" title="Reset")
         input.button2#generateCAButton.SubmitButton(type="submit" title="submit", value="Generate")
-    //- span.tagChooserValue 
-      input#tagChooserValue(type='text' name='tagChooserInput' title='Tag Chooser Input' oninput='searchTags()')
-      label#tagCaseLabel(for='Case Sensitivity') Ignore Case: 
-      input#tagCaseLabelCBox(type='checkbox' checked onclick='searchTags()')
-    form#tagChooser(class='slideForm topSlide' onsubmit='tagChooserSubmit()')
+    form#tagChooser(class='slide-form top-slide' onsubmit='tagChooserSubmit()')
       span.tagChooserValue 
         input#tagChooserValue(type='text' name='tagChooserInput' title='Tag Chooser Input' oninput='searchTags()')
         label#tagCaseLabel(for='Case Sensitivity') Ignore Case: 
