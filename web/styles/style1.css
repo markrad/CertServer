@@ -37,7 +37,7 @@ ul.view-table {
     font-family: Verdana, Geneva, Tahoma, sans-serif;
 }
 
-.SubjectTitle {
+.subject-title {
     width: 140px;
     text-align: left;
     /* padding-right: 2em; */
@@ -46,7 +46,7 @@ ul.view-table {
     display: block;
 }
 
-.SubjectValue {
+.subject-value {
     /* display: block; */
     width: 600px;
     /* float: right; */
@@ -57,15 +57,15 @@ ul.view-table {
     display: none;
 } */
 
-.SubmitButton {
+.form-submit-button {
     margin-left: 5px;
 }
 
-span.UploadButton {
+/* span.UploadButton {
     margin-left: 4px;
-}
+} */
 
-div.SubmitButton {
+div.form-buttons {
     padding-top: 4px;
     padding-bottom: 4px;
 }
@@ -76,7 +76,7 @@ button#uploadButton {
     float: left;
 }
 
-.tagButton {
+.tag-form-button {
     margin-left: 10px;
 }
 
@@ -84,9 +84,9 @@ button#uploadButton {
     width: calc(100% - 50px);
 }
 
-.twelvePoint {
+/* .twelvePoint {
     font-size: 12pt;
-}
+} */
 
 span.cert-line-id {
     font-family: 'Courier New', Courier, monospace;
@@ -138,22 +138,22 @@ span.cert-value-signed {
     background-color: #7AC5CD;
 }
 
-.certOutOfValidity {
+.cert-out-of-validity {
     color: red;
 }
 
-span.certButtons {
+/* span.certButtons {
     text-align: right;
     display: block;
-}
+} */
 
-span.certDeleteBtn {
+/* span.certDeleteBtn {
     cursor: pointer;
-}
+} */
 
-span.certDownloadBtn {
+/* span.certDownloadBtn {
     cursor: pointer;
-}
+} */
 
 div.cert-details {
     display: none;
@@ -187,25 +187,25 @@ span.key-line {
     cursor: pointer;
     word-wrap: break-word;
 }
-
+/* 
 span.keyButtons {
     text-align: right;
     display: block;
-}
+} */
 
-span.keyDeleteBtn {
+/* span.keyDeleteBtn {
     cursor: pointer;
 }
 
 span.keyDownloadBtn {
     cursor: pointer;
-}
+} */
 
 div.key-details {
     display: none;
 }
 
-div.keyInfo {
+div.key-container {
     font-family: monospace;
     margin-left: 25px;
     margin-bottom: 10px;
@@ -290,7 +290,7 @@ button.button1 {
     width: 140pt;
 }
 
-span.button1Arrow {
+span.button1-arrow {
     float: right
 }
 
@@ -315,12 +315,7 @@ button.button1:hover {
     text-decoration: none;
 }
 
-.button3 {
-    float: right;
-    margin: 8px 8px;
-}
-
-button.button2Red {
+button.button2-red {
     background-color: rgb(160, 13, 13);
 }
 
@@ -328,8 +323,13 @@ button.button2Red {
     background-color: rgb(64, 167, 64);
 }
 
-button.button2Red:hover {
+button.button2-red:hover {
     background-color: red;
+}
+
+.button3 {
+    float: right;
+    margin: 8px 8px;
 }
 
 #tagChooserValue {
@@ -341,7 +341,7 @@ button.button2Red:hover {
     font-size: small;
 }
 
-.modalLabel {
+.modal-label {
     color: green;
     width: 100%;
     display: block;
@@ -380,7 +380,7 @@ button.button2Red:hover {
     padding-bottom: 5px;
 }
 
-.intButtons {
+.new-form-buttons {
     padding-top: 10px;
 }
 
@@ -393,28 +393,28 @@ button.button2Red:hover {
     margin-left: 8pt;
 }
 
-.SANValue {
+.san-value {
     margin-left: 8pt;
     width: 120pt;
 }
 
-.SANEnter {
+.san-enter {
     float: right;
     cursor: pointer;
 }
 
-.SANList {
+.san-list {
     border-width: 0px;
     outline: none;
     margin-left: 8pt;
 }
 
-.SANList:focus {
+.san-list:focus {
     border-width: 0px;
     outline: none;
 }
 
-#keyPasswordLabel {
+/* #keyPasswordLabel {
     padding-left: 6pt;
     padding-right: 3pt;
-}
+} */

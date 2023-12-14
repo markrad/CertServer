@@ -67,22 +67,22 @@ function buildKeyEntry(file) {
 
 function buildKeyDetail(detail) {
     const detailHTML = ({ id, name, certPair, encrypted }) => `
-        <div class="keyInfo">
+        <div class="key-container">
         <div class="cert-info-buttons"> 
             <button type="button" class="button2 keyBtnDownload" onClick="keyDownload('${id}')">Download</button>
-            <button type="button" class="button2 button2Red keyBtnDelete" onClick="keyDelete('${id}')">Delete</button>
+            <button type="button" class="button2 button2-red keyBtnDelete" onClick="keyDelete('${id}')">Delete</button>
         </div>
-        <div class="keyName">
-            <span class="keyNameLabel">Name:&nbsp;</span>
-            <span class="keyNameValue">${name}</span>
+        <div class="key-info-type">
+            <span class="key-info-name-label">Name:&nbsp;</span>
+            <span class="key-info-name-value">${name}</span>
         </div>
-        <div class="keyPair">
-            <span class="keyPairLabel">Pair:&nbsp;</span>
-            <span class="keyPairValue">${certPair}</span>
+        <div class="key-info-pair">
+            <span class="key-info-pair-label">Pair:&nbsp;</span>
+            <span class="key-info-pair-value">${certPair}</span>
         </div>
-        <div class="keyEncrypted">
-            <span class="keyEncryptedLabel">Encrypted:&nbsp;</span>
-            <span class="keyEncryptedValue">${encrypted}</span>
+        <div class="key-info-encrypted">
+            <span class="key-info-encrypted-label">Encrypted:&nbsp;</span>
+            <span class="key-info-encrypted-value">${encrypted}</span>
         </div>
     `;
     return detailHTML({ id: detail.id, name: detail.name, certPair: detail.certPair, encrypted: result.encrypted? 'yes' : 'no' });
@@ -273,7 +273,7 @@ function buildCertDetail(detail) {
         <div class="cert-info-buttons"> 
             <a href="/api/getCertificatePem?id=${id}" class="button2 certBtnDownload">Download</a>
             <a href="/api/chainDownload?id=${id}" class="button2 certBtnDownloadChain">Download Chain</a>
-            <button type="button" class="button2 button2Red certBtnDelete" onClick="certDelete('${name}', '${id}')">Delete</button>
+            <button type="button" class="button2 button2-red certBtnDelete" onClick="certDelete('${name}', '${id}')">Delete</button>
             <span class="cert-info-optional-buttons">
             <button type="button" class="button2" onClick="newIntermediateDialog('${id}', '${name}')">New Intermediate</button>
             <button type="button" class="button2" onClick="newLeafDialog('${id}', '${name}')">New Leaf</button>
@@ -283,23 +283,23 @@ function buildCertDetail(detail) {
             <span class="cert-info-type-label">Type:&nbsp;</span>
             <span class="cert-info-type-value">${certType}</span>
             <span class="cert-info-type-key">${withKeyPresent}</span></div>
-        <div class="cert-info-serial">Serial Number: ${serialNumber}</div>  
-        <div class="cert-info-fingerprint">FingerPrint: ${fingerprint}</div>
-        <div class="cert-info-fingerprint256">FingerPrint256: ${fingerprint256}</div>
-        <div class="cert-info-subject">Subject:&nbsp;
-            <span class="cert-info-subject-c">C=${subjectC};&nbsp;</span>
-            <span class="cert-info-subject-st">ST=${subjectST};&nbsp;</span>
-            <span class="cert-info-subject-l">L=${subjectL};&nbsp;</span>
-            <span class="cert-info-subject-o">O=${subjectO};&nbsp;</span>
-            <span class="cert-info-subject-ou">OU=${subjectOU}; </span>
+            <div class="cert-info-serial">Serial Number: ${serialNumber}</div>  
+            <div class="cert-info-fingerprint">FingerPrint: ${fingerprint}</div>
+            <div class="cert-info-fingerprint256">FingerPrint256: ${fingerprint256}</div>
+            <div class="cert-info-subject">Subject:
+            <span class="cert-info-subject-c">C=${subjectC};</span>
+            <span class="cert-info-subject-st">ST=${subjectST};</span>
+            <span class="cert-info-subject-l">L=${subjectL};</span>
+            <span class="cert-info-subject-o">O=${subjectO};</span>
+            <span class="cert-info-subject-ou">OU=${subjectOU};</span>
             <span class="cert-info-subject-cn">CN=${subjectCN}</span>
         </div>
-        <div class="cert-info-issuer">&nbsp;Issuer:&nbsp;
-            <span class="cert-info-issuer-c">C=${issuerC};&nbsp;</span>
-            <span class="cert-info-issuer-st">ST=${issuerST};&nbsp;</span>
-            <span class="cert-info-issuer-l">L=${issuerL};&nbsp;</span>
-            <span class="cert-info-issuer-o">O=${issuerO};&nbsp;</span>
-            <span class="cert-info-issuer-ou">OU=${issuerOU};&nbsp;</span>
+        <div class="cert-info-issuer">&nbsp;Issuer:
+            <span class="cert-info-issuer-c">C=${issuerC};</span>
+            <span class="cert-info-issuer-st">ST=${issuerST};</span>
+            <span class="cert-info-issuer-l">L=${issuerL};</span>
+            <span class="cert-info-issuer-o">O=${issuerO};</span>
+            <span class="cert-info-issuer-ou">OU=${issuerOU};</span>
             <span class="cert-info-issuer-cn">CN=${issuerCN}</span>
         </div>
         <div class="cert-info-valid-from">Valid from: ${validFrom}</div>
@@ -395,11 +395,11 @@ async function certShow(id, details, arrow) {
         let now = new Date();
 
         if (new Date(result.validTo) < now) {
-            details.find('.cert-info-valid-to').addClass('certOutOfValidity');
+            details.find('.cert-info-valid-to').addClass('cert-out-of-validity');
         }
 
         if (new Date(result.validFrom) > now) {
-            details.find('.cert-info-valid-from').addClass('certOutOfValidity');
+            details.find('.cert-info-valid-from').addClass('cert-out-of-validity');
         }
 
         details.slideDown(500);
@@ -528,7 +528,7 @@ function tagsAddLast(tagArray) {
         <span id="tagLast">
             <input class="text ui-widget-content ui-corner-all tags" id="tagValueLast" type="text" name="lastTag" value="">
             </input>
-            <input class="tagButton" type="button" title="tagEdit" value="✔" onclick="tagAdd('tagArray')"></input>
+            <input class="tag-form-button" type="button" title="tagEdit" value="✔" onclick="tagAdd('tagArray')"></input>
         </span>`;
     tagArray.append(lastLine);
 }
@@ -538,7 +538,7 @@ function tagsEdit(id) {
         <span id="tag${tagIndex}">
             <input class="text ui-widget-content ui-corner-all tags" id="tagValue${tagIndex}"type="text" name="tags" value="${tagValue}">
             </input>
-            <input class="tagButton" type="button" title="tagEdit" value="✘" onclick="tagDelete('${tagIndex}')">
+            <input class="tag-form-button" type="button" title="tagEdit" value="✘" onclick="tagDelete('${tagIndex}')">
         </span>`;
 
     let entry = $('#' + id);
@@ -575,7 +575,7 @@ function newLeafDialog(id, name) {
 
 // Slide top panes in or out of view
 function togglePane(button, id) {
-    let arrow = button.find('.button1Arrow');
+    let arrow = button.find('.button1-arrow');
     let p = $(id);
     if (p.is(':visible')) {
         arrow.text('>');
@@ -730,7 +730,7 @@ function tagAdd(tagArrayId) {
     let highValue = parseInt(tagArray.data('highValue'));
     let id = highValue.toString().padStart(3, '0');
     let tagInput = tagLast.find('#tagValueLast');
-    let tagButton = tagLast.find('.tagButton');
+    let tagButton = tagLast.find('.tag-form-button');
     tagLast.prop('id', 'tag' + id);
     tagInput.prop('name', 'tags');
     tagInput.prop('id', 'tagValue' + id);
@@ -764,12 +764,12 @@ function AddLeafSAN() {
 }
 
 function AddSAN(list, input) {
-    let type = input.find('.SANType');
-    let value = input.find('.SANValue');
+    let type = input.find('.san-type');
+    let value = input.find('.san-value');
     let spanId = 'SAN' + list.children().length;
     let newSpan = $(`<div id=${spanId}></div>`);
     let newButton = $(`<input type='button' value='✘' onClick="removeSAN('${spanId}')"></input>`);
-    let newEntry = $(`<input type='text' name='SANArray' value='${type.val()}: ${value.val()}' class='SANList' readonly></input>`);
+    let newEntry = $(`<input type='text' name='SANArray' value='${type.val()}: ${value.val()}' class='san-list' readonly></input>`);
     newSpan.append(newButton);
     newSpan.append(newEntry);
     list.append(newSpan);
@@ -841,8 +841,8 @@ function processUpdates(changePacket) {
 
             let details = null;
             if ((details = $(`#id_${change.type}_${change.id} .key-details`))) {
-                $(`${idName}${change.id} .keyNameValue`).text(keyDetails.name);
-                $(`${idName}${change.id} .keyPairValue`).text(keyDetails.certPair);
+                $(`${idName}${change.id} .key-info-name-value`).text(keyDetails.name);
+                $(`${idName}${change.id} .key-info-pair-value`).text(keyDetails.certPair);
             }
         }
         else {
