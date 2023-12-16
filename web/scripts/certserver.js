@@ -547,9 +547,11 @@ function tagsEdit(id) {
     let tagArray = $('#tagArray');
     tagArray.empty();
     let tags = entry.find('.cert-info-tags-value').text().split(';');
-    for (let tagI in tags) {
-        let newInput = line({ tagValue: `${tags[tagI]}`, tagIndex: `${tagI.toString().padStart(3, '0')}` });
-        tagArray.append(newInput);
+    if (tags[0] != '') {
+        for (let tagI in tags) {
+            let newInput = line({ tagValue: `${tags[tagI]}`, tagIndex: `${tagI.toString().padStart(3, '0')}` });
+            tagArray.append(newInput);
+        }
     }
     tagsAddLast(tagArray);
     tagArray.data('highValue', tags.length.toString());
@@ -644,6 +646,7 @@ function showMessage(msg) {
         },
         buttons: {
             "Ok": function() {
+                $('#messageDialogMessage').text('');
                 $(this).dialog('close');
             }
         }
@@ -851,11 +854,11 @@ function processUpdates(changePacket) {
                 try {
                     let result = await getCertDetails({ id: change.id });
                     $(`${idName}${change.id} .cert-line-tags-value`).text(`${result.tags.join(';')}`);
-                    $(`${idName}${change.id} .cert-info-type-key`).text(result.keyPresent == 'yes'? ' with private key' : '');
+                    $(`${idName}${change.id} .cert-info-type-key`).text(result.keyId != null? ' with private key' : '');
                     $(`${idName}${change.id} .cert-info-signer-value`).text(result.signer);
-                    $(`${idName}${change.id} .cert-info-key-value`).text(result.keyPresent);
+                    $(`${idName}${change.id} .cert-info-key-value`).text(result.keyId != null? 'yes' : '');
                     $(`${idName}${change.id} .cert-info-tags-value`).text(result.tags.join(';'));
-                    if (result.keyPresent == 'no') $(`${idName}${change.id} .cert-info-optional-buttons`).hide();
+                    if (result.keyId == null) $(`${idName}${change.id} .cert-info-optional-buttons`).hide();
                     else $(`${idName}${change.id} .cert-info-optional-buttons`).show();
                 }
                 catch({ error, message }) {
