@@ -856,7 +856,7 @@ function processUpdates(changePacket) {
                     $(`${idName}${change.id} .cert-line-tags-value`).text(`${result.tags.join(';')}`);
                     $(`${idName}${change.id} .cert-info-type-key`).text(result.keyId != null? ' with private key' : '');
                     $(`${idName}${change.id} .cert-info-signer-value`).text(result.signer);
-                    $(`${idName}${change.id} .cert-info-key-value`).text(result.keyId != null? 'yes' : '');
+                    $(`${idName}${change.id} .cert-info-key-value`).text(result.keyId != null? 'yes' : 'no');
                     $(`${idName}${change.id} .cert-info-tags-value`).text(result.tags.join(';'));
                     if (result.keyId == null) $(`${idName}${change.id} .cert-info-optional-buttons`).hide();
                     else $(`${idName}${change.id} .cert-info-optional-buttons`).show();
