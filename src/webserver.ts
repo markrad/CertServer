@@ -1103,7 +1103,7 @@ export class WebServer {
                     serialNumber: c.serialNumber, 
                     publicKey: c.publicKey, 
                     privateKey: null, 
-                    signedById: signedById == -1? this._certificates.maxId + 1 : signedById,
+                    signedById: signedById,
                     issuer: WebServer._getSubject(c.issuer),
                     subject: WebServer._getSubject(c.subject),
                     notBefore: c.validity.notBefore,
@@ -1118,11 +1118,13 @@ export class WebServer {
                 result.added.push({ type: type, id: newRecord.$loki });
 
                 // If the certificate is self-signed update the id in the record
-                // if (signedById == -1) {
-                //     this._certificates.chain().find({ $loki: newRecord.$loki }).update((r) => {
-                //         r.signedById = r.$loki;
-                //     });
-                // }
+                if (signedById == -1) {
+                    let c = this._certificates.findOne({ $loki: newRecord.$loki });
+                    if (c) {
+                        c.signedById = newRecord.$loki;
+                        this._certificates.update(c);
+                    }
+                }
                 
                 // Update any certificates signed by this one
                 if (type != CertTypes.leaf) {
@@ -1242,7 +1244,9 @@ export class WebServer {
     }
 
     /**
-     * Tries to add the key specified by the pem file to the database and file store.
+     * Tries to add the key specified by the pem file to the database and file store. 
+     * If a certificate pair is found then the certificate row will be updated to show 
+     * that the key pair is also in the system. 
      * 
      * @param filename - The path to the file containing the key's pem
      * @param password - Optional password for encrypted keys
@@ -1342,6 +1346,12 @@ export class WebServer {
         });
     }
 
+    /**
+     * Returns enough information about a key to build the summary on the client browser.
+     * 
+     * @param r The key row from the database
+     * @returns A summary of the database row
+     */
     private _getKeyBrief(r: PrivateKeyRow & LokiObj): KeyBrief {
         return { 
             id: r.$loki,
@@ -1351,6 +1361,13 @@ export class WebServer {
         }
     }
 
+    /**
+     * Deletes a key's pem file and removes it from the database. If this key has a certificate pair that the certificate will be
+     * updated to show that it no longer has its key pair in the system.
+     * 
+     * @param k Key to delete
+     * @returns Summary of modifications to the database
+     */
     private _tryDeleteKey(k: PrivateKeyRow & LokiObj): Promise<OperationResult> {
         return new Promise<OperationResult>(async (resolve, reject) => {
             try {
@@ -1387,6 +1404,13 @@ export class WebServer {
         });
     }
 
+    /**
+     * Takes the certificate's pem string and concatenates the parent certificate's pem string 
+     * until it reaches the self signed certificate at the top of the chain 
+     * 
+     * @param c Certificate at the bottom of the certificate chain
+     * @returns Certificate chain
+     */
     private async _getChain(c: CertificateRow & LokiObj): Promise<string> {
         return new Promise(async (resolve, reject) => {
             try {
@@ -1409,10 +1433,22 @@ export class WebServer {
         });
     }
 
+    /**
+     * Takes a filename of a certificate and returns the fully qualified name
+     * 
+     * @param filename The filename of the certificate
+     * @returns The fully qualified name of that certificate
+     */
     private _getCertificatesDir(filename: string): string {
         return path.join(this._certificatesPath, filename);
     }
 
+    /**
+     * Takes a filename of a key and returns the fully qualified name
+     * 
+     * @param filename The filename of the key 
+     * @returns The fully qualifed name
+     */
     private _getKeysDir(filename: string): string {
         return path.join(this._privatekeysPath, filename);
     }
@@ -1443,7 +1479,7 @@ export class WebServer {
                 }
             }
     
-            if (i < caList.length) {
+            if (i == caList.length) {
                 resolve(null);
             }
         });
