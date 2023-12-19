@@ -11,6 +11,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.exists = void 0;
 const promises_1 = require("fs/promises");
+/**
+ * Async version of the fs exists function that is not provided by the standard node package
+ *
+ * @param filename The name of the file to check for existence
+ * @returns True if it exists otherwise false
+ */
 function exists(filename) {
     return __awaiter(this, void 0, void 0, function* () {
         return new Promise((resolve, _reject) => __awaiter(this, void 0, void 0, function* () {

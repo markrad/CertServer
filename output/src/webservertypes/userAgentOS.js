@@ -1,6 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.userAgentOS = void 0;
+/**
+ * Possible OS versions derived from user agent string
+ */
 var userAgentOS;
 (function (userAgentOS) {
     userAgentOS[userAgentOS["UNKNOWN"] = 0] = "UNKNOWN";

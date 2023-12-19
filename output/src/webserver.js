@@ -65,7 +65,7 @@ const CertError_1 = require("./webservertypes/CertError");
 const logger = log4js.getLogger();
 logger.level = "debug";
 /**
- * @classdesc Web server to help maintain test certificates and keys
+ * @classdesc Web server to help maintain test certificates and keys in the file system and a database.
  */
 class WebServer {
     static createWebServer(config) {
@@ -117,7 +117,7 @@ class WebServer {
         this._app.set('view engine', 'pug');
     }
     /**
-     * Starts the webserver
+     * Starts the webserver and defines the express routes.
      *
      * @returns Promise\<void>
      */
@@ -907,7 +907,8 @@ class WebServer {
         });
     }
     /**
-     * Initializes the database from the file system and cleans up the file system
+     * Initializes the database from the file system and cleans up the file system.
+     *
      * @private
      * @returns Promise\<void>
      */
@@ -1009,6 +1010,14 @@ class WebServer {
             }));
         });
     }
+    /**
+     * Tries to add a new certificate to the system. During that process, it will also check to see if there is already a key pair in the system
+     * and will link the two if there is. It will also look for a signing certificate and link that and any certificates that have been signed by
+     * this certificate and link those.
+     *
+     * @param input Either the filename of a file containing the pem or the pem in a string
+     * @returns Synopsis of modifications made to the databases
+     */
     _tryAddCertificate(input) {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
@@ -1123,6 +1132,12 @@ class WebServer {
             }));
         });
     }
+    /**
+     * Returns details of the certificate for display on the client browser.
+     *
+     * @param c Certificate row of the certificate requested
+     * @returns The useful fields from the certificate row
+     */
     _getCertificateBrief(c) {
         var _a;
         let c2 = null;
@@ -1152,6 +1167,12 @@ class WebServer {
             tags: (_a = c.tags) !== null && _a !== void 0 ? _a : [],
         };
     }
+    /**
+     * Tries to delete a certificate and breaks all the links it has with other certificates and keys if any.
+     *
+     * @param c The row of the certificate to delete
+     * @returns A synopsis of the database updates made as a result of this deletion
+     */
     _tryDeleteCert(c) {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {

@@ -36,7 +36,7 @@ import { CertificateLine } from './webservertypes/CertificateLine';
 import { CertificateBrief } from './webservertypes/CertificateBrief';
 import { KeyBrief } from './webservertypes/KeyBrief';
 import { GenerateCertRequest } from './webservertypes/GenerateCertRequest';
-import { GenerateChildCertRequest } from './webservertypes/GenerateChildCertRequest';
+import { GenerateNonRootCertRequest } from './webservertypes/GenerateNonRootCertRequest';
 import { QueryType } from './webservertypes/QueryType';
 import { userAgentOS } from './webservertypes/userAgentOS';
 import { CertError } from './webservertypes/CertError';
@@ -45,7 +45,7 @@ const logger = log4js.getLogger();
 logger.level = "debug";
 
 /**
- * @classdesc Web server to help maintain test certificates and keys
+ * @classdesc Web server to help maintain test certificates and keys in the file system and a database.
  */
 export class WebServer {
     static instance: WebServer = null;
@@ -116,7 +116,7 @@ export class WebServer {
     }
 
     /**
-     * Starts the webserver
+     * Starts the webserver and defines the express routes.
      * 
      * @returns Promise\<void>
      */
@@ -516,7 +516,7 @@ export class WebServer {
         this._app.post('/api/createIntermediateCert', async (request, response) => {
             try {
                 logger.debug(request.body);
-                let body: GenerateChildCertRequest = typeof request.body == 'string'? JSON.parse(request.body) : request.body;
+                let body: GenerateNonRootCertRequest = typeof request.body == 'string'? JSON.parse(request.body) : request.body;
                 let validFrom: Date = body.validFrom? new Date(body.validFrom) : new Date();
                 let validTo: Date = body.validTo? new Date(body.validTo) : null;
                 let subject: CertificateSubject = {
@@ -612,7 +612,7 @@ export class WebServer {
         this._app.post('/api/createLeafCert', async (request, response) => {
             try {
                 logger.debug(request.body);
-                let body: GenerateChildCertRequest = typeof request.body == 'string'? JSON.parse(request.body) : request.body;
+                let body: GenerateNonRootCertRequest = typeof request.body == 'string'? JSON.parse(request.body) : request.body;
                 let validFrom: Date = body.validFrom? new Date(body.validFrom) : new Date();
                 let validTo: Date = body.validTo? new Date(body.validTo) : null;
                 let subject: CertificateSubject = {
@@ -921,7 +921,8 @@ export class WebServer {
     }
 
     /**
-     * Initializes the database from the file system and cleans up the file system
+     * Initializes the database from the file system and cleans up the file system.
+     * 
      * @private
      * @returns Promise\<void>
      */
@@ -1037,6 +1038,14 @@ export class WebServer {
         });
     }
 
+    /**
+     * Tries to add a new certificate to the system. During that process, it will also check to see if there is already a key pair in the system
+     * and will link the two if there is. It will also look for a signing certificate and link that and any certificates that have been signed by
+     * this certificate and link those.
+     * 
+     * @param input Either the filename of a file containing the pem or the pem in a string
+     * @returns Synopsis of modifications made to the databases
+     */
     private async _tryAddCertificate(input: { filename: string, pemString?: string } | { filename?: string, pemString: string }): Promise<OperationResult> {
         return new Promise<OperationResult>(async (resolve, reject) => {
             try {
@@ -1167,6 +1176,12 @@ export class WebServer {
         });
     }
 
+    /**
+     * Returns details of the certificate for display on the client browser.
+     * 
+     * @param c Certificate row of the certificate requested
+     * @returns The useful fields from the certificate row
+     */
     private _getCertificateBrief(c: CertificateRow & LokiObj): CertificateBrief {
         let c2: CertificateRow & LokiObj = null;
         if (c.signedById != null) {
@@ -1196,6 +1211,12 @@ export class WebServer {
          };
     }
 
+   /**
+    * Tries to delete a certificate and breaks all the links it has with other certificates and keys if any.
+    * 
+    * @param c The row of the certificate to delete
+    * @returns A synopsis of the database updates made as a result of this deletion
+    */
     private async _tryDeleteCert(c: CertificateRow & LokiObj): Promise<OperationResult> {
         return new Promise<OperationResult>(async (resolve, reject) => {
             try {
