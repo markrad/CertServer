@@ -1074,13 +1074,13 @@ class WebServer {
                         type: type,
                         serialNumber: c.serialNumber,
                         publicKey: c.publicKey,
-                        privateKey: null,
+                        // privateKey: null, 
                         signedById: signedById,
                         issuer: WebServer._getSubject(c.issuer),
                         subject: WebServer._getSubject(c.subject),
                         notBefore: c.validity.notBefore,
                         notAfter: c.validity.notAfter,
-                        havePrivateKey: undefined,
+                        // havePrivateKey: undefined,
                         fingerprint: new crypto_1.default.X509Certificate(input.pemString).fingerprint,
                         fingerprint256: fingerprint256,
                         tags: [],
@@ -1643,40 +1643,11 @@ class WebServer {
     _databaseFixUp() {
         return __awaiter(this, void 0, void 0, function* () {
             // First check that the database is a version that can be operated upon by the code.
-            if (this._currentVersion < 3) {
+            if (this._currentVersion < 4) {
                 console.error(`Database version ${this._currentVersion} is not supported by the release - try installing the previous minor version`);
                 process.exit(4);
             }
             // Check that the database is an older version that needs to be modified
-            else if (this._currentVersion == 3) {
-                logger.info(`Upgrading database to version 4`);
-                // Remove havePrivateKey and add keyId
-                this._certificates.findAndUpdate({ havePrivateKey: { $ne: undefined } }, (c) => Object.assign(c, { havePrivateKey: undefined, keyId: null }));
-                let keys = this._privateKeys.find();
-                for (let i in keys) {
-                    if (!keys[i].pairId) {
-                        // Add pairID if it is not present and make sure it is null
-                        if (keys[i].pairId == undefined) {
-                            keys[i].pairId = null;
-                            this._privateKeys.update(keys[i]);
-                        }
-                    }
-                    else {
-                        // Find and update the associated certificate record
-                        let c = this._certificates.findOne({ $loki: keys[i].pairId });
-                        if (c == null) {
-                            logger.error(`Could not find certificate for key ${keys[i].$loki} with id ${keys[i].pairId}`);
-                        }
-                        else {
-                            c.keyId = keys[i].$loki;
-                            this._certificates.update(c);
-                            logger.debug(`Updated certificate ${c.subject.CN}`);
-                        }
-                    }
-                }
-                // Update the database version to the new version
-                this._dbVersion.findAndUpdate({}, (v) => v.version = 4);
-            }
             logger.info('Database is a supported version for this release');
         });
     }

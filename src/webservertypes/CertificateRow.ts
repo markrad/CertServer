@@ -17,9 +17,6 @@ export type CertificateRow = {
     fingerprint256: string;
     /** Public key */
     publicKey: any;
-    // TODO Deprecate this
-    /** Not used - will be deprecated */
-    privateKey: string;
     /** List of user defined tags */
     tags: string[];
     /** The $loki value of the certificate that signed this one or null if there isn't one in the system */
@@ -32,9 +29,6 @@ export type CertificateRow = {
     notBefore: Date;
     /** The data that this certificate is valid to */
     notAfter: Date;
-    // TODO - Deprecate this
-    /** Not used - will be deprecated */
-    havePrivateKey: boolean;
     /** $loki value of key pair */
     keyId: number;
 };
