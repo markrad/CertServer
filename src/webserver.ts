@@ -76,7 +76,7 @@ export class WebServer {
     private _config: Config;
     private _version = 'v' + require('../../package.json').version;
     private static readonly _lowestDBVersion: number = 0;
-    private _currentVersion: number = null;
+    private _currentVersion: number = 4;
     get port() { return this._port; }
     get dataPath() { return this._dataPath; }
     /**
@@ -936,7 +936,6 @@ export class WebServer {
                     process.exit(4);
                 }
                 else if (version.length == 0) {
-                    this._currentVersion = 3;
                     this._dbVersion.insert({ version: this._currentVersion });
                 }
                 else {

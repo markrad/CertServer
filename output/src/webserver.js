@@ -90,7 +90,7 @@ class WebServer {
         this._certificate = null;
         this._key = null;
         this._version = 'v' + require('../../package.json').version;
-        this._currentVersion = null;
+        this._currentVersion = 4;
         this._config = config;
         this._port = config.certServer.port;
         this._dataPath = config.certServer.root;
@@ -922,7 +922,6 @@ class WebServer {
                         process.exit(4);
                     }
                     else if (version.length == 0) {
-                        this._currentVersion = 3;
                         this._dbVersion.insert({ version: this._currentVersion });
                     }
                     else {
