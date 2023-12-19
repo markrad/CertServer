@@ -907,7 +907,8 @@ class WebServer {
         });
     }
     /**
-     * Initializes the database from the file system and cleans up the file system.
+     * Ensures that the certificates and keys in the file system are consistent with the entries in the database and vice-versa. Thus, files found
+     * in the file system that are not in the database will be added, rows found in the database that do not have matching files will be deleted.
      *
      * @private
      * @returns Promise\<void>
