@@ -1,36 +1,23 @@
 // TODO Clean up this code - WIP
 
 // BUG Tags dialog is flawed if there are no tags
-// BUG Appears that a self-signed certificate does not highlight itself it has not signed anything else
 
 const typeLookup = [
-    '',
+    null,
     'root',
     'intermediate', 
     'leaf',
     'key',
-]
+];
 
-// Acquires all of the certificates or keys of a certain type
-// dir: string - root | intermediate | leaf | key
-//
-// Returns JSON blob with listing of the requested entries
-async function getDir(dir) {
-    return new Promise((resolve, reject) => {
-        $.ajax({
-            url: `/certList?type=${dir}`,
-            method: 'GET',
-            error: (_xhr, _status, err) => { 
-                console.error('Failed to get ' + dir);
-                reject(err);
-            },
-            success: (result, _status, _xhr) => {
-                resolve(result);
-            }
-        });
-    });
-}
+var lineCache = null;
 
+/**
+ * Acquires all of the certificates or keys of a certain type
+ * 
+ * @param {*} dir string - root | intermediate | leaf | key
+ * @returns JSON blob with listing of the requested entries
+ */
 // Add all keys to the UI
 function buildKeyList(target, files) {
     target.empty();
@@ -85,7 +72,7 @@ function buildKeyDetail(detail) {
             <span class="key-info-encrypted-value">${encrypted}</span>
         </div>
     `;
-    return detailHTML({ id: detail.id, name: detail.name, certPair: detail.certPair, encrypted: result.encrypted? 'yes' : 'no' });
+    return detailHTML({ id: detail.id, name: detail.name, certPair: detail.certPair, encrypted: detail.encrypted? 'yes' : 'no' });
 }
 
 function keyHide(details, arrow) {
@@ -98,7 +85,7 @@ function keyHide(details, arrow) {
 async function keyShow(details, arrow, id) {
     arrow.text('˅');
     try {
-        result = await getKeyDetails({ id: id });
+        var result = await lineCache.getKeyDetail(id);
         let content = buildKeyDetail(result);
         details.html(content);
         console.log('success');
@@ -121,26 +108,11 @@ async function keyClick(id) {
     };
 }
 
-// Get key details from the server
-async function getKeyDetails({ id }) {
-    return new Promise((resolve, reject) => {
-        let url = `/keyDetails?id=${id}`;
-        $.ajax({
-            url: url,
-            method: 'GET',
-            processData: false,
-            contentType: false,
-            error: (xhr, msg, err) => {
-                reject({ error: err, message: xhr.responseText });
-            },
-            success: (result, status) => {
-                resolve(result);
-            }
-        });
-    });
-}
-
-// Call the server to download the key
+/**
+ * Download a key from the server
+ * 
+ * @param {*} id Key id
+ */
 function keyDownload(id) {
     let filename = $(`#k${id} .cert-line-info`).text() + '.pem';
     let fileLocation = '/api/getKeyPem?id=' + id;
@@ -152,7 +124,7 @@ function keyDownload(id) {
 
 // Call the server to delete a key
 function keyDelete(id) {
-    let keyName = $(`#k${id} .cert-line-info`).text();
+    let keyName = $(`#k${id} .cert-line-name`).text();
     if (confirm(`This will delete ${keyName}. \n\nDo you wish to continue?`)) {
         $.ajax({
             url: '/deleteKey?id=' + id,
@@ -168,38 +140,6 @@ function keyDelete(id) {
         });
     }
 }
-
-// Upload a new key
-// function uploadKey(e) {
-//     var data = new FormData();
-//     var files = $('#keyUpload');
-//     if (files[0].files.length == 0) {
-//         alert('No files chosen');
-//     }
-//     else {
-//         for (let i = 0; i < files[0].files.length; i++) {
-//             data.append('keyFile', files[0].files[i]);
-//         }
-
-//         let url = `/uploadKey${$('#keyPasswordValue').val() == '' ? '' : `?password=${$('#keyPasswordValue').val()}`}`;
-
-//         $.ajax({
-//             url: url,
-//             method: 'POST',
-//             processData: false,
-//             contentType: false,
-//             data: data,
-//             error: (xhr, _msg, err) => {
-//                 document.getElementById('uploadKeyForm').reset();
-//                 showError(err, JSON.parse(xhr.responseText).error);
-//             },
-//             success: async (_result, _status) => {
-//                 document.getElementById('uploadKeyForm').reset();
-//                 showMessage('Key uploaded');
-//             }
-//         });
-//     }
-// }
 
 // Adds certificates to the section passed
 function buildCertList(target, files) {
@@ -366,7 +306,7 @@ async function certShow(id, details, arrow) {
     $('.cert-value-signed').removeClass('cert-value-signed');
     arrow.text('˅');
     try {
-        var result = await getCertDetails({ id: id});
+        var result = await lineCache.getCertDetail(id);
         let content = buildCertDetail(result);
         details.html(content);
         if (result.certType == 'root') details.find('.' + 'certBtnDownloadChain').hide();
@@ -426,30 +366,6 @@ async function certClick(id) {
     }
 }
 
-// Get certificate details from the server
-async function getCertDetails({ id }) {
-    return new Promise(async (resolve, reject) => {
-        try {
-            let url = `/certDetails?id=${id}`;
-            $.ajax({
-                url: url,
-                method: 'GET',
-                processData: false,
-                contentType: false,
-                error: (xhr, msg, err) => {
-                    reject({ error: err, message: xhr.responseText});
-                },
-                success: (result, status) => {
-                    resolve(result);
-                }
-            });
-        }
-        catch (err) {
-            reject({ error: err, message: 'Unknown error' });
-        }       
-    });
-}
-
 // Ask the server to delete a certificate
 function certDelete(name, id) {
     if (confirm(`This will delete certificate ${name}. \n\nDo you wish to continue?`)) {
@@ -497,26 +413,6 @@ function uploadCert(e) {
             }
         });
     }
-}
-
-// Get the certificate name (CN) from the id
-async function getName(type, id) {
-    return new Promise((resolve, reject) => {
-        let url = type == 4? '/api/keyname' : '/api/certname';
-        url += '?id=' + id.toString();
-        $.ajax({
-            url: url,
-            method: 'GET',
-            processData: false,
-            contentType: false,
-            error: (xhr, msg, err) => {
-                reject(err);
-            },
-            success: async (result, status) => {
-                resolve(result);
-            }
-        });
-    });
 }
 
 function resetTagForm() {
@@ -784,90 +680,6 @@ function removeSAN(spanId) {
     $(`#${spanId}`).remove();
 }
 
-// Update the page with updates sent via the WebSocket
-function processUpdates(changePacket) {
-    console.log('Changes: ' + changePacket);
-    changeJSON = JSON.parse(changePacket);
-    let lists = ['#rootList', '#intermediateList', '#leafList', '#keyList'];
-
-    changeJSON.deleted.forEach((change) => {
-        console.log(change);
-        $(`#${change.type == 4? 'k' : 'c'}${change.id}`).remove();
-    });
-
-    lists.forEach((header) => {
-        if ($(`${header} li`).length == 0) {
-            $(header).append('<li class="empty">None</li>');
-        }
-    });
-
-    changeJSON.added.forEach(async (change) => {
-        let certs = [];
-        let result = await getName(change.type, change.id);
-        let header = $(`${lists[change.type - 1]} li`);
-        let entry = (change.type == 4? buildKeyEntry(result) : buildCertEntry(result));
-
-        if (header.length > 0 && header.first().attr('class') == 'empty') {
-            header.first().remove();
-        }
-
-        $(`#${typeLookup[change.type]}List li`).each(function() {
-            let span = $(this).find('span.cert-line-name');
-            certs.push({ parent: $(this), span: span.text() });
-        });
-        if (certs.length == 0) {
-            $(`#${typeLookup[change.type]}List`).append(entry);
-        }
-        else if (result.name.localeCompare(certs[certs.length - 1].span) == 1) {
-            certs[certs.length - 1].parent.after(entry);
-        }
-        else {
-            for (let i = 0; i < certs.length; i++) {
-                if (result.name.localeCompare(certs[i].span) == -1) {
-                    certs[i].parent.before(entry);
-                    break;
-                }
-            }
-        }
-    });
-
-    changeJSON.updated.forEach(async (change) => {
-        let idName = change.type == 4? '#k' : '#c';
-        let name = $(`${idName}${change.id} .cert-line-info`);
-        if (change.type == 4) {
-            let keyDetails = await getKeyDetails({ id: change.id });
-            if (keyDetails.name != name.text()) {
-                // remove and reinsert
-                let newChange = { deleted: [ { type: change.type, id: change.id}], added: [ { type: change.type, id: change.id }], updated: [] };
-                processUpdates(JSON.stringify(newChange));
-            }
-
-            let details = null;
-            if ((details = $(`#id_${change.type}_${change.id} .key-details`))) {
-                $(`${idName}${change.id} .key-info-name-value`).text(keyDetails.name);
-                $(`${idName}${change.id} .key-info-pair-value`).text(keyDetails.certPair);
-            }
-        }
-        else {
-            let info = $(`${idName}${change.id} .cert-container`);
-            if (info.length > 0) {
-                try {
-                    let result = await getCertDetails({ id: change.id });
-                    $(`${idName}${change.id} .cert-line-tags-value`).text(`${result.tags.join(';')}`);
-                    $(`${idName}${change.id} .cert-info-type-key`).text(result.keyId != null? ' with private key' : '');
-                    $(`${idName}${change.id} .cert-info-signer-value`).text(result.signer);
-                    $(`${idName}${change.id} .cert-info-key-value`).text(result.keyId != null? 'yes' : 'no');
-                    $(`${idName}${change.id} .cert-info-tags-value`).text(result.tags.join(';'));
-                    if (result.keyId == null) $(`${idName}${change.id} .cert-info-optional-buttons`).hide();
-                    else $(`${idName}${change.id} .cert-info-optional-buttons`).show();
-                }
-                catch({ error, message }) {
-                    showError(error, message);
-                }
-            }
-        }
-    });
-}
 
 // Called when page is first loaded
 $(async function() {
@@ -886,16 +698,83 @@ $(async function() {
     datePicker = $('#LeafValidTo');
     datePicker.datepicker( { defaultDate: +365 } );
 
+    lineCache = new LineCache();
+
+    lineCache.setAddHandler(addHandler);
+    lineCache.setUpdateHandler(updateHandler);
+    lineCache.setDeleteHandler(deleteHandler);
+        
+    async function updateHandler(type, entry) {
+        console.log('Update: ' + JSON.stringify(entry));
+        let idName = `${type == 4 ? '#k' : '#c'}${entry.id}`;
+        let name = $(`${idName} .cert-line-name`);
+        let details = $(`${idName} ${type == 4? '.key-details' : '.cert-details'}`);
+        let arrow = $(`${idName}  ${type == 4 ? '.key-line-arrow' : '.cert-line-arrow'}`);
+        let detailsVisible = !details.is(':hidden')
+        if (type == 4) {
+            if (entry.name != name) {
+                deleteHandler(type, entry.id);
+                addHandler(type, entry);
+                if (detailsVisible) {
+                    await keyShow(entry.id, details, arrow);
+                }
+            }
+            else if (detailsVisible) {
+                await keyShow(entry.id, details, arrow);
+            }
+        }
+        else {
+            $(`${idName} .cert-line-tags-value`).text(`${entry.tags.join(';')}`);
+            if (detailsVisible) {
+                await certShow(entry.id, details, arrow);
+            }
+        }
+    }
+
+    function addHandler(type, entry) {
+        console.log('Add: ' + JSON.stringify(entry));
+        let newEntry = type == 4 ? buildKeyEntry(entry) : buildCertEntry(entry);
+        let listChildren = $(`#${typeLookup[type]}List li`);
+        if (listChildren.length == 1 && listChildren.first().attr('class') == 'empty') {
+            listChildren.append(newEntry);
+            listChildren.first().remove();
+        }
+        else {
+            if (entry.name.localeCompare(listChildren.last().find('span.cert-line-name').text()) == 1) {
+                listChildren.last().after(newEntry);
+            }
+            else {
+                for (let i = 0; i < listChildren.length; i++) {
+                    console.log(`>> ${entry.name} ${$(listChildren[i]).find('span.cert-line-name').text() }`)
+                    if (entry.name.localeCompare($(listChildren[i]).find('span.cert-line-name').text()) != 1) {
+                        $(listChildren[i]).before(newEntry);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    function deleteHandler(type, id) {
+        console.log('Delete: ' + id);
+        let entry = $(`#${type == 4 ? 'k' : 'c'}${id}`);
+        let list = entry.closest('ul');
+        $(`#${type == 4 ? 'k' : 'c'}${id}`).remove();
+        if (list.children().length == 0) {
+            list.append('<li class="empty">None</li>');
+        }
+    }
+
     // Populate the page
     let files;
-    [ 
-        ['root', buildCertList], 
-        ['intermediate', buildCertList], 
-        ['leaf', buildCertList], 
-        ['key', buildKeyList] 
-    ].forEach(async (entry) => { 
-        files = await getDir(entry[0]);
-        entry[1]($(`#${entry[0]}List`), files.files);
+    [
+        ['root', buildCertList],
+        ['intermediate', buildCertList],
+        ['leaf', buildCertList],
+        ['key', buildKeyList]
+    ].forEach(async (entry) => {
+        files = await lineCache.getLineHeaders(entry[0]);
+        entry[1]($(`#${entry[0]}List`), files);
     });
 
     $('#generateCertForm').ajaxForm({
@@ -950,32 +829,4 @@ $(async function() {
         modal: true,
         width: 450,
     });
-
-    let connectWebSocket = () => {
-        let wsURL = (window.location.protocol == 'https:'? 'wss://' : 'ws://') + 
-        window.location.hostname + 
-        ':' + window.location.port;
-        const ws = new WebSocket(wsURL);
-        ws.onopen = wsonopen;
-        ws.onclose = wsonclose;
-        ws.onerror = wsonerror;
-        ws.onmessage =  wsonmessage;
-    }
-    let wsonopen = (e) => {
-        console.log('WebSocket is open');
-    }
-    let wsonclose = (e) => {
-        console.log('WebSocket is closed - reopening');
-        connectWebSocket();
-    }
-    let wsonerror = (e) => {
-        console.log('WebSocket error: ' + e.message);
-    }
-    let wsonmessage = (e) => {
-        //- console.log('Received: ' + e.data);
-        if (e.data != 'Connected') {
-        processUpdates(e.data);
-        }
-    }
-    connectWebSocket();
 });

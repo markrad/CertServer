@@ -40,6 +40,7 @@ import { GenerateNonRootCertRequest } from './webservertypes/GenerateNonRootCert
 import { QueryType } from './webservertypes/QueryType';
 import { userAgentOS } from './webservertypes/userAgentOS';
 import { CertError } from './webservertypes/CertError';
+import { KeyLine } from './KeyLine';
 
 const logger = log4js.getLogger();
 logger.level = "debug";
@@ -710,7 +711,7 @@ export class WebServer {
         this._app.get('/api/certName', async(request, response) => {
             try {
                 let c = this._resolveCertificateQuery(request.query as QueryType);
-                response.status(200).json({ name: c.subject.CN, id: c.$loki, tags: c.tags });
+                response.status(200).json({ name: c.subject.CN, id: c.$loki, tags: c.tags?? [] });
             }
             catch (err) {
                 response.status(err.status ?? 500).json({ error: err.message });
@@ -728,9 +729,9 @@ export class WebServer {
                 response.status(404).json({ error: `Directory ${request.query.type} not found` });
             }
             else {
-                let retVal: CertificateLine[] = [];
+                let retVal: CertificateLine[] | KeyLine[] = [];
                 if (type != CertTypes.key) {
-                    retVal = this._certificates.chain().find({ type: type }).sort((l, r) => l.name.localeCompare(r.name)).data().map((entry) => { 
+                    retVal = this._certificates.chain().find({ type: type }).sort((l, r) => l.name.localeCompare(r.name)).data().map((entry): CertificateLine => { 
                         return { name: entry.subject.CN, type: CertTypes[type].toString(), id: entry.$loki, tags: entry.tags?? [], keyId: entry.keyId }; 
                     });
                 }

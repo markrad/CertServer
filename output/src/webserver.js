@@ -687,13 +687,13 @@ class WebServer {
                 }
             }));
             this._app.get('/api/certName', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _d;
+                var _d, _e;
                 try {
                     let c = this._resolveCertificateQuery(request.query);
-                    response.status(200).json({ name: c.subject.CN, id: c.$loki, tags: c.tags });
+                    response.status(200).json({ name: c.subject.CN, id: c.$loki, tags: (_d = c.tags) !== null && _d !== void 0 ? _d : [] });
                 }
                 catch (err) {
-                    response.status((_d = err.status) !== null && _d !== void 0 ? _d : 500).json({ error: err.message });
+                    response.status((_e = err.status) !== null && _e !== void 0 ? _e : 500).json({ error: err.message });
                 }
             }));
             this._app.get('/api/keyList', (request, _response, next) => {
@@ -732,7 +732,7 @@ class WebServer {
                 }
             });
             this._app.get('/api/getCertificatePem', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _e;
+                var _f;
                 try {
                     let c = this._resolveCertificateQuery(request.query);
                     response.download(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(c)), c.name + '.pem', (err) => {
@@ -743,11 +743,11 @@ class WebServer {
                 }
                 catch (err) {
                     logger.error('Certificate download failed: ', err.message);
-                    return response.status((_e = err.status) !== null && _e !== void 0 ? _e : 500).json({ error: err.message });
+                    return response.status((_f = err.status) !== null && _f !== void 0 ? _f : 500).json({ error: err.message });
                 }
             }));
             this._app.post('/api/uploadCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _f;
+                var _g;
                 // FUTURE Allow multiple concatenated pem files
                 // FUTURE Merge uploadCert and uploadKey into uploadFile
                 if (request.headers['content-type'] != 'text/plain') {
@@ -762,11 +762,11 @@ class WebServer {
                     return response.status(200).json({ message: `Certificate ${result.name} added` });
                 }
                 catch (err) {
-                    response.status((_f = err.status) !== null && _f !== void 0 ? _f : 500).json({ error: err.message });
+                    response.status((_g = err.status) !== null && _g !== void 0 ? _g : 500).json({ error: err.message });
                 }
             }));
             this._app.delete('/api/deleteCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _g;
+                var _h;
                 try {
                     let c = this._resolveCertificateQuery(request.query);
                     let result = yield this._tryDeleteCert(c);
@@ -774,11 +774,11 @@ class WebServer {
                     return response.status(200).json({ message: `Certificate ${result.name} deleted` });
                 }
                 catch (err) {
-                    return response.status((_g = err.status) !== null && _g !== void 0 ? _g : 500).json(JSON.stringify({ error: err.message }));
+                    return response.status((_h = err.status) !== null && _h !== void 0 ? _h : 500).json(JSON.stringify({ error: err.message }));
                 }
             }));
             this._app.post('/api/updateCertTag', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _h;
+                var _j;
                 try {
                     let tags = typeof request.body == 'string' ? JSON.parse(request.body) : request.body;
                     if (tags.tags === undefined)
@@ -797,18 +797,18 @@ class WebServer {
                     return response.status(200).json({ message: `Certificate tags updated` });
                 }
                 catch (err) {
-                    return response.status((_h = err.status) !== null && _h !== void 0 ? _h : 500).json({ error: err.message });
+                    return response.status((_j = err.status) !== null && _j !== void 0 ? _j : 500).json({ error: err.message });
                     // return response.status(err.status?? 500).json(`{"error": "${err.message}"}`);
                 }
             }));
             this._app.get('/api/keyname', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _j;
+                var _k;
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     response.status(200).json({ name: k.name, id: k.$loki, tags: [] });
                 }
                 catch (err) {
-                    response.status((_j = err.status) !== null && _j !== void 0 ? _j : 500).json({ error: err.message });
+                    response.status((_k = err.status) !== null && _k !== void 0 ? _k : 500).json({ error: err.message });
                 }
             }));
             this._app.post('/api/uploadKey', (request, response) => __awaiter(this, void 0, void 0, function* () {
@@ -830,7 +830,7 @@ class WebServer {
                 }
             }));
             this._app.delete('/api/deleteKey', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _k;
+                var _l;
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     let result = yield this._tryDeleteKey(k);
@@ -838,11 +838,11 @@ class WebServer {
                     return response.status(200).json({ message: `Key ${result.name} deleted` });
                 }
                 catch (err) {
-                    return response.status((_k = err.status) !== null && _k !== void 0 ? _k : 500).json({ error: err.message });
+                    return response.status((_l = err.status) !== null && _l !== void 0 ? _l : 500).json({ error: err.message });
                 }
             }));
             this._app.get('/api/getKeyPem', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _l;
+                var _m;
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     response.download(this._getKeysDir(WebServer._getKeyFilenameFromRow(k)), k.name + '.pem', (err) => {
@@ -853,11 +853,11 @@ class WebServer {
                 }
                 catch (err) {
                     logger.error('Key download failed: ', err.message);
-                    return response.status((_l = err.status) !== null && _l !== void 0 ? _l : 500).json({ error: err.message });
+                    return response.status((_m = err.status) !== null && _m !== void 0 ? _m : 500).json({ error: err.message });
                 }
             }));
             this._app.get('/api/ChainDownload', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _m;
+                var _o;
                 // BUG - Breaks if there chain is not complete
                 try {
                     let c = this._resolveCertificateQuery(request.query);
@@ -868,7 +868,7 @@ class WebServer {
                 }
                 catch (err) {
                     logger.error('Chain download failed: ' + err.message);
-                    return response.status((_m = err.status) !== null && _m !== void 0 ? _m : 500).json({ error: err.message });
+                    return response.status((_o = err.status) !== null && _o !== void 0 ? _o : 500).json({ error: err.message });
                 }
             }));
             let server;

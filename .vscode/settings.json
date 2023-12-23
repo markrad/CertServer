@@ -1,6 +1,7 @@
 {
     "cSpell.words": [
         "autoload",
+        "certcache",
         "certname",
         "certserver",
         "cshost",
@@ -19,6 +20,7 @@
         "keyn",
         "keyname",
         "laki",
+        "linecache",
         "lokijs",
         "maxline",
         "mycert",
@@ -35,6 +37,7 @@
         "rski",
         "simplesort",
         "testdata",
+        "tswebscripts",
         "webserver",
         "webservertypes",
         "wsonclose",

@@ -1,6 +1,5 @@
 import { CertTypes } from './CertTypes';
 
-
 /**
  * Represents a single modification to the database
  */
