@@ -101,7 +101,7 @@ block layout-content
           input#certUpload(type="file", multiple, name="certFile", accept=".pem,.crt", title="Upload file")
         div.form-buttons
           input#fileCertReset(type="reset")
-          button#uploadCertButton.form-submit-button(type="button", onClick="uploadCert()" title="submit", value="Upload") Upload
+          button#uploadCertButton.form-submit-button(type="button", onClick="uploadPem()" title="submit", value="Upload") Upload
     form#generateCertForm(action="/createCACert" method="post" class='slide-form top-slide' encType="application/x-www-form-urlencoded") This will generate a private key and self-signed root CA pair
       .Country 
         span.subject-title

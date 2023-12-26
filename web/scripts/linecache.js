@@ -57,7 +57,7 @@ class LineCache {
     async getCertDetail(id) {
         let certDetails = this._certs.get(parseInt(id));
         if (certDetails.details === undefined) {
-            let details = await this._getFromServer(`/certDetails?id=${id}`);
+            let details = await this._ajaxCall('GET', `/certDetails?id=${id}`, null);
             certDetails['details'] = details;
         }
 
@@ -67,11 +67,19 @@ class LineCache {
     async getKeyDetail(id) {
         let keyDetails = this._keys.get(parseInt(id));
         if (keyDetails.details === undefined) {
-            let details = await this._getFromServer(`/keyDetails?id=${id}`);
+            let details = await this._ajaxCall('GET', `/keyDetails?id=${id}`, null);
             keyDetails['details'] = details;
         }
 
         return keyDetails.details;
+    }
+
+    async deleteKey(id) {
+        return this._ajaxCall('DELETE', `/deleteKey?id=${id}`, null);
+    }
+
+    async deleteCert(id) {
+        return this._ajaxCall('DELETE', `/deleteCert?id=${id}`, null);
     }
 
     setAddHandler(func) {
@@ -148,16 +156,40 @@ class LineCache {
     }
 
     async _getFromServer(url) {
+        return this._ajaxCall('GET', url, null);
+    }
+
+    async postToServer(url, data) {
+        return this._ajaxCall('POST', url, data);
+        // return new Promise((resolve, reject) => {
+        //     $.ajax({
+        //         url: url,
+        //         method: 'POST',
+        //         processData: false,
+        //         contentType: false,
+        //         data: data,
+        //         error: (xhr, _msg, err) => {
+        //             reject(new Error(err + ': ' + JSON.parse(xhr.responseText).error));
+        //         },
+        //         success: async (result, status) => {
+        //             resolve();
+        //         }
+        //     });
+        // });
+    }
+
+    async _ajaxCall(verb, url, data) {
         return new Promise((resolve, reject) => {
             $.ajax({
                 url: url,
-                method: 'GET',
+                method: verb,
                 processData: false,
                 contentType: false,
-                error: (xhr, msg, err) => {
-                    reject(err);
+                data: data,
+                error: (xhr, _msg, err) => {
+                    reject(new Error(`${err}: ${xhr.responseJSON.error}`));
                 },
-                success: async (result, status) => {
+                success: async (result, _status) => {
                     resolve(result);
                 }
             });

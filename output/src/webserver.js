@@ -314,7 +314,7 @@ class WebServer {
              * Upload pem format files. These can be key, a certificate, or a file that
              * contains keys or certificates.
              */
-            this._app.post('/uploadCert', ((request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.post('/uploadPem', ((request, response) => __awaiter(this, void 0, void 0, function* () {
                 var _a;
                 // FUTURE: Allow der and pfx files to be submitted
                 if (!request.files || Object.keys(request.files).length == 0) {
@@ -399,18 +399,6 @@ class WebServer {
                     response.status((_b = err.status) !== null && _b !== void 0 ? _b : 500).json({ error: err.message });
                 }
             }));
-            // this._app.post('/uploadKey', async (request: any, response) => {
-            //     if (!request.files || Object.keys(request.files).length == 0) {
-            //         return response.status(400).json({ error: 'No file selected' });
-            //     }
-            //     try {
-            //         let result: OperationResult = await this._tryAddKey({ pemString: request.files.keyFile.data.toString(), password: request.query.password });
-            //         this._broadcast(result);
-            //     }
-            //     catch (err) {
-            //         return response.status(err.status ?? 500).json({ error: err.message });
-            //     }
-            // });
             this._app.delete('/deleteKey', ((request, _response, next) => {
                 request.url = '/api/deleteKey';
                 next();

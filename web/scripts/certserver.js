@@ -57,7 +57,7 @@ function buildKeyDetail(detail) {
         <div class="key-container">
         <div class="cert-info-buttons"> 
             <button type="button" class="button2 keyBtnDownload" onClick="keyDownload('${id}')">Download</button>
-            <button type="button" class="button2 button2-red keyBtnDelete" onClick="keyDelete('${id}')">Delete</button>
+            <button type="button" class="button2 button2-red keyBtnDelete" onClick="keyDelete('${name}', '${id}')">Delete</button>
         </div>
         <div class="key-info-type">
             <span class="key-info-name-label">Name:&nbsp;</span>
@@ -123,21 +123,15 @@ function keyDownload(id) {
 }
 
 // Call the server to delete a key
-function keyDelete(id) {
-    let keyName = $(`#k${id} .cert-line-name`).text();
-    if (confirm(`This will delete ${keyName}. \n\nDo you wish to continue?`)) {
-        $.ajax({
-            url: '/deleteKey?id=' + id,
-            method: 'DELETE',
-            processData: false,
-            contentType: false,
-            error: (xhr, msg, err) => {
-                showError(err, JSON.parse(xhr.responseText).error);
-            },
-            success: async (_result, _status) => {
-                showMessage(`Key ${keyName} deleted`);
-            }
-        });
+async function keyDelete(name, id) {
+    try {
+        if (confirm(`This will delete key ${name}. \n\nDo you wish to continue?`)) {
+            await lineCache.deleteKey(id);
+            showMessage(`Key ${name} deleted`);
+        }
+    }
+    catch (err) {
+        showError(err);
     }
 }
 
@@ -367,26 +361,20 @@ async function certClick(id) {
 }
 
 // Ask the server to delete a certificate
-function certDelete(name, id) {
-    if (confirm(`This will delete certificate ${name}. \n\nDo you wish to continue?`)) {
-        $.ajax({
-            url: `/deleteCert?id=${id}`,
-            method: 'DELETE',
-            processData: false,
-            contentType: false,
-            error: (xhr, msg, err) => {
-                let result = JSON.parse(xhr.responseJSON);
-                showError(err, result.error);
-            },
-            success: async (result, status) => {
-                showMessage(`Certificate ${name} deleted`);
-            }
-        });
+async function certDelete(name, id) {
+    try {
+        if (confirm(`This will delete certificate ${name}. \n\nDo you wish to continue?`)) {
+            await lineCache.deleteCert(id);
+            showMessage(`Certificate ${name} deleted`);
+        }
+    }
+    catch (err) {
+        showError(err);
     }
 }
 
-// Upload a new certificate
-function uploadCert(e) {
+// Upload a new pem file
+async function uploadPem(e) {
     var data = new FormData();
     var files = $('#certUpload');
     if (files[0].files.length == 0) {
@@ -396,22 +384,13 @@ function uploadCert(e) {
         for (let i = 0; i < files[0].files.length; i++) {
             data.append('certFile', files[0].files[i]);
         }
-
-        $.ajax({
-            url: '/uploadCert',
-            method: 'POST',
-            processData: false,
-            contentType: false,
-            data: data,
-            error: (xhr, msg, err) => {
-                document.getElementById('uploadCertForm').reset();
-                showError(err, JSON.parse(xhr.responseText).error);
-            },
-            success: async (result, status) => {
-                document.getElementById('uploadCertForm').reset();
-                showMultiMessage(result);
-            }
-        });
+        try {
+            await lineCache.postToServer('/uploadPem', data);
+        }
+        catch (err) {
+            document.getElementById('uploadCertForm').reset();
+            showError(err);
+        }
     }
 }
 
