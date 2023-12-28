@@ -1635,6 +1635,8 @@ class WebServer {
                 console.error(`Database version ${this._currentVersion} is not supported by the release - try installing the previous minor version`);
                 process.exit(4);
             }
+            this._certificates.find({ $and: [{ signedById: null }, { type: 1 }] }).forEach(r => logger.warn(`Bad signed (${r.$loki}): ${r.subject.CN} - fixing`));
+            this._certificates.chain().find({ $and: [{ signedById: null }, { type: 1 }] }).update((r) => r.signedById = r.$loki);
             // Check that the database is an older version that needs to be modified
             logger.info('Database is a supported version for this release');
         });
