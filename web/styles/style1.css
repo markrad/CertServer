@@ -3,7 +3,6 @@ h1 {
 }
 
 div.certs-view {
-    /* height: 100%; */
     border: 1px black solid;
     padding-left: 5px;
     padding-bottom: 5px;
@@ -40,30 +39,19 @@ ul.view-table {
 .subject-title {
     width: 140px;
     text-align: left;
-    /* padding-right: 2em; */
     padding-top: 10px;
     padding-bottom: 4px;
     display: block;
 }
 
 .subject-value {
-    /* display: block; */
     width: 600px;
-    /* float: right; */
     margin-bottom: 1em;
 }
-
-/* form#uploadCertForm {
-    display: none;
-} */
 
 .form-submit-button {
     margin-left: 5px;
 }
-
-/* span.UploadButton {
-    margin-left: 4px;
-} */
 
 div.form-buttons {
     padding-top: 4px;
@@ -71,7 +59,6 @@ div.form-buttons {
 }
 
 button#uploadButton {
-    /* padding-left: 4px; */
     margin-left: 8px;
     float: left;
 }
@@ -84,21 +71,26 @@ button#uploadButton {
     width: calc(100% - 50px);
 }
 
-/* .twelvePoint {
-    font-size: 12pt;
-} */
+div.cert-line-inner:hover {
+    background-color: rgb(231, 252, 231);
+    cursor: pointer;
+    width: 100%;
+}
+
+div.cert-details {
+    cursor: default;
+}
+
+.cert-info-tags-edit {
+    cursor: pointer;
+}
 
 span.cert-line-id {
     font-family: 'Courier New', Courier, monospace;
     font-size: smaller;
     font-weight: bolder;
     color: darkviolet;
-    /* float: left; */
     cursor: pointer;
-    /* padding-left: 10%; */
-}
-
-span.cert-line-id-value {
     width: 5%;
 }
 
@@ -113,7 +105,6 @@ span.cert-line-info {
     font-family: 'Courier New', Courier, monospace;
     cursor: pointer;
     word-wrap: break-word;
-    /* float: right; */
     width: 95%
 }
 
@@ -142,19 +133,6 @@ span.cert-value-signed {
     color: red;
 }
 
-/* span.certButtons {
-    text-align: right;
-    display: block;
-} */
-
-/* span.certDeleteBtn {
-    cursor: pointer;
-} */
-
-/* span.certDownloadBtn {
-    cursor: pointer;
-} */
-
 div.cert-details {
     display: none;
 }
@@ -179,7 +157,6 @@ button.cert-info-tags-edit {
 span.key-line-arrow {
     font-family:'Courier New', Courier, monospace;
     cursor: pointer;
-    /* padding-right: 10pt; */
 }
 
 span.key-line {
@@ -187,19 +164,6 @@ span.key-line {
     cursor: pointer;
     word-wrap: break-word;
 }
-/* 
-span.keyButtons {
-    text-align: right;
-    display: block;
-} */
-
-/* span.keyDeleteBtn {
-    cursor: pointer;
-}
-
-span.keyDownloadBtn {
-    cursor: pointer;
-} */
 
 div.key-details {
     display: none;
@@ -214,13 +178,10 @@ div.key-container {
 input[type=file]::file-selector-button {
     background-color: rgb(34, 116, 34);
     border: none;
-    /* padding: 8px 8px; */
     text-align: center;
     display: inline-block;
     font-size: 12pt;
     margin-left: 4px;
-    /* margin: 4px 4px; */
-    /* transition-duration: 0.4s; */
     cursor: pointer;
     color: whitesmoke;
     border-radius: 2px;
@@ -234,13 +195,10 @@ input[type=file]::file-selector-button:hover {
 #uploadCertButton {
     background-color: rgb(34, 116, 34);
     border: none;
-    /* padding: 8px 8px; */
     text-align: center;
     display: inline-block;
     font-size: 12pt;
     margin-left: 4px;
-    /* margin: 4px 4px; */
-    /* transition-duration: 0.4s; */
     cursor: pointer;
     color: whitesmoke;
     border-radius: 2px;
@@ -254,13 +212,10 @@ input[type=file]::file-selector-button:hover {
 #fileCertReset {
     background-color: rgb(34, 116, 34);
     border: none;
-    /* padding: 8px 8px; */
     text-align: center;
     display: inline-block;
     font-size: 12pt;
     margin-left: 4px;
-    /* margin: 4px 4px; */
-    /* transition-duration: 0.4s; */
     cursor: pointer;
     color: whitesmoke;
     border-radius: 2px;
@@ -413,8 +368,3 @@ button.button2-red:hover {
     border-width: 0px;
     outline: none;
 }
-
-/* #keyPasswordLabel {
-    padding-left: 6pt;
-    padding-right: 3pt;
-} */

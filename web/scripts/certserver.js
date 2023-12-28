@@ -13,10 +13,10 @@ const typeLookup = [
 var lineCache = null;
 
 /**
- * Acquires all of the certificates or keys of a certain type
+ * Adds all the key lines to the UI.
  * 
- * @param {*} dir string - root | intermediate | leaf | key
- * @returns JSON blob with listing of the requested entries
+ * @param {JQuery<HTMLElement>} target the unordered list node for the keys
+ * @param {{ id: string, name: string}[]} files List of key entries
  */
 // Add all keys to the UI
 function buildKeyList(target, files) {
@@ -32,26 +32,36 @@ function buildKeyList(target, files) {
     }
 }
 
-// Builds HTML for a key entry in the UI
+/**
+ * Builds the HTML for a key entry in the UI
+ * 
+ * @param {{ id: string, name: string }} file input object containing id and name 
+ * @returns {string} HTML string for a key line on the webpage
+ */
 function buildKeyEntry(file) {
     let listEntryHTML = ({ id, name }) => `
         <li class="key-line" id="k${id}">
-        <span onclick="keyClick('${id}')">
-            <span class="key-line-arrow">></span>
-            <span class="cert-line-id">
-                <span class="cert-line-id-value">${id}</span>
+            <div class="cert-line-inner" onclick="keyClick('${id}')">
+                <span class="key-line-arrow">></span>
+                <span class="cert-line-id">${id}</span>
+                <span class="cert-line-info">
+                    <span class="cert-line-name">${name}</span>
+                </span>
             </span>
-            <span class="cert-line-info">
-                <span class="cert-line-name">${name}</span>
-            </span>
-        </span>
-        <div class="key-details">
+        </div>
+        <div class="key-details" data-id="${id}">
         </div>
         </li>
     `;
     return listEntryHTML({ id: file.id, name: file.name });
 }
 
+/**
+ * Builds a key detail entry for the UI. This detail is shown when the user clicks on a key line.
+ * 
+ * @param {{name: string, certPair: string, encrypted: 'yes' | 'no'}} detail input object containing id, name, certPair, and encrypted
+ * @returns {string} HTML string for a key detail block on the webpage
+ */
 function buildKeyDetail(detail) {
     const detailHTML = ({ id, name, certPair, encrypted }) => `
         <div class="key-container">
@@ -75,6 +85,12 @@ function buildKeyDetail(detail) {
     return detailHTML({ id: detail.id, name: detail.name, certPair: detail.certPair, encrypted: detail.encrypted? 'yes' : 'no' });
 }
 
+/**
+ * Hides the key detail blob in the UI. This is called when the key line is clicked and the detail is in displayed.
+ * 
+ * @param {JQuery<HTMLElement>} details jquery object for the key blob
+ * @param {JQuery<HTMLElement>} arrow jquery object for the arrow on the key line
+ */
 function keyHide(details, arrow) {
     details.slideUp(400, () => {
         details.html('');
@@ -82,20 +98,31 @@ function keyHide(details, arrow) {
     });
 }
 
-async function keyShow(details, arrow, id) {
+/**
+ * Shows the key detail blob in the UI. This is called when the key line is clicked and the detail is hidden.
+ * 
+ * @param {JQuery<HTMLElement>} details jquery object for the key blob
+ * @param {JQuery<HTMLElement>} arrow jquery object for the arrow on the key line
+ */
+async function keyShow(details, arrow) {
     arrow.text('˅');
     try {
-        var result = await lineCache.getKeyDetail(id);
+        let id = details.data('id');
+        let result = await lineCache.getKeyDetail(id);
         let content = buildKeyDetail(result);
         details.html(content);
-        console.log('success');
-        details.slideDown(500);           // &#9650
+        details.slideDown(500);
     }
     catch (err) {
         showError(err.error, err.message);
     };
 }
 
+/**
+ * Key line click handler. Reverse the display state of the key detail.
+ * 
+ * @param {string} id 
+ */
 async function keyClick(id) {
     let line = $('.key-line#k' + id);
     let details = line.find('.key-details');
@@ -104,16 +131,18 @@ async function keyClick(id) {
         keyHide(details, arrow);
     }
     else {
-        keyShow(details, arrow, id);
+        keyShow(details, arrow);
     };
 }
 
 /**
  * Download a key from the server
  * 
- * @param {*} id Key id
+ * @param {string} id Key id
+ * @deprecated Can be better done with an href that behaves like a button
  */
 function keyDownload(id) {
+    // FUTURE Deprecate this
     let filename = $(`#k${id} .cert-line-info`).text() + '.pem';
     let fileLocation = '/api/getKeyPem?id=' + id;
     const anchor = $('<a>', { href: fileLocation, download: filename })[0];
@@ -122,7 +151,12 @@ function keyDownload(id) {
     $(anchor).remove();
 }
 
-// Call the server to delete a key
+/**
+ * Delete a key from the server.
+ * 
+ * @param {string} name key friendly name
+ * @param {string} id key id
+ */
 async function keyDelete(name, id) {
     try {
         if (confirm(`This will delete key ${name}. \n\nDo you wish to continue?`)) {
@@ -151,31 +185,62 @@ function buildCertList(target, files) {
 }
 
 // Builds HTML for a certificate in the UI
+/**
+ * 
+ * @param {{ id: string, name: string, keyId: string, tags: string[] }} file details for certificate entry line
+ * @returns {string} HTML to add to the UI for this certificate
+ */
 function buildCertEntry(file) {
     let listEntryHTML = ({ id, name, tags, keyId }) => `
         <li class="cert-line" id="c${id}">
-        <span onclick="certClick('${id}')">
-            <span class="cert-line-arrow">˃</span>
-            <span class="cert-line-id" data-keyid="${keyId}">
-                <span class="cert-line-id-value">${id}</span>
-            </span>
-            <span class="cert-line-info">
-                <span class="cert-line-name">${name}</span>
-                <span class="cert-line-tags-container">
-                    <span class="cert-line-tags-l">[</span>
-                    <span class="cert-line-tags-value">${tags}</span>
-                    <span class="cert-line-tags-r">]</span>
+            <div class="cert-line-inner" onclick="certClick('${id}')">
+                <span class="cert-line-arrow">˃</span>
+                <span class="cert-line-id" data-keyid="${keyId}">${id}</span>
+                <span class="cert-line-info">
+                    <span class="cert-line-name">${name}</span>
+                    <span class="cert-line-tags-container">
+                        <span class="cert-line-tags-l">[</span>
+                        <span class="cert-line-tags-value">${tags}</span>
+                        <span class="cert-line-tags-r">]</span>
+                    </span>
                 </span>
-            </span>
-        </span>
-        <div class="cert-details">
-        </div>
+            </div>
+            <div class="cert-details" data-id="${id}"></div>
         </li>
     `;
     return listEntryHTML({ id: file.id, name: file.name, keyId: file.keyId, tags: `${file.tags.join(';')}` });
 }
 
-// Build the certificate detail HTML
+/**
+ * Builds the HTML to display the certificate detail.
+ * 
+ * @param {{ 
+ *          id: string, 
+ *          name: string,
+ *          certType: 'root' | 'intermediate' | 'leaf',
+ *          keyId: string,
+ *          serialNumber: string,
+ *          fingerprint: string,
+ *          fingerprint256: string,
+ *          subjectC: string,
+ *          subjectST: string,
+ *          subjectL: string,
+ *          subjectO: string,
+ *          subjectOU: string,
+ *          subjectCN: string,
+ *          issuerC: string,
+ *          issuerST: string,
+ *          issuerL: string,
+ *          issuerO: string,
+ *          issuerOU: string,
+ *          issuerCN: string,
+ *          validFrom: string,
+ *          validTo: string,
+ *          signer: string,
+ *          tags: string
+ * }} detail Required elements to build HTML detail
+ * @returns {string} HTML to display certificate detail in the UI
+ */
 function buildCertDetail(detail) {
     let detailHTML = ({
         id,
@@ -214,7 +279,7 @@ function buildCertDetail(detail) {
             </span>
         </div>
         <div class="cert-info-type">
-            <span class="cert-info-type-label">Type:&nbsp;</span>
+            <span class="cert-info-type-label">Type:</span>
             <span class="cert-info-type-value">${certType}</span>
             <span class="cert-info-type-key">${withKeyPresent}</span></div>
             <div class="cert-info-serial">Serial Number: ${serialNumber}</div>  
@@ -243,7 +308,7 @@ function buildCertDetail(detail) {
             <span class="cert-info-signer-value">${signer}</span>
         </div>
         <div class="cert-info-key">
-            <span class="cert-info-key-label">Key Present:&nbsp;</span>
+            <span class="cert-info-key-label">Key Present:</span>
             <span class="cert-info-key-value">${keyPresent}</span> 
         </div>
         <div class="cert-info-tags">
@@ -282,24 +347,40 @@ function buildCertDetail(detail) {
     });
 }
 
-// Hide the certificate detail
-function certHide(details, arrow) {
+/**
+ * Remove the highlights that signify a key or certificate is related to the certificate that has had the detail displayed.
+ */
+function removeRelativeHighlights() {
     $('.cert-value-key').removeClass('cert-value-key');
     $('.cert-value-signer').removeClass('cert-value-signer');
     $('.cert-value-signed').removeClass('cert-value-signed');
+}
+
+/**
+ * Hides the certificate detail.
+ * 
+ * @param {JQuery<HTMLElement>} details certificate details blob
+ * @param {JQuery<HTMLElement>} arrow arrow node in overview line
+ */
+function certHide(details, arrow) {
+    removeRelativeHighlights();
     details.slideUp(400, () => {
         details.text('');
         arrow.text('>');
     });
 }
 
-// Show the certificate detail
-async function certShow(id, details, arrow) {
-    $('.cert-value-key').removeClass('cert-value-key');
-    $('.cert-value-signer').removeClass('cert-value-signer');
-    $('.cert-value-signed').removeClass('cert-value-signed');
+/**
+ * Shows the certificate detail.
+ * 
+ * @param {JQuery<HTMLElement>} details certificate details blob
+ * @param {JQuery<HTMLElement>} arrow arrow node in overview line
+ */
+async function certShow(details, arrow) {
+    removeRelativeHighlights();
     arrow.text('˅');
     try {
+        let id = details.data('id');
         var result = await lineCache.getCertDetail(id);
         let content = buildCertDetail(result);
         details.html(content);
@@ -347,7 +428,11 @@ async function certShow(id, details, arrow) {
     }
 }
 
-// Shows or hides certificate detail
+/**
+ * Certificate line click handler.
+ * 
+ * @param {string} id certificate id that was clicked 
+ */
 async function certClick(id) {
     let line = $('.cert-line#c' + id);
     let details = line.find('.cert-details');
@@ -356,11 +441,16 @@ async function certClick(id) {
         certHide(details, arrow);
     }
     else {
-        await certShow(id, details, arrow);
+        await certShow(details, arrow);
     }
 }
 
-// Ask the server to delete a certificate
+/**
+ * Sends a request to the server to delete a certificate.
+ * 
+ * @param {string} name name of the certificate for display purposes
+ * @param {string} id id of the certificate to be deleted
+ */
 async function certDelete(name, id) {
     try {
         if (confirm(`This will delete certificate ${name}. \n\nDo you wish to continue?`)) {
@@ -373,8 +463,11 @@ async function certDelete(name, id) {
     }
 }
 
-// Upload a new pem file
-async function uploadPem(e) {
+/**
+ * Upload a new pem file to the server. This can be a certificate, a key, or a file containing multiple pem files.
+ * 
+ */
+async function uploadPem() {
     var data = new FormData();
     var files = $('#certUpload');
     if (files[0].files.length == 0) {
@@ -394,10 +487,18 @@ async function uploadPem(e) {
     }
 }
 
+/**
+ * Close the tags form
+ */
 function resetTagForm() {
     $('#tagsEdit').dialog('close');
 }
 
+/**
+ * Appends a new input tag box to the end of the tags array.
+ * 
+ * @param {JQuery<HTMLElement} tagArray the array of existing tags
+ */
 function tagsAddLast(tagArray) {
     let lastLine = `
         <span id="tagLast">
@@ -407,7 +508,12 @@ function tagsAddLast(tagArray) {
         </span>`;
     tagArray.append(lastLine);
 }
-// Open the certificate tags dialog box
+
+/**
+ * Builds the tags dialog with the existing tags in separate inputs that can be edited or deleted.
+ * 
+ * @param {string} id certificate id of the tags to be edited
+ */
 function tagsEdit(id) {
     let line = ({ tagValue, tagIndex }) => `
         <span id="tag${tagIndex}">
@@ -433,7 +539,12 @@ function tagsEdit(id) {
     dialog.dialog('open');
 }
 
-// Open the new intermediate certificate dialog box
+/**
+ * Open a new intermediate certificate dialog box.
+ * 
+ * @param {string} id id of the certificate that will sign this new intermediate 
+ * @param {*} name name of the certificate that will sign this new intermediate
+ */
 function newIntermediateDialog(id, name) {
     let dialog = $('#newIntermediate');
     dialog.dialog('option', 'title', `${name} -> intermediate`);
@@ -441,9 +552,13 @@ function newIntermediateDialog(id, name) {
     dialog.dialog('open');
 }
 
-// Open the new leaf certificate box
+/**
+ * Open a new leaf certificate dialog box.
+ * 
+ * @param {string} id id of the certificate that will sign this new leaf 
+ * @param {*} name name of the certificate that will sign this new leaf
+ */
 function newLeafDialog(id, name) {
-    console.log(name);
     let dialog = $('#newLeaf');
     dialog.dialog('option', 'title', `${name} -> leaf`);
     $('#leafSigner').val(id); 
@@ -451,6 +566,12 @@ function newLeafDialog(id, name) {
 }
 
 // Slide top panes in or out of view
+/**
+ * Toggles the top forms in and out of view
+ * 
+ * @param {JQuery<HTMLElement} button the button that was clicked indicating the form to show unless it is already showing then it will be hidden
+ * @param {string} id html id of the form to display or hide
+ */
 function togglePane(button, id) {
     let arrow = button.find('.button1-arrow');
     let p = $(id);
@@ -469,7 +590,9 @@ function togglePane(button, id) {
     }
 }
 
-// Search tags and hide those that don't match
+/**
+ * Searches for certificates that contain a string in the tags that matches the input filter. Hides any lines that don't.
+ */
 function searchTags() {
     let filter = $('#tagChooserValue').val();
     let keyIds = [];
@@ -503,12 +626,21 @@ function searchTags() {
     });
 }
 
+/**
+ * Work in progress function to try and improve the tag dialog behavior.
+ * 
+ * @returns {boolean} always false
+ */
 function tagChooserSubmit() {
     console.log('tag submit');
     return false;
 }
 
-// Show an informational message box
+/**
+ * Displays a modal dialog with an informational message.
+ * 
+ * @param {string} msg message to display
+ */
 function showMessage(msg) {
     $('#messageDialogMessage').text(msg);
     $('#messageDialog').dialog({
@@ -528,6 +660,12 @@ function showMessage(msg) {
     });
 }
 
+/**
+ * Shows a modal dialog with a mix of informational and error messages. Messages tagged with zero will be treated as informational, 
+ * everything else will be treated as an error.
+ * 
+ * @param {{ level: number, message: string}[]} messages array of messages to display with informational or error flag
+ */
 function showMultiMessage(messages) {
     let msg = $('#messageDialogMessage');
     for (let i in messages) {
@@ -556,7 +694,12 @@ function showMultiMessage(messages) {
     });
 }
 
-// Show an error message box
+/**
+ * Shows a modal dialog with an error message.
+ * 
+ * @param {string} error error dialog title
+ * @param {string} message message to display 
+ */ 
 function showError(error, message) {
     $('#messageDialogMessage').text(`${error}: ${message}`);
     $('#messageDialog').dialog({
@@ -575,33 +718,126 @@ function showError(error, message) {
     });
 }
 
+/**
+ * Called when a new CA is successfully created.
+ * 
+ * @param {{ message: string }} result result when creating a new CA
+ */
 function createCACertResponse(result) {
     $('#generateCAReset').trigger('click');
     showMessage(result.message);
 }
 
+/**
+ * Called when a new intermediate is successfully created.
+ * 
+ * @param {{ message: string }} result result when creating a new intermediate
+ */
 function createIntermediateCertResponse(result) {
     $('#generateIntermediateReset').trigger('click');
     showMessage(result.message);
     $('#newIntermediate').dialog('close');
 }
 
+/**
+ * Called when the reset button is clicked on the new intermediate form.
+ */
 function resetIntermediateForm() {
     $('#newIntermediateForm')[0].reset();
     $('#IntermediateSANList').empty();
 }
 
+/**
+ * Called when a new leaf is successfully created.
+ * 
+ * @param {{ message: string }} result result when creating a new leaf
+ */
+function createLeafCertResponse(result) {
+    $('#generateLeafReset').trigger('click');
+    showMessage(result.message);
+    $('#newLeaf').dialog('close');
+}
+
+/**
+ * Called when the reset button is clicked on the new leaf form.
+ */
+function resetLeafForm() {
+    $('#newLeafForm')[0].reset();
+    $('#LeafSANList').empty();
+}
+
+/**
+ * Add a new subject alternative name input box to the new intermediate certificate dialog
+ */
+function AddIntermediateSAN() {
+    let list = $('#IntermediateSANList');
+    let input = $('#IntermediateSANInput');
+    AddSAN(list, input);
+}
+
+/**
+ * Add a new subject alternative name input box to the new leaf certificate dialog
+ */
+function AddLeafSAN() {
+    let list = $('#LeafSANList');
+    let input = $('#LeafSANInput');
+    AddSAN(list, input);
+}
+
+/**
+ * When the tick is clicked to accept a new SAN, this is called to add it to the current list of SANs.
+ * 
+ * @param {JQuery<HTMLElement>} list the current list of SANs
+ * @param {JQuery<HTMLElement>} input the new SAN to add
+ */
+function AddSAN(list, input) {
+    let type = input.find('.san-type');
+    let value = input.find('.san-value');
+    let spanId = 'SAN' + list.children().length;
+    let newSpan = $(`<div id=${spanId}></div>`);
+    let newButton = $(`<input type='button' value='✘' onClick="removeSAN('${spanId}')"></input>`);
+    let newEntry = $(`<input type='text' name='SANArray' value='${type.val()}: ${value.val()}' class='san-list' readonly></input>`);
+    newSpan.append(newButton);
+    newSpan.append(newEntry);
+    list.append(newSpan);
+    type.val('DNS');
+    value.val('');
+}
+
+/**
+ * Removes a SAN from the current list of SANs
+ * 
+ * @param {JQuery<HTMLElement>} spanId the SAN to remove from the existing SANs list
+ */
+function removeSAN(spanId) {
+    $(`#${spanId}`).remove();
+}
+
+/**
+ * Called when the certificate's tags are successfully updated.
+ * 
+ * @param {{ message: string }} result the result message
+ */
 function updateTagsDisplay(result) {
     $('tagsCancelButton').trigger('click');
     showMessage(result.message);
     $('#tagsEdit').dialog('close');
 }
 
+/**
+ * Called to remove a tag from the certificates tags.
+ * 
+ * @param {number} tagIndex index of the tag to remove
+ */
 function tagDelete(tagIndex) {
-    console.log('tagDelete ' + tagIndex);
     $(`#tag${tagIndex}`).remove();
 }
 
+/**
+ * Adds the new tag input to the list of tags.
+ * 
+ * @param {string} tagArrayId HTML id of the tag array
+ */
 function tagAdd(tagArrayId) {
     let tagArray = $(`#${tagArrayId}`);
     let tagLast = tagArray.find('#tagLast');
@@ -618,49 +854,9 @@ function tagAdd(tagArrayId) {
     tagArray.data('highValue', `${(++highValue)}`);
 }
 
-function createLeafCertResponse(result) {
-    $('#generateLeafReset').trigger('click');
-    showMessage(result.message);
-    $('#newLeaf').dialog('close');
-}
-
-function resetLeafForm() {
-    $('#newLeafForm')[0].reset();
-    $('#LeafSANList').empty();
-}
-
-function AddIntermediateSAN() {
-    let list = $('#IntermediateSANList');
-    let input = $('#IntermediateSANInput');
-    AddSAN(list, input);
-}
-
-function AddLeafSAN() {
-    let list = $('#LeafSANList');
-    let input = $('#LeafSANInput');
-    AddSAN(list, input);
-}
-
-function AddSAN(list, input) {
-    let type = input.find('.san-type');
-    let value = input.find('.san-value');
-    let spanId = 'SAN' + list.children().length;
-    let newSpan = $(`<div id=${spanId}></div>`);
-    let newButton = $(`<input type='button' value='✘' onClick="removeSAN('${spanId}')"></input>`);
-    let newEntry = $(`<input type='text' name='SANArray' value='${type.val()}: ${value.val()}' class='san-list' readonly></input>`);
-    newSpan.append(newButton);
-    newSpan.append(newEntry);
-    list.append(newSpan);
-    type.val('DNS');
-    value.val('');
-}
-
-function removeSAN(spanId) {
-    $(`#${spanId}`).remove();
-}
-
-
-// Called when page is first loaded
+/**
+ * This function is automatically called by jQuery when the webpage is loaded. It initializes stuff.
+ */
 $(async function() {
     // Initialize date input boxes
     let datePicker;
@@ -683,6 +879,12 @@ $(async function() {
     lineCache.setUpdateHandler(updateHandler);
     lineCache.setDeleteHandler(deleteHandler);
         
+    /**
+     * Applies an update from the server to the UI.
+     * 
+     * @param {1 | 2 | 3 | 4} type Type of entry updated - root, intermediate, leaf, or key (1, 2, 3, 4)
+     * @param {{ id: number, name: string }} entry id and name of the entry - id will never change, name can
+     */
     async function updateHandler(type, entry) {
         console.log('Update: ' + JSON.stringify(entry));
         let idName = `${type == 4 ? '#k' : '#c'}${entry.id}`;
@@ -695,21 +897,27 @@ $(async function() {
                 deleteHandler(type, entry.id);
                 addHandler(type, entry);
                 if (detailsVisible) {
-                    await keyShow(entry.id, details, arrow);
+                    await keyShow(details, arrow);
                 }
             }
             else if (detailsVisible) {
-                await keyShow(entry.id, details, arrow);
+                await keyShow(details, arrow);
             }
         }
         else {
             $(`${idName} .cert-line-tags-value`).text(`${entry.tags.join(';')}`);
             if (detailsVisible) {
-                await certShow(entry.id, details, arrow);
+                await certShow(details, arrow);
             }
         }
     }
 
+    /**
+     * Add a new entry from the server to the UI.
+     * 
+     * @param {1 | 2 | 3 | 4} type Type of entry updated - root, intermediate, leaf, or key (1, 2, 3, 4)
+     * @param {{ id: number, name: string }} entry id and name of the entry - id will never change, name can
+     */
     function addHandler(type, entry) {
         console.log('Add: ' + JSON.stringify(entry));
         let newEntry = type == 4 ? buildKeyEntry(entry) : buildCertEntry(entry);
@@ -734,6 +942,12 @@ $(async function() {
         }
     }
 
+    /**
+     * Removes an entry deleted by the server.
+     * 
+     * @param {1 | 2 | 3 | 4} type Type of entry updated - root, intermediate, leaf, or key (1, 2, 3, 4)
+     * @param {*} id id of deleted entry
+     */
     function deleteHandler(type, id) {
         console.log('Delete: ' + id);
         let entry = $(`#${type == 4 ? 'k' : 'c'}${id}`);
@@ -759,7 +973,7 @@ $(async function() {
     $('#generateCertForm').ajaxForm({
         dataType: 'json',
         success: createCACertResponse,
-        error: (xhr, msg, err) => {
+        error: (xhr, _msg, err) => {
             showError(err, JSON.parse(xhr.responseText).error);
         } 
     });
@@ -767,7 +981,7 @@ $(async function() {
     $('#newIntermediateForm').ajaxForm({
         dataType: 'json',
         success: createIntermediateCertResponse,
-        error: (xhr, msg, err) => {
+        error: (xhr, _msg, err) => {
             showError(err, JSON.parse(xhr.responseText).error);
         } 
     });
@@ -775,7 +989,7 @@ $(async function() {
     $('#newLeafForm').ajaxForm({
         dataType: 'json',
         success: createLeafCertResponse,
-        error: (xhr, msg, err) => {
+        error: (xhr, _msg, err) => {
             showError(err, JSON.parse(xhr.responseText).error);
         } 
     });
@@ -783,7 +997,7 @@ $(async function() {
     $('#tagsEditForm').ajaxForm({
         datType: 'json',
         success: updateTagsDisplay,
-        error: (xhr, msg, err) => {
+        error: (xhr, _msg, err) => {
             showError(err, JSON.parse(xhr.responseText).error);
         } 
     });
