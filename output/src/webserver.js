@@ -741,13 +741,23 @@ class WebServer {
                 var _g;
                 // FUTURE Allow multiple concatenated pem files
                 // FUTURE Merge uploadCert and uploadKey into uploadFile
-                if (request.headers['content-type'] != 'text/plain') {
-                    return response.status(400).json({ error: 'Content-Type must be text/plain' });
-                }
-                if (!request.body.includes('\n')) {
-                    return response.status(400).json({ error: 'Certificate must be in standard 64 byte line length format - try --data-binary with curl' });
-                }
                 try {
+                    if (request.headers['content-type'] != 'text/plain') {
+                        return response.status(400).json({ error: 'Content-Type must be text/plain' });
+                    }
+                    if (!request.body.includes('\n')) {
+                        return response.status(400).json({ error: 'Certificate must be in standard 64 byte line length format - try --data-binary with curl' });
+                    }
+                    let msg = node_forge_1.pem.decode(request.body);
+                    if (msg.length == 0) {
+                        return response.status(400).json({ error: 'Could not decode the file as a pem certificate' });
+                    }
+                    else if (msg.length > 1) {
+                        return response.status(400).json({ error: 'Multiple pems in a single file are not supported' });
+                    }
+                    else if (!msg[0].type.includes('CERTIFICATE')) {
+                        return response.status(400).json({ error: `Expecting CERTIFICATE - received ${msg[0].type}` });
+                    }
                     let result = yield this._tryAddCertificate({ pemString: request.body });
                     this._broadcast(result);
                     return response.status(200).json({ message: `Certificate ${result.name} added` });
@@ -804,16 +814,24 @@ class WebServer {
             }));
             this._app.post('/api/uploadKey', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
-                    // if (typeof request.body != 'string') {
                     if (request.headers['content-type'] != 'text/plain') {
                         return response.status(400).send('Content type must be text/plain');
                     }
                     if (!request.body.includes('\n')) {
                         return response.status(400).send('Key must be in standard 64 byte line length format - try --data-binary with curl');
                     }
+                    let msg = node_forge_1.pem.decode(request.body);
+                    if (msg.length == 0) {
+                        return response.status(400).json({ error: 'Could not decode the file as a pem key' });
+                    }
+                    else if (msg.length > 1) {
+                        return response.status(400).json({ error: 'Multiple pems in a single file are not supported' });
+                    }
+                    else if (!msg[0].type.includes('KEY')) {
+                        return response.status(400).json({ error: `Expecting KEY - received ${msg[0].type}` });
+                    }
                     let result = yield this._tryAddKey({ pemString: request.body, password: request.query.password });
                     this._broadcast(result);
-                    // TODO: I don't think type is used any longer
                     return response.status(200).json({ message: `Key ${result.name} added` });
                 }
                 catch (err) {

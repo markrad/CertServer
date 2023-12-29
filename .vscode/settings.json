@@ -30,6 +30,7 @@
         "newleaf",
         "orphanedkey",
         "pathlen",
+        "pems",
         "privatekeys",
         "pushcert",
         "pushkey",
