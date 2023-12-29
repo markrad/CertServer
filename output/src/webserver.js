@@ -321,20 +321,23 @@ class WebServer {
                     return response.status(400).json({ error: 'No file selected' });
                 }
                 try {
+                    let compareResultItem = (l, r) => {
+                        return l.type == r.type && l.id == r.id;
+                    };
                     let mergeResults = (accumulator, next) => {
                         let i;
                         for (i in next.added) {
-                            if (!accumulator.added.some((a) => a.type == next.added[i].type && a.id == next.added[i].id)) {
+                            if (!accumulator.added.some((a) => compareResultItem(a, next.added[i]))) {
                                 accumulator.added.push(next.added[i]);
                             }
                         }
                         for (i in next.updated) {
-                            if (!accumulator.updated.some((a) => a.type == next.updated[i].type && a.id == next.updated[i].id)) {
+                            if (!accumulator.updated.some((a) => compareResultItem(a, next.updated[i]))) {
                                 accumulator.updated.push(next.updated[i]);
                             }
                         }
                         for (i in next.deleted) {
-                            if (!accumulator.deleted.some((a) => a.type == next.deleted[i].type && a.id == next.deleted[i].id)) {
+                            if (!accumulator.deleted.some((a) => compareResultItem(a, next.deleted[i]))) {
                                 accumulator.deleted.push(next.deleted[i]);
                             }
                         }
