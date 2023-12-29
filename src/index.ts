@@ -1,44 +1,30 @@
 import path from 'path';
 import deepmerge from 'deepmerge';
 import { WebServer } from './webserver';
+import { Config } from './webservertypes/Config';
+import { load } from 'js-yaml';
+import { readFileSync } from 'fs';
+import { defaultConfig } from './defaultConfig';
 
-// const ROOT_DIRECTORY = '/workspaces/typescript-node/data';
-// const ROOT_DIRECTORY = path.join(__dirname, '../data');
-// const SERVER_PORT = 5501;
-
-const defaultConfig: any = {
-    certServer: {
-        certificate: null,
-        key: null,
-        port: 4141,
-        root: './data',
-        subject: {
-            C: 'US',
-            ST: 'Washington',
-            L: 'Redmond',
-            O: 'None',
-            OU: 'None'
-        }
-    }
-};
-
-let config: any = {};
+let config: Config = defaultConfig;
 
 try {
     switch (process.argv.length) {
         case 2:
-            config = defaultConfig;
+            // Use default config
             break;
         case 3:
-            let options = require('yaml-reader').read(path.resolve(process.argv[2]));
+            // Merge specified options from config file with default config
+            let options: Config = (load(readFileSync((path.resolve(process.argv[2])), { encoding: 'utf8' }))) as Config;
             config = deepmerge(defaultConfig, options);
             break;
         default:
+            // Error exit
             throw 'Invalid number of arguments - only a config file path is allowed'
     }
 
     if (config.certServer.subject.C.length != 2) {
-        throw new Error(`Invalid country code ${config.C} - must be two characters`);
+        throw new Error(`Invalid country code ${config.certServer.subject.C} - must be two characters`);
     }
 
     const webServer = WebServer.createWebServer(config);
