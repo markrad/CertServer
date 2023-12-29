@@ -1667,6 +1667,12 @@ class WebServer {
             return userAgentOS_1.userAgentOS.ANDROID;
         return userAgentOS_1.userAgentOS.UNKNOWN;
     }
+    /**
+     * Validates RNA strings to ensure they consist only of characters allowed in those strings. The node-forge package does not enforce this.
+     *
+     * @param rnas Array of RNA values for validation
+     * @returns {{valid: boolean, message?: string}} valid: true if all are valid otherwise valid: false, message: error message
+     */
     static _isValidRNASequence(rnas) {
         for (let r in rnas) {
             if (!/^[a-z A-Z 0-9'\=\(\)\+\,\-\.\/\:\?]*$/.test(rnas[r])) {
