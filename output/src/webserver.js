@@ -427,6 +427,7 @@ class WebServer {
                 }
             }));
             this._app.post('/api/createCaCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
+                var _d;
                 try {
                     logger.debug(request.body);
                     if (typeof request.body != 'string') {
@@ -491,7 +492,7 @@ class WebServer {
                         .json({ message: `Certificate/Key ${certResult.name} added`, types: [CertTypes_1.CertTypes[CertTypes_1.CertTypes.root], CertTypes_1.CertTypes[CertTypes_1.CertTypes.key]].join(';') });
                 }
                 catch (err) {
-                    return response.status(500).json({ error: err.message });
+                    return response.status((_d = err.status) !== null && _d !== void 0 ? _d : 500).json({ error: err.message });
                 }
             }));
             this._app.post('/api/createIntermediateCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
@@ -532,7 +533,6 @@ class WebServer {
                         return response.status(404).json({ error: 'Could not find signing certificate\'s private key' });
                     }
                     const c = yield this._pkiCertFromRow(cRow);
-                    // const c = pki.certificateFromPem(fs.readFileSync(path.join(this._certificatesPath, WebServer._getCertificateFilenameFromRow(cRow)), { encoding: 'utf8' }));
                     const k = yield (this._pkiKeyFromRow(kRow, body.password));
                     // Create an empty Certificate
                     let cert = node_forge_1.pki.createCertificate();
@@ -685,13 +685,13 @@ class WebServer {
                 }
             }));
             this._app.get('/api/certName', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _d, _e;
+                var _e, _f;
                 try {
                     let c = this._resolveCertificateQuery(request.query);
-                    response.status(200).json({ name: c.subject.CN, id: c.$loki, tags: (_d = c.tags) !== null && _d !== void 0 ? _d : [] });
+                    response.status(200).json({ name: c.subject.CN, id: c.$loki, tags: (_e = c.tags) !== null && _e !== void 0 ? _e : [] });
                 }
                 catch (err) {
-                    response.status((_e = err.status) !== null && _e !== void 0 ? _e : 500).json({ error: err.message });
+                    response.status((_f = err.status) !== null && _f !== void 0 ? _f : 500).json({ error: err.message });
                 }
             }));
             this._app.get('/api/keyList', (request, _response, next) => {
@@ -730,7 +730,7 @@ class WebServer {
                 }
             });
             this._app.get('/api/getCertificatePem', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _f;
+                var _g;
                 try {
                     let c = this._resolveCertificateQuery(request.query);
                     response.download(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(c)), c.name + '.pem', (err) => {
@@ -741,11 +741,11 @@ class WebServer {
                 }
                 catch (err) {
                     logger.error('Certificate download failed: ', err.message);
-                    return response.status((_f = err.status) !== null && _f !== void 0 ? _f : 500).json({ error: err.message });
+                    return response.status((_g = err.status) !== null && _g !== void 0 ? _g : 500).json({ error: err.message });
                 }
             }));
             this._app.post('/api/uploadCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _g;
+                var _h;
                 // FUTURE Allow multiple concatenated pem files
                 // FUTURE Merge uploadCert and uploadKey into uploadFile
                 try {
@@ -770,11 +770,11 @@ class WebServer {
                     return response.status(200).json({ message: `Certificate ${result.name} added` });
                 }
                 catch (err) {
-                    response.status((_g = err.status) !== null && _g !== void 0 ? _g : 500).json({ error: err.message });
+                    response.status((_h = err.status) !== null && _h !== void 0 ? _h : 500).json({ error: err.message });
                 }
             }));
             this._app.delete('/api/deleteCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _h;
+                var _j;
                 try {
                     let c = this._resolveCertificateQuery(request.query);
                     let result = yield this._tryDeleteCert(c);
@@ -782,11 +782,11 @@ class WebServer {
                     return response.status(200).json({ message: `Certificate ${result.name} deleted` });
                 }
                 catch (err) {
-                    return response.status((_h = err.status) !== null && _h !== void 0 ? _h : 500).json(JSON.stringify({ error: err.message }));
+                    return response.status((_j = err.status) !== null && _j !== void 0 ? _j : 500).json(JSON.stringify({ error: err.message }));
                 }
             }));
             this._app.post('/api/updateCertTag', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _j;
+                var _k;
                 try {
                     let tags = typeof request.body == 'string' ? JSON.parse(request.body) : request.body;
                     if (tags.tags === undefined)
@@ -805,18 +805,18 @@ class WebServer {
                     return response.status(200).json({ message: `Certificate tags updated` });
                 }
                 catch (err) {
-                    return response.status((_j = err.status) !== null && _j !== void 0 ? _j : 500).json({ error: err.message });
+                    return response.status((_k = err.status) !== null && _k !== void 0 ? _k : 500).json({ error: err.message });
                     // return response.status(err.status?? 500).json(`{"error": "${err.message}"}`);
                 }
             }));
             this._app.get('/api/keyname', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _k;
+                var _l;
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     response.status(200).json({ name: k.name, id: k.$loki, tags: [] });
                 }
                 catch (err) {
-                    response.status((_k = err.status) !== null && _k !== void 0 ? _k : 500).json({ error: err.message });
+                    response.status((_l = err.status) !== null && _l !== void 0 ? _l : 500).json({ error: err.message });
                 }
             }));
             this._app.post('/api/uploadKey', (request, response) => __awaiter(this, void 0, void 0, function* () {
@@ -846,7 +846,7 @@ class WebServer {
                 }
             }));
             this._app.delete('/api/deleteKey', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _l;
+                var _m;
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     let result = yield this._tryDeleteKey(k);
@@ -854,11 +854,11 @@ class WebServer {
                     return response.status(200).json({ message: `Key ${result.name} deleted` });
                 }
                 catch (err) {
-                    return response.status((_l = err.status) !== null && _l !== void 0 ? _l : 500).json({ error: err.message });
+                    return response.status((_m = err.status) !== null && _m !== void 0 ? _m : 500).json({ error: err.message });
                 }
             }));
             this._app.get('/api/getKeyPem', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _m;
+                var _o;
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     response.download(this._getKeysDir(WebServer._getKeyFilenameFromRow(k)), k.name + '.pem', (err) => {
@@ -869,11 +869,11 @@ class WebServer {
                 }
                 catch (err) {
                     logger.error('Key download failed: ', err.message);
-                    return response.status((_m = err.status) !== null && _m !== void 0 ? _m : 500).json({ error: err.message });
+                    return response.status((_o = err.status) !== null && _o !== void 0 ? _o : 500).json({ error: err.message });
                 }
             }));
             this._app.get('/api/ChainDownload', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _o;
+                var _p;
                 // BUG - Breaks if there chain is not complete
                 try {
                     let c = this._resolveCertificateQuery(request.query);
@@ -884,7 +884,7 @@ class WebServer {
                 }
                 catch (err) {
                     logger.error('Chain download failed: ' + err.message);
-                    return response.status((_o = err.status) !== null && _o !== void 0 ? _o : 500).json({ error: err.message });
+                    return response.status((_p = err.status) !== null && _p !== void 0 ? _p : 500).json({ error: err.message });
                 }
             }));
             let server;
@@ -1668,6 +1668,62 @@ class WebServer {
             // Check that the database is an older version that needs to be modified
             logger.info('Database is a supported version for this release');
         });
+    }
+    static _validateCertificateInput(type, bodyIn) {
+        var _a, _b, _c, _d, _e, _f;
+        try {
+            if (typeof bodyIn !== 'string') {
+                throw new CertError_1.CertError(400, 'Bad POST data format - use Content-type: application/json');
+            }
+            let body = JSON.parse(bodyIn);
+            let result = {
+                validFrom: body.validFrom ? new Date(body.validFrom) : new Date(),
+                validTo: new Date(body.validTo),
+                subject: {
+                    C: (_a = body.country) !== null && _a !== void 0 ? _a : null,
+                    ST: (_b = body.state) !== null && _b !== void 0 ? _b : null,
+                    L: (_c = body.location) !== null && _c !== void 0 ? _c : null,
+                    O: (_d = body.organization) !== null && _d !== void 0 ? _d : null,
+                    OU: (_e = body.unit) !== null && _e !== void 0 ? _e : null,
+                    CN: (_f = body.commonName) !== null && _f !== void 0 ? _f : null
+                },
+                san: {
+                    domains: [],
+                    IPs: [],
+                }
+            };
+            let errString = [];
+            if (!result.subject.CN)
+                errString.push('Common name is required');
+            if (!result.validTo)
+                errString.push('Valid to is required');
+            if (isNaN(result.validTo.valueOf()))
+                errString.push('Valid to is invalid');
+            if (body.validFrom && isNaN(result.validFrom.valueOf()))
+                errString.push('Valid from is invalid');
+            if (result.subject.C.length != null && result.subject.C.length != 2)
+                errString.push('Country code must be omitted or have two characters');
+            let rc = WebServer._isValidRNASequence([result.subject.C, result.subject.ST, result.subject.L, result.subject.O, result.subject.OU, result.subject.CN]);
+            if (!rc.valid)
+                errString.push(rc.message);
+            if (errString.length > 0) {
+                throw new CertError_1.CertError(500, errString.join(';'));
+            }
+            result.san.domains.push(body.commonName);
+            if (type != CertTypes_1.CertTypes.root && body.SANArray) {
+                let SANArray = Array.isArray(body.SANArray) ? body.SANArray : [body.SANArray];
+                let domains = SANArray.filter((entry) => entry.startsWith('DNS:')).map((entry) => entry.split(' ')[1]);
+                let ips = SANArray.filter((entry) => entry.startsWith('IP:')).map((entry) => entry.split(' ')[1]);
+                if (domains.length > 0)
+                    result.san.domains = result.san.domains.concat(domains);
+                if (ips.length > 0)
+                    result.san.IPs = ips;
+            }
+            return result;
+        }
+        catch (err) {
+            throw new CertError_1.CertError(500, err.message);
+        }
     }
     /**
      * Attempts to guess the client OS from the user agent string
