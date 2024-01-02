@@ -7,4 +7,7 @@ export type GenerateCertRequest = {
     commonName: string;
     validFrom: string;
     validTo: string;
+    password: string;
+    signer: string;
+    SANArray?: string[];
 };

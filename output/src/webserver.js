@@ -429,7 +429,10 @@ class WebServer {
             this._app.post('/api/createCaCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     logger.debug(request.body);
-                    let body = typeof request.body == 'string' ? JSON.parse(request.body) : request.body;
+                    if (typeof request.body != 'string') {
+                        return response.status(400).json({ error: 'Bad POST data format - use Content-type: application/json' });
+                    }
+                    let body = JSON.parse(request.body);
                     let validFrom = body.validFrom ? new Date(body.validFrom) : new Date();
                     let validTo = body.validTo ? new Date(body.validTo) : null;
                     let subject = {
@@ -445,6 +448,10 @@ class WebServer {
                         errString.push('Common name is required');
                     if (!validTo)
                         errString.push('Valid to is required');
+                    if (isNaN(validTo.valueOf()))
+                        errString.push('Valid to is invalid');
+                    if (body.validFrom && isNaN(validFrom.valueOf()))
+                        errString.push('Valid from is invalid');
                     if (body.country.length > 0 && body.country.length != 2)
                         errString.push('Country code must be omitted or have two characters');
                     let rc = WebServer._isValidRNASequence([body.country, body.state, body.location, body.unit, body.commonName]);

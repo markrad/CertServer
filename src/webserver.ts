@@ -41,6 +41,7 @@ import { QueryType } from './webservertypes/QueryType';
 import { userAgentOS } from './webservertypes/userAgentOS';
 import { CertError } from './webservertypes/CertError';
 import { KeyLine } from './KeyLine';
+import { CertificateInput } from './webservertypes/CertificateInput';
 
 const logger = log4js.getLogger();
 logger.level = "debug";
@@ -444,7 +445,10 @@ export class WebServer {
         this._app.post('/api/createCaCert', async (request, response) => {
             try {
                 logger.debug(request.body);
-                let body: GenerateCertRequest = typeof request.body == 'string'? JSON.parse(request.body) : request.body;
+                if (typeof request.body != 'string') {
+                    return response.status(400).json({ error: 'Bad POST data format - use Content-type: application/json' })
+                }
+                let body: GenerateCertRequest = JSON.parse(request.body);
                 let validFrom: Date = body.validFrom? new Date(body.validFrom) : new Date();
                 let validTo: Date = body.validTo? new Date(body.validTo) : null;
                 let subject: CertificateSubject = {
@@ -460,6 +464,8 @@ export class WebServer {
 
                 if (!subject.CN) errString.push('Common name is required');
                 if (!validTo) errString.push('Valid to is required');
+                if (isNaN(validTo.valueOf())) errString.push('Valid to is invalid');
+                if (body.validFrom && isNaN(validFrom.valueOf())) errString.push('Valid from is invalid');
                 if (body.country.length > 0 && body.country.length != 2) errString.push('Country code must be omitted or have two characters');
                 let rc: { valid: boolean, message?: string } = WebServer._isValidRNASequence([ body.country, body.state, body.location, body.unit, body.commonName ]);
                 if (!rc.valid) errString.push(rc.message);
@@ -503,7 +509,7 @@ export class WebServer {
                     .json({ message: `Certificate/Key ${certResult.name} added`, types: [ CertTypes[CertTypes.root], CertTypes[CertTypes.key] ].join(';') });
             }
             catch (err) {
-                return response.status(500).json({ error: err.message })
+                return response.status(err.status?? 500).json({ error: err.message })
             }
         });
         this._app.post('/api/createIntermediateCert', async (request, response) => {
@@ -544,7 +550,6 @@ export class WebServer {
                 }
 
                 const c: pki.Certificate = await this._pkiCertFromRow(cRow);
-                // const c = pki.certificateFromPem(fs.readFileSync(path.join(this._certificatesPath, WebServer._getCertificateFilenameFromRow(cRow)), { encoding: 'utf8' }));
                 const k: pki.PrivateKey = await(this._pkiKeyFromRow(kRow, body.password));
 
                 // Create an empty Certificate
@@ -1740,6 +1745,54 @@ export class WebServer {
 
         // Check that the database is an older version that needs to be modified
         logger.info('Database is a supported version for this release');
+    }
+
+    private static _validateCertificateInput(type: CertTypes, bodyIn: any): CertificateInput {
+        try {
+            if (typeof bodyIn !== 'string') {
+                throw new CertError(400, 'Bad POST data format - use Content-type: application/json');
+            }
+            let body: GenerateCertRequest = JSON.parse(bodyIn);
+            let result: CertificateInput = {
+                validFrom: body.validFrom ? new Date(body.validFrom) : new Date(),
+                validTo: new Date(body.validTo),
+                subject: {
+                    C: body.country ?? null,
+                    ST: body.state ?? null,
+                    L: body.location ?? null,
+                    O: body.organization ?? null,
+                    OU: body.unit ?? null,
+                    CN: body.commonName ?? null
+                },
+                san: {
+                    domains: [],
+                    IPs: [],
+                }
+            };
+            let errString: string[] = [];
+            if (!result.subject.CN) errString.push('Common name is required');
+            if (!result.validTo) errString.push('Valid to is required');
+            if (isNaN(result.validTo.valueOf())) errString.push('Valid to is invalid');
+            if (body.validFrom && isNaN(result.validFrom.valueOf())) errString.push('Valid from is invalid');
+            if (result.subject.C.length != null && result.subject.C.length != 2) errString.push('Country code must be omitted or have two characters');
+            let rc: { valid: boolean, message?: string } = WebServer._isValidRNASequence([result.subject.C, result.subject.ST, result.subject.L, result.subject.O, result.subject.OU, result.subject.CN]);
+            if (!rc.valid) errString.push(rc.message);
+            if (errString.length > 0) {
+                throw new CertError(500, errString.join(';'));
+            }
+            result.san.domains.push(body.commonName);
+            if (type != CertTypes.root && body.SANArray) {
+                let SANArray = Array.isArray(body.SANArray) ? body.SANArray : [body.SANArray];
+                let domains = SANArray.filter((entry: string) => entry.startsWith('DNS:')).map((entry: string) => entry.split(' ')[1]);
+                let ips = SANArray.filter((entry: string) => entry.startsWith('IP:')).map((entry: string) => entry.split(' ')[1]);
+                if (domains.length > 0) result.san.domains = result.san.domains.concat(domains);
+                if (ips.length > 0) result.san.IPs = ips;
+            }
+            return result;
+        }
+        catch (err) {
+            throw new CertError(500, err.message);
+        }
     }
 
     /**
