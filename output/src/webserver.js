@@ -650,7 +650,7 @@ class WebServer {
                     }
                     let result = yield this._tryAddCertificate({ pemString: request.body });
                     this._broadcast(result);
-                    return response.status(200).json({ message: `Certificate ${result.name} added` });
+                    return response.status(200).json({ message: `Certificate ${result.name} of type ${CertTypes_1.CertTypes[result.added[0].type]} added` });
                 }
                 catch (err) {
                     response.status((_h = err.status) !== null && _h !== void 0 ? _h : 500).json({ error: err.message });

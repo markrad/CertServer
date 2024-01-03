@@ -681,7 +681,7 @@ export class WebServer {
                 }
                 let result: OperationResult = await this._tryAddCertificate({ pemString: request.body });
                 this._broadcast(result);
-                return response.status(200).json({ message: `Certificate ${result.name} added` });
+                return response.status(200).json({ message: `Certificate ${result.name} of type ${CertTypes[result.added[0].type]} added` });
             }
             catch (err) {
                 response.status(err.status?? 500).json({ error: err.message });
