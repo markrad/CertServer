@@ -9,6 +9,7 @@ import crypto from 'crypto';
 import { jsbn, pki, pem, util, random, md } from 'node-forge'; 
 import loki, { Collection, LokiFsAdapter } from 'lokijs'
 import Express, { NextFunction } from 'express';
+import bodyParser from 'body-parser';
 import FileUpload from 'express-fileupload';
 import serveFavicon from 'serve-favicon';
 import WsServer from 'ws';
@@ -111,7 +112,6 @@ export class WebServer {
         if (!existsSync(this._dbPath)) 
             mkdirSync(this._dbPath);
 
-        // this._cache = new CertificateCache(this._certificatesPath, 10 * 60 * 60);
         this._app.set('views', path.join(__dirname, '../../web/views'));
         this._app.set('view engine', 'pug');
     }
@@ -168,7 +168,8 @@ export class WebServer {
             logger.fatal('Failed to initialize the database: ' + err.message);
             process.exit(4);
         }
-        // this._app.use(Express.bodyParser.json());
+
+        const jsonParser = bodyParser.json();
         this._app.use(Express.urlencoded({ extended: true }));
         this._app.use(serveFavicon(path.join(__dirname, "../../web/icons/doc_lock.ico"), { maxAge: 2592000000 }));
         this._app.use(Express.text({ type: 'text/plain' }));
@@ -404,25 +405,19 @@ export class WebServer {
             request.url = '/api/deleteCert';
             next();
         }));
-        this._app.get('/certList', (request, _response, next) => {
+        this._app.get('/certList', (request: any, _response: any, next: NextFunction) => {
             request.url = '/api/certList';
             next();
         });
-        this._app.get('/certDetails', async (request, response) => {
-            try {
-                let c = this._resolveCertificateQuery(request.query as QueryType);
-                let retVal: CertificateBrief = this._getCertificateBrief(c as CertificateRow & LokiObj);
-                response.status(200).json(retVal);
-            }
-            catch (err) {
-                response.status(err.status ?? 500).json({ error: err.message })
-            }
+        this._app.get('/certDetails', async (request: any, _response: any, next: NextFunction) => {
+            request.url = '/api/certDetails';
+            next();
         });
         this._app.delete('/deleteKey', ((request, _response, next: NextFunction) => {
             request.url = '/api/deleteKey';
             next();
         }))
-        this._app.get('/keyList', (request, _response, next) => {
+        this._app.get('/keyList', (request, _response, next: NextFunction) => {
             request.url = '/certList';
             next();
         });
@@ -441,7 +436,7 @@ export class WebServer {
                 response.status(err.status ?? 500).json({ error: err.message });
             }
         });
-        this._app.post('/api/createCaCert', async (request, response) => {
+        this._app.post('/api/createCaCert', jsonParser, async (request, response) => {
             try {
                 logger.debug(request.body);
                 let certInput: CertificateInput = WebServer._validateCertificateInput(CertTypes.root, request.body);
@@ -484,7 +479,7 @@ export class WebServer {
                 return response.status(err.status?? 500).json({ error: err.message })
             }
         });
-        this._app.post('/api/createIntermediateCert', async (request, response) => {
+        this._app.post('/api/createIntermediateCert', jsonParser, async (request, response) => {
             try {
                 logger.debug(request.body);
                 let certInput: CertificateInput = WebServer._validateCertificateInput(CertTypes.intermediate, request.body);
@@ -541,7 +536,7 @@ export class WebServer {
                 return response.status(500).json({ error: err.message });
             }
         });
-        this._app.post('/api/createLeafCert', async (request, response) => {
+        this._app.post('/api/createLeafCert', jsonParser, async (request, response) => {
             try {
                 logger.debug(request.body);
                 let certInput: CertificateInput = WebServer._validateCertificateInput(CertTypes.leaf, request.body);
@@ -608,6 +603,16 @@ export class WebServer {
                 response.status(err.status ?? 500).json({ error: err.message });
             }
         });
+        this._app.get('/api/certDetails', async (request, response) => {
+            try {
+                let c = this._resolveCertificateQuery(request.query as QueryType);
+                let retVal: CertificateBrief = this._getCertificateBrief(c as CertificateRow & LokiObj);
+                response.status(200).json(retVal);
+            }
+            catch (err) {
+                response.status(err.status ?? 500).json({ error: err.message })
+            }
+        })
         this._app.get('/api/keyList', (request, _response, next) => {
             request.url = '/api/certList';
             request.query = { type: 'key' };
@@ -698,9 +703,9 @@ export class WebServer {
                 return response.status(err.status?? 500).json(JSON.stringify({ error: err.message }));
             }
         });
-        this._app.post('/api/updateCertTag', async (request, response) => {
+        this._app.post('/api/updateCertTag', jsonParser, async (request, response) => {
             try {
-                let tags: { tags: string[] } =  typeof request.body == 'string'? JSON.parse(request.body) : request.body;
+                let tags: { tags: string[], lastTag: string, toTag: string } =  request.body;
                 if (tags.tags === undefined) tags.tags = []
                 else if (!Array.isArray(tags.tags)) tags.tags = [ tags.tags ];
                 let cleanedTags: string[] = tags.tags.map((t) => t.trim()).filter((t) => t != '');
@@ -1644,10 +1649,10 @@ export class WebServer {
     private static _validateCertificateInput(type: CertTypes, bodyIn: any): CertificateInput {
         // FUTURE Needs a mechanism to force parts of the RDA sequence to be omitted
         try {
-            if (typeof bodyIn !== 'string') {
+            if (typeof bodyIn !== 'object') {
                 throw new CertError(400, 'Bad POST data format - use Content-type: application/json');
             }
-            let body: GenerateCertRequest = JSON.parse(bodyIn);
+            let body: GenerateCertRequest = bodyIn;
             let result: CertificateInput = {
                 validFrom: body.validFrom ? new Date(body.validFrom) : new Date(),
                 validTo: new Date(body.validTo),

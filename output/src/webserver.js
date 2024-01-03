@@ -46,6 +46,7 @@ const crypto_1 = __importDefault(require("crypto"));
 const node_forge_1 = require("node-forge");
 const lokijs_1 = __importStar(require("lokijs"));
 const express_1 = __importDefault(require("express"));
+const body_parser_1 = __importDefault(require("body-parser"));
 const express_fileupload_1 = __importDefault(require("express-fileupload"));
 const serve_favicon_1 = __importDefault(require("serve-favicon"));
 const ws_1 = __importDefault(require("ws"));
@@ -112,7 +113,6 @@ class WebServer {
             (0, node_fs_1.mkdirSync)(this._privatekeysPath);
         if (!(0, node_fs_1.existsSync)(this._dbPath))
             (0, node_fs_1.mkdirSync)(this._dbPath);
-        // this._cache = new CertificateCache(this._certificatesPath, 10 * 60 * 60);
         this._app.set('views', path_1.default.join(__dirname, '../../web/views'));
         this._app.set('view engine', 'pug');
     }
@@ -162,7 +162,7 @@ class WebServer {
                 logger.fatal('Failed to initialize the database: ' + err.message);
                 process.exit(4);
             }
-            // this._app.use(Express.bodyParser.json());
+            const jsonParser = body_parser_1.default.json();
             this._app.use(express_1.default.urlencoded({ extended: true }));
             this._app.use((0, serve_favicon_1.default)(path_1.default.join(__dirname, "../../web/icons/doc_lock.ico"), { maxAge: 2592000000 }));
             this._app.use(express_1.default.text({ type: 'text/plain' }));
@@ -391,16 +391,9 @@ class WebServer {
                 request.url = '/api/certList';
                 next();
             });
-            this._app.get('/certDetails', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _b;
-                try {
-                    let c = this._resolveCertificateQuery(request.query);
-                    let retVal = this._getCertificateBrief(c);
-                    response.status(200).json(retVal);
-                }
-                catch (err) {
-                    response.status((_b = err.status) !== null && _b !== void 0 ? _b : 500).json({ error: err.message });
-                }
+            this._app.get('/certDetails', (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
+                request.url = '/api/certDetails';
+                next();
             }));
             this._app.delete('/deleteKey', ((request, _response, next) => {
                 request.url = '/api/deleteKey';
@@ -411,7 +404,7 @@ class WebServer {
                 next();
             });
             this._app.get('/keyDetails', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _c;
+                var _b;
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     if (k) {
@@ -423,11 +416,11 @@ class WebServer {
                     }
                 }
                 catch (err) {
-                    response.status((_c = err.status) !== null && _c !== void 0 ? _c : 500).json({ error: err.message });
+                    response.status((_b = err.status) !== null && _b !== void 0 ? _b : 500).json({ error: err.message });
                 }
             }));
-            this._app.post('/api/createCaCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _d;
+            this._app.post('/api/createCaCert', jsonParser, (request, response) => __awaiter(this, void 0, void 0, function* () {
+                var _c;
                 try {
                     logger.debug(request.body);
                     let certInput = WebServer._validateCertificateInput(CertTypes_1.CertTypes.root, request.body);
@@ -462,10 +455,10 @@ class WebServer {
                         .json({ message: `Certificate/Key ${certResult.name}/${keyResult.name} added` });
                 }
                 catch (err) {
-                    return response.status((_d = err.status) !== null && _d !== void 0 ? _d : 500).json({ error: err.message });
+                    return response.status((_c = err.status) !== null && _c !== void 0 ? _c : 500).json({ error: err.message });
                 }
             }));
-            this._app.post('/api/createIntermediateCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.post('/api/createIntermediateCert', jsonParser, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     logger.debug(request.body);
                     let certInput = WebServer._validateCertificateInput(CertTypes_1.CertTypes.intermediate, request.body);
@@ -515,7 +508,7 @@ class WebServer {
                     return response.status(500).json({ error: err.message });
                 }
             }));
-            this._app.post('/api/createLeafCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.post('/api/createLeafCert', jsonParser, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     logger.debug(request.body);
                     let certInput = WebServer._validateCertificateInput(CertTypes_1.CertTypes.leaf, request.body);
@@ -568,10 +561,21 @@ class WebServer {
                 }
             }));
             this._app.get('/api/certName', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _e, _f;
+                var _d, _e;
                 try {
                     let c = this._resolveCertificateQuery(request.query);
-                    response.status(200).json({ name: c.subject.CN, id: c.$loki, tags: (_e = c.tags) !== null && _e !== void 0 ? _e : [] });
+                    response.status(200).json({ name: c.subject.CN, id: c.$loki, tags: (_d = c.tags) !== null && _d !== void 0 ? _d : [] });
+                }
+                catch (err) {
+                    response.status((_e = err.status) !== null && _e !== void 0 ? _e : 500).json({ error: err.message });
+                }
+            }));
+            this._app.get('/api/certDetails', (request, response) => __awaiter(this, void 0, void 0, function* () {
+                var _f;
+                try {
+                    let c = this._resolveCertificateQuery(request.query);
+                    let retVal = this._getCertificateBrief(c);
+                    response.status(200).json(retVal);
                 }
                 catch (err) {
                     response.status((_f = err.status) !== null && _f !== void 0 ? _f : 500).json({ error: err.message });
@@ -668,10 +672,10 @@ class WebServer {
                     return response.status((_j = err.status) !== null && _j !== void 0 ? _j : 500).json(JSON.stringify({ error: err.message }));
                 }
             }));
-            this._app.post('/api/updateCertTag', (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.post('/api/updateCertTag', jsonParser, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 var _k;
                 try {
-                    let tags = typeof request.body == 'string' ? JSON.parse(request.body) : request.body;
+                    let tags = request.body;
                     if (tags.tags === undefined)
                         tags.tags = [];
                     else if (!Array.isArray(tags.tags))
@@ -1556,10 +1560,10 @@ class WebServer {
         var _a, _b, _c, _d, _e, _f, _g, _h;
         // FUTURE Needs a mechanism to force parts of the RDA sequence to be omitted
         try {
-            if (typeof bodyIn !== 'string') {
+            if (typeof bodyIn !== 'object') {
                 throw new CertError_1.CertError(400, 'Bad POST data format - use Content-type: application/json');
             }
-            let body = JSON.parse(bodyIn);
+            let body = bodyIn;
             let result = {
                 validFrom: body.validFrom ? new Date(body.validFrom) : new Date(),
                 validTo: new Date(body.validTo),
