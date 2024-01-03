@@ -260,7 +260,7 @@ function getLeafCertificateList() {
 }
 function getCertificateDetailsByID() {
     return __awaiter(this, void 0, void 0, function* () {
-        res = yield httpRequest('get', url + '/certDetails?id=2');
+        res = yield httpRequest('get', url + '/api/certDetails?id=2');
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         node_assert_1.default.equal(res.body.certType, 'intermediate', `Wrong certificate type ${res.body.certType} returned`);
         node_assert_1.default.equal(res.body.id, 2, `Wrong id ${res.body.id} returned`);

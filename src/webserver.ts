@@ -169,9 +169,10 @@ export class WebServer {
             process.exit(4);
         }
 
-        const jsonParser = bodyParser.json();
+        //const jsonParser = bodyParser.json();
         this._app.use(Express.urlencoded({ extended: true }));
         this._app.use(serveFavicon(path.join(__dirname, "../../web/icons/doc_lock.ico"), { maxAge: 2592000000 }));
+        this._app.use(Express.json({ type: '*/json' }));
         this._app.use(Express.text({ type: 'text/plain' }));
         this._app.use(Express.text({ type: 'application/x-www-form-urlencoded' }));
         this._app.use(Express.text({ type: 'application/json' }));
@@ -436,7 +437,7 @@ export class WebServer {
                 response.status(err.status ?? 500).json({ error: err.message });
             }
         });
-        this._app.post('/api/createCaCert', jsonParser, async (request, response) => {
+        this._app.post('/api/createCaCert', async (request, response) => {
             try {
                 logger.debug(request.body);
                 let certInput: CertificateInput = WebServer._validateCertificateInput(CertTypes.root, request.body);
@@ -479,7 +480,7 @@ export class WebServer {
                 return response.status(err.status?? 500).json({ error: err.message })
             }
         });
-        this._app.post('/api/createIntermediateCert', jsonParser, async (request, response) => {
+        this._app.post('/api/createIntermediateCert', async (request, response) => {
             try {
                 logger.debug(request.body);
                 let certInput: CertificateInput = WebServer._validateCertificateInput(CertTypes.intermediate, request.body);
@@ -536,7 +537,7 @@ export class WebServer {
                 return response.status(500).json({ error: err.message });
             }
         });
-        this._app.post('/api/createLeafCert', jsonParser, async (request, response) => {
+        this._app.post('/api/createLeafCert', async (request, response) => {
             try {
                 logger.debug(request.body);
                 let certInput: CertificateInput = WebServer._validateCertificateInput(CertTypes.leaf, request.body);
@@ -703,7 +704,7 @@ export class WebServer {
                 return response.status(err.status?? 500).json(JSON.stringify({ error: err.message }));
             }
         });
-        this._app.post('/api/updateCertTag', jsonParser, async (request, response) => {
+        this._app.post('/api/updateCertTag', async (request, response) => {
             try {
                 let tags: { tags: string[], lastTag: string, toTag: string } =  request.body;
                 if (tags.tags === undefined) tags.tags = []

@@ -261,7 +261,7 @@ async function getLeafCertificateList(): Promise<boolean> {
 }
 
 async function getCertificateDetailsByID(): Promise<boolean> {
-    res = await httpRequest('get', url + '/certDetails?id=2');
+    res = await httpRequest('get', url + '/api/certDetails?id=2');
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
     assert.equal(res.body.certType, 'intermediate', `Wrong certificate type ${res.body.certType} returned`);
     assert.equal(res.body.id, 2, `Wrong id ${res.body.id} returned`);

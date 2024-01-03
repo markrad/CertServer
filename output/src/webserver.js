@@ -46,7 +46,6 @@ const crypto_1 = __importDefault(require("crypto"));
 const node_forge_1 = require("node-forge");
 const lokijs_1 = __importStar(require("lokijs"));
 const express_1 = __importDefault(require("express"));
-const body_parser_1 = __importDefault(require("body-parser"));
 const express_fileupload_1 = __importDefault(require("express-fileupload"));
 const serve_favicon_1 = __importDefault(require("serve-favicon"));
 const ws_1 = __importDefault(require("ws"));
@@ -162,9 +161,10 @@ class WebServer {
                 logger.fatal('Failed to initialize the database: ' + err.message);
                 process.exit(4);
             }
-            const jsonParser = body_parser_1.default.json();
+            //const jsonParser = bodyParser.json();
             this._app.use(express_1.default.urlencoded({ extended: true }));
             this._app.use((0, serve_favicon_1.default)(path_1.default.join(__dirname, "../../web/icons/doc_lock.ico"), { maxAge: 2592000000 }));
+            this._app.use(express_1.default.json({ type: '*/json' }));
             this._app.use(express_1.default.text({ type: 'text/plain' }));
             this._app.use(express_1.default.text({ type: 'application/x-www-form-urlencoded' }));
             this._app.use(express_1.default.text({ type: 'application/json' }));
@@ -419,7 +419,7 @@ class WebServer {
                     response.status((_b = err.status) !== null && _b !== void 0 ? _b : 500).json({ error: err.message });
                 }
             }));
-            this._app.post('/api/createCaCert', jsonParser, (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.post('/api/createCaCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 var _c;
                 try {
                     logger.debug(request.body);
@@ -458,7 +458,7 @@ class WebServer {
                     return response.status((_c = err.status) !== null && _c !== void 0 ? _c : 500).json({ error: err.message });
                 }
             }));
-            this._app.post('/api/createIntermediateCert', jsonParser, (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.post('/api/createIntermediateCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     logger.debug(request.body);
                     let certInput = WebServer._validateCertificateInput(CertTypes_1.CertTypes.intermediate, request.body);
@@ -508,7 +508,7 @@ class WebServer {
                     return response.status(500).json({ error: err.message });
                 }
             }));
-            this._app.post('/api/createLeafCert', jsonParser, (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.post('/api/createLeafCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     logger.debug(request.body);
                     let certInput = WebServer._validateCertificateInput(CertTypes_1.CertTypes.leaf, request.body);
@@ -672,7 +672,7 @@ class WebServer {
                     return response.status((_j = err.status) !== null && _j !== void 0 ? _j : 500).json(JSON.stringify({ error: err.message }));
                 }
             }));
-            this._app.post('/api/updateCertTag', jsonParser, (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.post('/api/updateCertTag', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 var _k;
                 try {
                     let tags = request.body;
