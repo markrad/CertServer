@@ -1424,10 +1424,10 @@ class WebServer {
         let selector = ('name' in query) ? { name: query.name } : { $loki: parseInt(query.id) };
         c = this._certificates.find(selector);
         if (c.length == 0) {
-            throw new CertError_1.CertError(404, `No certificate for ${JSON.stringify(query)} found`);
+            throw new CertError_1.CertError(404, `No certificate for ${query.id ? 'id' : 'name'} ${Object.values(selector)[0]} found`);
         }
         else if (c.length > 1) {
-            throw new CertError_1.CertError(400, `Multiple certificates match the CN ${JSON.stringify(query)} - use id instead`);
+            throw new CertError_1.CertError(400, `Multiple certificates match the name ${Object.values(selector)[0]} - use id instead`);
         }
         return c[0];
     }
@@ -1446,10 +1446,10 @@ class WebServer {
         let selector = ('name' in query) ? { name: query.name } : { $loki: parseInt(query.id) };
         let c = this._certificates.chain().find(selector);
         if (c.count() == 0) {
-            throw new CertError_1.CertError(404, `No certificate for ${JSON.stringify(query)} found`);
+            throw new CertError_1.CertError(404, `No certificate for ${query.id ? 'id' : 'name'} ${Object.values(selector)[0]} found`);
         }
         else if (c.count() > 1) {
-            throw new CertError_1.CertError(400, `Multiple certificates match the CN ${JSON.stringify(query)} - use id instead`);
+            throw new CertError_1.CertError(400, `Multiple certificates match the name ${Object.values(selector)[0]} - use id instead`);
         }
         let result = { name: null, added: [], updated: [], deleted: [] };
         let cd = c.data()[0];

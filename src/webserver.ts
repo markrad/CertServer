@@ -1506,10 +1506,10 @@ export class WebServer {
         c = this._certificates.find(selector);
 
         if (c.length == 0) {
-            throw new CertError(404, `No certificate for ${JSON.stringify(query)} found`);
+            throw new CertError(404, `No certificate for ${query.id ? 'id' : 'name'} ${Object.values(selector)[0]} found`);
         }
         else if (c.length > 1) {
-            throw new CertError(400, `Multiple certificates match the CN ${JSON.stringify(query)} - use id instead`);
+            throw new CertError(400, `Multiple certificates match the name ${Object.values(selector)[0]} - use id instead`);
         }
 
         return c[0];
@@ -1530,10 +1530,10 @@ export class WebServer {
         let c = this._certificates.chain().find(selector);
 
         if (c.count() == 0) {
-            throw new CertError(404, `No certificate for ${JSON.stringify(query)} found`);
+            throw new CertError(404, `No certificate for ${query.id ? 'id' : 'name'} ${Object.values(selector)[0]} found`);
         }
         else if (c.count() > 1) {
-            throw new CertError(400, `Multiple certificates match the CN ${JSON.stringify(query)} - use id instead`);
+            throw new CertError(400, `Multiple certificates match the name ${Object.values(selector)[0]} - use id instead`);
         }
 
         let result: OperationResult = { name: null, added: [], updated: [], deleted: [] };
