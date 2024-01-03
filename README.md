@@ -123,6 +123,21 @@ Sample response:
     "types": "root;key"
 }
 ```
+#### Examples
+##### Curl
+```bash
+curl -X POST -H 'Content-type: application --data '
+{
+  "country": "US",
+  "state": "WA",
+  "location": "anyCity",
+  "organization": "myCompany",
+  "unit": "three",
+  "commonName": "test name",
+  "validFrom": "2024\01\01"
+  "validTo": "2028\01\01"
+}'  http://myserver:4141/api/createcacert
+```
 ### Create a new intermediate certificate
 Intermediate certificates can be signed by either a root CA or another intermediate certificate.  
 `POST http://server:4141/api/createintermediatecert`  
@@ -137,7 +152,8 @@ Post data:
     "commonName": "required common name",
     "validFrom": "required date from in format yyyy/dd/dd",
     "validTo": "required date to in format yyyy/dd/dd",
-    "signer": "id of certificate to sign this certificate"
+    "signer": "id of certificate to sign this certificate",
+    "password": "password for signer's key if required"
 }
 
 ```
@@ -147,6 +163,23 @@ Sample response:
     "message": "Certificate/Key intName/intName_key added",
     "types": "intermediate;key"
 }
+```
+#### Examples
+##### Curl
+```bash
+curl -X POST -H 'Content-type: application --data '
+{
+  "country": "US",
+  "state": "WA",
+  "location": "anyCity",
+  "organization": "myCompany",
+  "unit": "three",
+  "commonName": "test name",
+  "validFrom": "2024\01\01"
+  "validTo": "2028\01\01",
+  "signer": "15",
+  "password": "secret-p@ssword"
+}'  http://myserver:4141/api/createintermediatecert
 ```
 ### Create a new leaf certificate
 Leaf certificates can be signed by either a root CA or intermediate certificate but they **cannot sign** other certificates.  
@@ -163,6 +196,7 @@ Post data:
     "validFrom": "required date from in format yyyy/dd/dd",
     "validTo": "required date to in format yyyy/dd/dd",
     "signer": "id of certificate to sign this certificate",
+    "password": "password for signer's key if required",
     "SANArray": [
       "DNS: a string for an alternative name such as localhost",
       "IP: an IP or IPv6 address in standard representation"
@@ -170,17 +204,37 @@ Post data:
 }
 
 ```
-Note in the post data, the SANArray entries must begin with the string 'DNS: ' or 'IP: '.
+_Note, in the post data, the SANArray entries must begin with the string 'DNS: ' or 'IP: '. Anything else will be ignored._  
 Sample response:
 ```JSON
 {
-    "message": "Certificate/Key leafName/leafName_key added",
-    "types": "leaf;key"
+    "message": "Certificate/Key leafName/leafName_key added"
 }
+```
+#### Examples
+##### Curl
+```bash
+curl -X POST -H 'Content-type: application --data '
+{
+  "country": "US",
+  "state": "WA",
+  "location": "anyCity",
+  "organization": "myCompany",
+  "unit": "three",
+  "commonName": "test name",
+  "validFrom": "2024\01\01"
+  "validTo": "2028\01\01",
+  "signer": "15",
+  "password": "secret-p@ssword",
+  "SANArray": [
+    "DNS:mysite.com",
+    "IP:222.33.22.3"
+  ]
+}'  http://myserver:4141/api/createleafcert
 ```
 ### Get a list of certificates by type:  
 `GET http://server:4141/api/certlist?type=root | intermediate | leaf | key`  
-Sample output:  
+Sample response:  
 ```json
 {
   "files": [
@@ -239,7 +293,7 @@ Invoke-WebRequest -Uri http://myserver:4141/api/uploadcert `
 Deletes the certificate from the server. If name is used and two certificates share the same common name it will fail with an error.
 ### Get a list of keys:  
 `GET http://server:4141/api/keylist`  
-Sample output:  
+Sample response:  
 ```json
 {
   "files": [
