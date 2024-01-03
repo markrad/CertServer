@@ -22,6 +22,9 @@
             "name": "Test Suite",
             "program": "${workspaceFolder}/output/src/tests/tests.js",
             "request": "launch",
+            "env": {
+                "LOG_SERVER_STDOUT": "1"
+            },
             "skipFiles": [
                 "<node_internals>/**"
             ],

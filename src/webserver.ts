@@ -36,7 +36,6 @@ import { CertificateLine } from './webservertypes/CertificateLine';
 import { CertificateBrief } from './webservertypes/CertificateBrief';
 import { KeyBrief } from './webservertypes/KeyBrief';
 import { GenerateCertRequest } from './webservertypes/GenerateCertRequest';
-import { GenerateNonRootCertRequest } from './webservertypes/GenerateNonRootCertRequest';
 import { QueryType } from './webservertypes/QueryType';
 import { userAgentOS } from './webservertypes/userAgentOS';
 import { CertError } from './webservertypes/CertError';
@@ -445,53 +444,26 @@ export class WebServer {
         this._app.post('/api/createCaCert', async (request, response) => {
             try {
                 logger.debug(request.body);
-                if (typeof request.body != 'string') {
-                    return response.status(400).json({ error: 'Bad POST data format - use Content-type: application/json' })
-                }
-                let body: GenerateCertRequest = JSON.parse(request.body);
-                let validFrom: Date = body.validFrom? new Date(body.validFrom) : new Date();
-                let validTo: Date = body.validTo? new Date(body.validTo) : null;
-                let subject: CertificateSubject = {
-                    C: body.country,
-                    ST: body.state,
-                    L: body.location,
-                    O: body.organization,
-                    OU: body.unit,
-                    CN: body.commonName
-                };
-
-                let errString: string[] = [];
-
-                if (!subject.CN) errString.push('Common name is required');
-                if (!validTo) errString.push('Valid to is required');
-                if (isNaN(validTo.valueOf())) errString.push('Valid to is invalid');
-                if (body.validFrom && isNaN(validFrom.valueOf())) errString.push('Valid from is invalid');
-                if (body.country.length > 0 && body.country.length != 2) errString.push('Country code must be omitted or have two characters');
-                let rc: { valid: boolean, message?: string } = WebServer._isValidRNASequence([ body.country, body.state, body.location, body.unit, body.commonName ]);
-                if (!rc.valid) errString.push(rc.message);
-
-                if (errString.length > 0) {
-                    return response.status(400).json({ error: errString.join('; ') })
-                }
-
-                // Create an empty Certificate
-                let cert = pki.createCertificate();
+                let certInput: CertificateInput = WebServer._validateCertificateInput(CertTypes.root, request.body);
 
                 const { privateKey, publicKey } = pki.rsa.generateKeyPair(2048);
-                const attributes = WebServer._setAttributes(subject);
+                const attributes = WebServer._setAttributes(certInput.subject);
                 const extensions: ExtensionParent[] = [
                     new ExtensionBasicConstraints({ cA: true, critical: true }),
                     new ExtensionKeyUsage({ keyCertSign: true, cRLSign: true }),
                     // new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, keyIdentifier: true }),
                     new ExtensionSubjectKeyIdentifier({ }),
                 ]
+
+                // Create an empty Certificate
+                let cert = pki.createCertificate();
         
                 // Set the Certificate attributes for the new Root CA
                 cert.publicKey = publicKey;
                 // cert.privateKey = privateKey;
                 cert.serialNumber = WebServer._getRandomSerialNumber();
-                cert.validity.notBefore = validFrom;
-                cert.validity.notAfter = validTo;
+                cert.validity.notBefore = certInput.validFrom;
+                cert.validity.notAfter = certInput.validTo;
                 cert.setSubject(attributes);
                 cert.setIssuer(attributes);
                 cert.setExtensions(extensions.map((extension) => extension.getObject()));
@@ -506,7 +478,7 @@ export class WebServer {
                 certResult.name = `${certResult.name}/${keyResult.name}`;
                 this._broadcast(certResult);
                 return response.status(200)
-                    .json({ message: `Certificate/Key ${certResult.name} added`, types: [ CertTypes[CertTypes.root], CertTypes[CertTypes.key] ].join(';') });
+                    .json({ message: `Certificate/Key ${certResult.name}/${keyResult.name} added` });
             }
             catch (err) {
                 return response.status(err.status?? 500).json({ error: err.message })
@@ -515,77 +487,39 @@ export class WebServer {
         this._app.post('/api/createIntermediateCert', async (request, response) => {
             try {
                 logger.debug(request.body);
-                let body: GenerateNonRootCertRequest = typeof request.body == 'string'? JSON.parse(request.body) : request.body;
-                let validFrom: Date = body.validFrom? new Date(body.validFrom) : new Date();
-                let validTo: Date = body.validTo? new Date(body.validTo) : null;
-                let subject: CertificateSubject = {
-                    C: body.country,
-                    ST: body.state,
-                    L: body.location,
-                    O: body.organization,
-                    OU: body.unit,
-                    CN: body.commonName
-                };
-                let errString: string[] = [];
+                let certInput: CertificateInput = WebServer._validateCertificateInput(CertTypes.intermediate, request.body);
 
-                if (!subject.CN) errString.push('Common name is required');
-                if (!validTo) errString.push('Valid to is required');
-                if (!body.signer) errString.push('Signing certificate is required');
-                if (body.country.length > 0 && body.country.length != 2) errString.push('Country code must be omitted or have two characters');
-                let rc: { valid: boolean, message?: string } = WebServer._isValidRNASequence([ body.country, body.state, body.location, body.unit, body.commonName ]);
-                if (!rc.valid) errString.push(rc.message);
-
-                if (errString.length > 0) {
-                    return response.status(400).json({ error: errString.join('\n') })
-                }
-
-                const cRow = this._certificates.findOne({ $loki: parseInt(body.signer) });
+                const cRow = this._certificates.findOne({ $loki: parseInt(certInput.signer) });
                 const kRow = this._privateKeys.findOne({ $loki: cRow.keyId });
 
-                if (!cRow) {
-                    return response.status(404).json({ error: 'Could not find signing certificate'});
+                if (!cRow || !kRow) {
+                    return response.status(404).json({ error: 'Signing certificate or key are either missing or invalid' });
                 }
-                if (!kRow) {
-                    return response.status(404).json({ error: 'Could not find signing certificate\'s private key'});
-                }
-
                 const c: pki.Certificate = await this._pkiCertFromRow(cRow);
-                const k: pki.PrivateKey = await(this._pkiKeyFromRow(kRow, body.password));
-
-                // Create an empty Certificate
-                let cert = pki.createCertificate();
+                const k: pki.PrivateKey = await(this._pkiKeyFromRow(kRow, certInput.password));
         
-                // const ski: any = c.getExtension({ name: 'subjectKeyIdentifier' });
                 const { privateKey, publicKey } = pki.rsa.generateKeyPair(2048);
-                const attributes = WebServer._setAttributes(subject);
-                let sal:ExtensionSubjectAltNameOptions = { domains: [ subject.CN ] };
-                if (body.SANArray != undefined) {
-                    // Add alternate subject names or IPs
-                    let SANArray = Array.isArray(body.SANArray)? body.SANArray : [ body.SANArray ];
-                    let domains = SANArray.filter((entry: string) => entry.startsWith('DNS:')).map((entry: string) => entry.split(' ')[1]);
-                    let ips = SANArray.filter((entry: string) => entry.startsWith('IP:')).map((entry: string) => entry.split(' ')[1]);
-                    if (domains.length > 0) sal.domains = sal.domains.concat(domains);
-                    if (ips.length > 0) sal['IPs'] = ips;
-                    logger.debug(sal.domains);
-                    logger.debug(sal.IPs);
-                }
+                const attributes = WebServer._setAttributes(certInput.subject);
+                let sal:ExtensionSubjectAltNameOptions = { };
+                sal.domains = certInput.san.domains;
+                sal.IPs = certInput.san.IPs;
                 const extensions: ExtensionParent[] = [
                     new ExtensionBasicConstraints({ cA: true, critical: true }),
                     new ExtensionKeyUsage({ keyCertSign: true, cRLSign: true }),
-                    // new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, keyIdentifier: true, serialNumber: ski['subjectKeyIdentifier'] }),
                     new ExtensionAuthorityKeyIdentifier({ keyIdentifier: c.generateSubjectKeyIdentifier().getBytes(), authorityCertSerialNumber: true }),
-                    // new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, serialNumber: c.serialNumber }),
-                    // new ExtensionAuthorityKeyIdentifier({ /*authorityCertIssuer: true, keyIdentifier: true,*/ serialNumber: ski['subjectKeyIdentifier'] }),
-                    // new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, keyIdentifier: true, authorityCertSerialNumber: true }),
                     new ExtensionSubjectKeyIdentifier({ }),
                     new ExtensionSubjectAltName(sal),
                 ]
+
+                // Create an empty Certificate
+                let cert = pki.createCertificate();
+
                 // Set the Certificate attributes for the new Root CA
                 cert.publicKey = publicKey;
                 // cert.privateKey = privateKey;
                 cert.serialNumber = WebServer._getRandomSerialNumber();
-                cert.validity.notBefore = validFrom;
-                cert.validity.notAfter = validTo;
+                cert.validity.notBefore = certInput.validFrom;
+                cert.validity.notAfter = certInput.validTo;
                 cert.setSubject(attributes);
                 cert.setIssuer(c.subject.attributes);
                 cert.setExtensions(extensions.map((extension) => extension.getObject()));
@@ -600,7 +534,7 @@ export class WebServer {
                 certResult.name = `${certResult.name}/${keyResult.name}`;
                 this._broadcast(certResult);
                 return response.status(200)
-                    .json({ message: `Certificate/Key ${certResult.name} added` });
+                    .json({ message: `Certificate/Key ${certResult.name}/${keyResult.name} added` });
             }
             catch (err) {
                 logger.error(`Failed to create intermediate certificate: ${err.message}`);
@@ -610,71 +544,31 @@ export class WebServer {
         this._app.post('/api/createLeafCert', async (request, response) => {
             try {
                 logger.debug(request.body);
-                let body: GenerateNonRootCertRequest = typeof request.body == 'string'? JSON.parse(request.body) : request.body;
-                let validFrom: Date = body.validFrom? new Date(body.validFrom) : new Date();
-                let validTo: Date = body.validTo? new Date(body.validTo) : null;
-                let subject: CertificateSubject = {
-                    C: body.country,
-                    ST: body.state,
-                    L: body.location,
-                    O: body.organization,
-                    OU: body.unit,
-                    CN: body.commonName
-                };
-                let errString: string[] = [];
+                let certInput: CertificateInput = WebServer._validateCertificateInput(CertTypes.leaf, request.body);
 
-                if (!subject.CN) errString.push('Common name is required');
-                if (!validTo) errString.push('Valid to is required');
-                if (!body.signer) errString.push('Signing certificate is required');
-                if (body.country.length > 0 && body.country.length != 2) errString.push('Country code must be omitted or have two characters');
-                let rc: { valid: boolean, message?: string } = WebServer._isValidRNASequence([ body.country, body.state, body.location, body.unit, body.commonName ]);
-                if (!rc.valid) errString.push(rc.message);
-
-                if (errString.length > 0) {
-                    return response.status(400).json({ error: errString.join('\n') })
-                }
-
-                const cRow = this._certificates.findOne({ $loki: parseInt(body.signer) });
+                const cRow = this._certificates.findOne({ $loki: parseInt(certInput.signer) });
                 const kRow = this._privateKeys.findOne({ pairId: cRow.$loki });
 
                 if (!cRow || !kRow) {
-                    return response.status(500).json({ error: 'Unexpected database corruption - rows missing'});
+                    return response.status(500).json({ error: 'Signing certificate or key are either missing or invalid'});
                 }
 
-                const c = pki.certificateFromPem(fs.readFileSync(path.join(this._certificatesPath, WebServer._getCertificateFilenameFromRow(cRow)), { encoding: 'utf8' }));
-                let k: pki.PrivateKey;
-
-                if (c) {
-                    if (body.password) {
-                        k = pki.decryptRsaPrivateKey(fs.readFileSync(path.join(this._privatekeysPath, WebServer._getKeyFilenameFromRow(kRow)), { encoding: 'utf8' }), body.password);
-                    }
-                    else {
-                        k = pki.privateKeyFromPem(fs.readFileSync(path.join(this._privatekeysPath, WebServer._getKeyFilenameFromRow(kRow)), { encoding: 'utf8' }));
-                    }
-                }
-                // const ski: any = c.getExtension({ name: 'subjectKeyIdentifier' });
+                const c = await this._pkiCertFromRow(cRow);
+                const k: pki.PrivateKey = await (this._pkiKeyFromRow(kRow, certInput.password));;
                 const { privateKey, publicKey } = pki.rsa.generateKeyPair(2048);
-                const attributes = WebServer._setAttributes(subject);
-                let sal:ExtensionSubjectAltNameOptions = { domains: [ subject.CN ] };
-                if (body.SANArray != undefined) {
-                    // Add alternate subject names or IPs
-                    let SANArray = Array.isArray(body.SANArray)? body.SANArray : [ body.SANArray ];
-                    let domains = SANArray.filter((entry: string) => entry.startsWith('DNS:')).map((entry: string) => entry.split(' ')[1]);
-                    let ips = SANArray.filter((entry: string) => entry.startsWith('IP:')).map((entry: string) => entry.split(' ')[1]);
-                    if (domains.length > 0) sal.domains = sal.domains.concat(domains);
-                    if (ips.length > 0) sal['IPs'] = ips;
-                    logger.debug(sal.domains);
-                    logger.debug(sal.IPs);
-                }
+                const attributes = WebServer._setAttributes(certInput.subject);
+                let sal:ExtensionSubjectAltNameOptions = { };
+                sal.domains = certInput.san.domains;
+                sal.IPs = certInput.san.IPs;
                 let extensions: ExtensionParent[] = [
                     new ExtensionBasicConstraints({ cA: false }),
                     new ExtensionSubjectKeyIdentifier({ }),
                     new ExtensionKeyUsage({ nonRepudiation: true, digitalSignature: true, keyEncipherment: true }),
-                    // new ExtensionAuthorityKeyIdentifier({ /*authorityCertIssuer: true, keyIdentifier: true,*/ serialNumber: ski['subjectKeyIdentifier'] }),
                     new ExtensionAuthorityKeyIdentifier({ keyIdentifier: c.generateSubjectKeyIdentifier().getBytes(), authorityCertSerialNumber: true }),
                     new ExtensionExtKeyUsage({ serverAuth: true, clientAuth: true,  }),
                     new ExtensionSubjectAltName(sal),
                 ];
+
                 // Create an empty Certificate
                 let cert = pki.createCertificate();
         
@@ -682,13 +576,13 @@ export class WebServer {
                 cert.publicKey = publicKey;
                 // cert.privateKey = privateKey;
                 cert.serialNumber = WebServer._getRandomSerialNumber();
-                cert.validity.notBefore = validFrom;
-                cert.validity.notAfter = validTo;
+                cert.validity.notBefore = certInput.validFrom;
+                cert.validity.notAfter = certInput.validTo;
                 cert.setSubject(attributes);
                 cert.setIssuer(c.subject.attributes);
                 cert.setExtensions(extensions.map((extension) => extension.getObject()));
         
-                // Self-sign the Certificate
+                // Sign the certificate with the parent's key
                 cert.sign(k, md.sha512.create());
 
                 // Convert to PEM format
@@ -1748,6 +1642,7 @@ export class WebServer {
     }
 
     private static _validateCertificateInput(type: CertTypes, bodyIn: any): CertificateInput {
+        // FUTURE Needs a mechanism to force parts of the RDA sequence to be omitted
         try {
             if (typeof bodyIn !== 'string') {
                 throw new CertError(400, 'Bad POST data format - use Content-type: application/json');
@@ -1756,6 +1651,8 @@ export class WebServer {
             let result: CertificateInput = {
                 validFrom: body.validFrom ? new Date(body.validFrom) : new Date(),
                 validTo: new Date(body.validTo),
+                signer: body.signer?? null,
+                password: body.password?? null,
                 subject: {
                     C: body.country ?? null,
                     ST: body.state ?? null,
@@ -1772,9 +1669,10 @@ export class WebServer {
             let errString: string[] = [];
             if (!result.subject.CN) errString.push('Common name is required');
             if (!result.validTo) errString.push('Valid to is required');
+            if (type != CertTypes.root && !body.signer) errString.push('Signing certificate is required')
             if (isNaN(result.validTo.valueOf())) errString.push('Valid to is invalid');
             if (body.validFrom && isNaN(result.validFrom.valueOf())) errString.push('Valid from is invalid');
-            if (result.subject.C.length != null && result.subject.C.length != 2) errString.push('Country code must be omitted or have two characters');
+            if (result.subject.C != null && result.subject.C.length != 2) errString.push('Country code must be omitted or have two characters');
             let rc: { valid: boolean, message?: string } = WebServer._isValidRNASequence([result.subject.C, result.subject.ST, result.subject.L, result.subject.O, result.subject.OU, result.subject.CN]);
             if (!rc.valid) errString.push(rc.message);
             if (errString.length > 0) {

@@ -134,7 +134,7 @@ async function createWebserver(): Promise<boolean> {
     webServer = spawn('node', [ path.join(__dirname, '../index.js'), testConfig ]);
     webServer.on('error', (err) => console.log(`webserver failed: ${err}`));
     webServer.on('close', (code, signal) => console.log(`Server terminated = code=${code};signal=${signal}`));
-    webServer.stdout.on('data', (data) => console.log(data.toString()));
+    webServer.stdout.on('data', (data) => { if (process.env.LOG_SERVER_STDOUT == "1") console.log(data.toString().trimEnd()); });
     await new Promise<void>((resolve) => setTimeout(() => resolve(), 2000));
     return true;
 }
@@ -317,7 +317,6 @@ async function getRootCertificateFile(): Promise<boolean> {
     fs.writeFileSync(path.join(testPath, 'someName.pem'), res.body);
     let rootCert = pki.certificateFromPem(res.body);
     rski = rootCert.getExtension('subjectKeyIdentifier');
-    console.log(JSON.stringify(rski, null, 4));
     console.log('passed');
     return true;
 }
@@ -340,6 +339,10 @@ async function getLeafCertificateFile(): Promise<boolean> {
     let leafCert = pki.certificateFromPem(res.body);
     let laki = leafCert.getExtension('authorityKeyIdentifier');
     assert.equal((iski as any).value.slice(1), (laki as any).value.slice(3), 'Authority key identifier does not match parent\'s subject key identifier');
+    let san: any = leafCert.getExtension('subjectAltName');
+    assert.notEqual(san, null, 'Failed to get the subject alternate names');
+    assert.equal(san.altNames.length, 3, 'Incorrect number of alt names on leaf');
+    assert.deepEqual(san.altNames, [{ type: 2, value: 'leafName' }, { type: 2, value: 'leafy.com' }, { type: 7, value: "7777", ip: '55.55.55.55' }], 'Alt names do not match expected list');
     console.log('passed');
     return true;
 }
@@ -457,10 +460,10 @@ async function runTests() {
             try {
                 tests[test].result = await tests[test].testFunction();
                 if (!tests[test].result) {
-                    console.error(`Test ${test}: failed`);
+                    console.error(`Test ${test}: ${fgRed('failed')}`);
                 }
                 else {
-                    console.log(`Test ${test}: succeeded`);
+                    console.log(`Test ${test}: ${fgGreen('succeeded')}`);
                 }
             }
             catch (err) {
@@ -483,7 +486,7 @@ async function runTests() {
         process.exit(4);
     }
     else {
-        console.log('All tests passed');
+        console.log(fgGreen('All tests passed'));
     }
 }
 
@@ -574,4 +577,16 @@ async function httpRequest(method: 'get' | 'post' | 'delete' | 'head', url: URL 
         // Close HTTP connection.
         clientRequest.end();
     });
+}
+
+const RESET = '\x1b[0m';
+const FG_GREEN = '\x1b[32m';
+const FG_RED = '\x1b[31m';
+
+function fgGreen(s: string): string {
+    return `${FG_GREEN}${s}${RESET}`;
+}
+
+function fgRed(s: string): string {
+    return `${FG_RED}${s}${RESET}`;
 }
