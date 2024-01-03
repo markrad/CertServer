@@ -256,12 +256,12 @@ curl http://myserver:4141/api/certlist?type=leaf
 Invoke-WebRequest -Uri http://myserver:4141/api/certlist?type=leaf
 ```
 ### Download a certificate pem file:  
-`GET http://server:4141/api/getcertificatepem/id=<certificate id>` or  
-`GET http://server:4141/api/getcertificatepem/name=<certificate name>`  
+`GET http://server:4141/api/getcertificatepem?id=<certificate id>` or  
+`GET http://server:4141/api/getcertificatepem?name=<certificate name>`  
 Returns the pem file. If name is used and two certificates share the same common name it will fail with an error.
 ### Download the certificate's full chain file:
-`GET http://server:4141/api/chaindownload/id=<certificate id>` or  
-`GET http://server:4141/api/chaindownload/name=<certificate name>`  
+`GET http://server:4141/api/chaindownload?id=<certificate id>` or  
+`GET http://server:4141/api/chaindownload?name=<certificate name>`  
 Returns a pem file containing the full chain of certificates from the one selected up. This is in the correct order to pass as a full chain pem file. If name is used and two certificates share the same common name it will fail with an error.
 ### Upload a certificate pem file:  
 `POST http://server:4141/api/uploadcert`  
@@ -286,9 +286,70 @@ Invoke-WebRequest -Uri http://myserver:4141/api/uploadcert `
   -Method POST `
   -Body $body
 ```
+### Get a certificate's details
+Returns the pertinent details of a specific certificate including the tags.  
+`GET http://server:4141/api/certDetails?id=<certificate id>` or  
+`GET http://server:4141/api/certDetails?name=<certificate name>`  
+Sample response:
+```json
+{
+  "id": 128,
+  "certType": "root",
+  "name": "test name",
+  "issuer": {
+    "C": "US",
+    "ST": "WA",
+    "L": "anyCity",
+    "O": "myCompany",
+    "OU": "three",
+    "CN": "test name"
+  },
+  "subject": {
+    "C": "US",
+    "ST": "WA",
+    "L": "anyCity",
+    "O": "myCompany",
+    "OU": "three",
+    "CN": "test name"
+  },
+  "validFrom": "2024-01-01T08:00:00.000Z",
+  "validTo": "2028-01-01T08:00:00.000Z",
+  "serialNumber": "18:2b:df:a7:97:d7:10:d5:f0:e6:b9:92:b9:1d:40:63:1a:81:a0:65",
+  "signer": "test name",
+  "signerId": 128,
+  "keyId": 121,
+  "fingerprint": "1F:C8:6B:58:A8:5E:EB:57:56:E2:F3:14:09:C0:52:D4:84:FF:11:00",
+  "fingerprint256": "B6:88:4E:B2:81:44:DE:0D:89:CE:AE:47:E1:01:CE:E5:2B:16:A3:E5:89:63:17:CE:31:6C:65:C6:E7:38:8C:CD",
+  "signed": [
+    127,
+    128
+  ],
+  "tags": [
+    "tag 2",
+    "tag 3",
+    "tag 1"
+  ]
+}
+```
+### Update a certificate's tags
+__Replace__ the tags associated with the certificate. Note the tags passed will replace all of the tags currently associated with the certificate.  
+`POST http://server:4141/api/updateCertTag?id=<certificate id>` or  
+`POST http://server:4141/api/updateCertTag?name=<certificate name>`  
+Post data:
+```json
+{
+  "tags": [ "tag-a", "tag-b" ]
+}
+```
+Sample response:
+```json
+{
+  "message": "Certificate tags updated"
+}
+```
 ### Delete a certificate:  
-`DELETE http://server:4141/api/deleteCert/id=<certificate id>` or  
-`DELETE http://server:4141/api/deleteCert/name=<certificate name>`  
+`DELETE http://server:4141/api/deleteCert?id=<certificate id>` or  
+`DELETE http://server:4141/api/deleteCert?name=<certificate name>`  
 Deletes the certificate from the server. If name is used and two certificates share the same common name it will fail with an error.
 ### Get a list of keys:  
 `GET http://server:4141/api/keylist`  
@@ -305,8 +366,8 @@ Sample response:
 }
 ```
 ### Download a key pem file:  
-`GET http://server:4141/api/getkeypem/id=<key id>` or  
-`GET http://server:4141/api/getkeypem/name=<key name>`  
+`GET http://server:4141/api/getkeypem?id=<key id>` or  
+`GET http://server:4141/api/getkeypem?name=<key name>`  
 Returns the pem file. If name is used and two keys share the same common name it will fail with an error.
 ### Upload a key pem file:  
 `POST http://server:4141/api/uploadkey`  
@@ -333,6 +394,6 @@ Invoke-WebRequest -Uri http://myserver:4141/api/uploadkey `
   -Body $body
 ```
 ### Delete a key:  
-`DELETE http://server:4141/api/deletekey/id=<key id>` or  
-`DELETE http://server:4141/api/deletekey/name=<key name>`  
+`DELETE http://server:4141/api/deletekey?id=<key id>` or  
+`DELETE http://server:4141/api/deletekey?name=<key name>`  
 Deletes the key from the server. If name is used and two certificates share the same common name it will fail with an error.
