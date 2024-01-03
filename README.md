@@ -126,7 +126,7 @@ Sample response:
 #### Examples
 ##### Curl
 ```bash
-curl -X POST -H 'Content-type: application --data '
+curl -X POST -H 'Content-type: application' --data '
 {
   "country": "US",
   "state": "WA",
@@ -167,7 +167,7 @@ Sample response:
 #### Examples
 ##### Curl
 ```bash
-curl -X POST -H 'Content-type: application --data '
+curl -X POST -H 'Content-type: application' --data '
 {
   "country": "US",
   "state": "WA",
@@ -214,7 +214,7 @@ Sample response:
 #### Examples
 ##### Curl
 ```bash
-curl -X POST -H 'Content-type: application --data '
+curl -X POST -H 'Content-type: application' --data '
 {
   "country": "US",
   "state": "WA",
@@ -265,14 +265,13 @@ Returns the pem file. If name is used and two certificates share the same common
 Returns a pem file containing the full chain of certificates from the one selected up. This is in the correct order to pass as a full chain pem file. If name is used and two certificates share the same common name it will fail with an error.
 ### Upload a certificate pem file:  
 `POST http://server:4141/api/uploadcert`  
-Uploads an existing certificate to the server. The pem data is placed in the post data. The POST must follow the following conventions:  
+Uploads an existing certificate to the server. The pem string is placed in the post data. The POST must follow the following conventions:  
   + The pem content is in standard 64 byte lines. Hint: use --data-binary @filename when using curl
   + The Content-Type header must be set to text/plain. In curl -H "Content-Type: text/plain"  
 Sample response:
 ```json
 {
-  "message":"Certificate Baltimore_CyberTrust_Root added",
-  "type":"root"
+  "message":"Certificate Baltimore_CyberTrust_Root of type root added"
 }
 ```
 ##### Curl
@@ -317,8 +316,7 @@ Uploads an existing key to the server. The pem data is placed in the post data. 
 Sample response:
 ```json
 {
-    "message": "Key intName_key added",
-    "type": "key;intermediate"
+    "message": "Key intName_key added"
 }
 ```
 #### Examples
