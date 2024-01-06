@@ -61,7 +61,7 @@ var counter = 0;
         message.properties.add('temperatureAlert', (temperature > 28) ? 'true' : 'false');
   
         if (counter++ % 3 == 0) {
-          message.properties.add('plustest', 'mark+radbourne');
+          message.properties.add('plusTest', 'mark+radbourne');
         }
       
         console.log('Sending message: ' + message.getData());
@@ -126,14 +126,14 @@ function generateConnectionString() {
     if (process.env.SHARED_ACCESS_KEY) {
       connectionString += (';SharedAccessKey=' + process.env.SHARED_ACCESS_KEY);
     }
-    else if (process.env.CERTFICATE_FILE) {
+    else if (process.env.CERTIFICATE_FILE) {
       if (!process.env.KEY_FILE) {
         console.error('KEY_FILE is required with CERTIFICATE_FILE');
         process.exit(4);
       }
       connectionString += ';X509=true';
       options = {
-        cert: fs.readFileSync(process.env.CERTFICATE_FILE, { encoding: 'utf8' }),
+        cert: fs.readFileSync(process.env.CERTIFICATE_FILE, { encoding: 'utf8' }),
         key: fs.readFileSync(process.env.KEY_FILE, { encoding: 'utf8' }),
       }
     }

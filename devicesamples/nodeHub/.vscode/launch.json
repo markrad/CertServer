@@ -25,7 +25,7 @@
             ],
             "program": "${workspaceFolder}/index.js",
             "env": {
-                "CERTFICATE_FILE": "<self-signed device certificate pem>",
+                "CERTIFICATE_FILE": "<self-signed device certificate pem>",
                 "KEY_FILE": "<key in pem for above>",
                 "HOST_NAME": "<hub name>.azure-devices.net",
                 "DEVICE_ID": "<device id>",
@@ -42,7 +42,7 @@
             ],
             "program": "${workspaceFolder}/index.js",
             "env": {
-                "CERTFICATE_FILE": "<CA signed device certificate pem>",
+                "CERTIFICATE_FILE": "<CA signed device certificate pem>",
                 "KEY_FILE": "<Key for above pem>",
                 "HOST_NAME": "<hub name>.azure-devices.net",
                 "DEVICE_ID": "<device id>",
@@ -60,7 +60,7 @@
             "program": "${workspaceFolder}/index.js",
             "env": {
                 "NEW_ENV": "true",
-                "CERTFICATE_FILE": "self or CA signed device certificate pem>",
+                "CERTIFICATE_FILE": "self or CA signed device certificate pem>",
                 "KEY_FILE": "<Key for above pem>",
                 "CA_FILE": "<certificate to trust from the upstream Edge>",
                 "HOST_NAME": "<hostname of upstream Edge>",
