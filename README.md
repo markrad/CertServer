@@ -26,13 +26,13 @@ There is a sample config file [here](./config_sample.yml). This are the settings
 certServer:
   root: "./data"
   port: 4141
-  certificate: null,
-  key: null,
+  certificate: null
+  key: null
   subject:
-    C: US,
-    ST: Washington,
-    L: Redmond,
-    O: None,
+    C: US
+    ST: Washington
+    L: Redmond
+    O: None
     OU: None
 ``` 
 ### Config file options
@@ -350,7 +350,18 @@ Sample response:
 ### Delete a certificate:  
 `DELETE http://server:4141/api/deleteCert?id=<certificate id>` or  
 `DELETE http://server:4141/api/deleteCert?name=<certificate name>`  
-Deletes the certificate from the server. If name is used and two certificates share the same common name it will fail with an error.
+Deletes the certificate from the server. If name is used and two certificates share the same common name it will fail with an error.  
+Sample response:
+```json
+{
+  "message": "Certificate deleted"
+}
+```
+#### Examples
+##### Curl
+```bash
+curl -X DELETE http://myserver:4141/api/deleteCert?id=33
+```
 ### Get a list of keys:  
 `GET http://server:4141/api/keylist`  
 Sample response:  
@@ -382,7 +393,7 @@ Sample response:
 ```
 #### Examples
 ##### Curl
-```
+```bash
 curl -X POST -H "Content-Type: text/plain" --data-binary @./mykey.pem http://myserver:4141/api/uploadkey 
 ```
 ##### PowerShell

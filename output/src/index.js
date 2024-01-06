@@ -24,7 +24,7 @@ try {
             // Error exit
             throw 'Invalid number of arguments - only a config file path is allowed';
     }
-    if (config.certServer.subject.C.length != 2) {
+    if (config.certServer.subject.C && config.certServer.subject.C.length != 2) {
         throw new Error(`Invalid country code ${config.certServer.subject.C} - must be two characters`);
     }
     const webServer = webserver_1.WebServer.createWebServer(config);

@@ -9,7 +9,6 @@ import crypto from 'crypto';
 import { jsbn, pki, pem, util, random, md } from 'node-forge'; 
 import loki, { Collection, LokiFsAdapter } from 'lokijs'
 import Express, { NextFunction } from 'express';
-import bodyParser from 'body-parser';
 import FileUpload from 'express-fileupload';
 import serveFavicon from 'serve-favicon';
 import WsServer from 'ws';
