@@ -98,6 +98,10 @@ export class WebServer {
             this._key = fs.readFileSync(config.certServer.key, { encoding: 'utf8' });
         }
 
+        if (config.certServer.subject.C && config.certServer.subject.C.length != 2) {
+            throw new Error(`Invalid country code ${config.certServer.subject.C} - must be two characters`);
+        }
+
         this._certificatesPath = path.join(this._dataPath, 'certificates');
         this._privatekeysPath = path.join(this._dataPath, 'privatekeys');
         this._dbPath = path.join(this._dataPath, 'db');

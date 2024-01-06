@@ -923,7 +923,7 @@ $(async function() {
         let newEntry = type == 4 ? buildKeyEntry(entry) : buildCertEntry(entry);
         let listChildren = $(`#${typeLookup[type]}List li`);
         if (listChildren.length == 1 && listChildren.first().attr('class') == 'empty') {
-            listChildren.append(newEntry);
+            listChildren.last().after(newEntry);
             listChildren.first().remove();
         }
         else {
