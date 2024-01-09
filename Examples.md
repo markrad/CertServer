@@ -38,7 +38,7 @@ Root
     ├── DPS direct certificate (CA)
     │   └──	Device certificate (leaf)
     └── DPS indirect certificate (CA)
-        └──	Intermediate certificate (CA)
+        └── Intermediate certificate (CA)
             └──	Device certificate (leaf)
 ```
 ### IoT Hub
