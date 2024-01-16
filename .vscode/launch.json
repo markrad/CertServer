@@ -48,5 +48,28 @@
             ],
             "type": "node"
         },
+        {
+            // Used to test the device sample code. This test uses a CA signed device that acquires
+            // its certificate and key from a running CertServer. The value for CERTIFICATE_SERVER
+            // will need to updated to a valid CertServer URL. The CERTIFICATE_FILE and KEY_FILE
+            // will need the certificate id and key id of the CA signed device certificate. The DEVICE_ID
+            // will need to specify the CN in the CERTIFICATE_FILE. The HOST_NAME will need to 
+            // reference a currently running CertServer instance.
+            "name": "Launch Acquire Test",
+            "program": "${workspaceFolder}/devicesamples/nodeHub/index.js",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "request": "launch",
+            "env": {
+                "CERTIFICATE_SERVER": "http://mrubu2204dt.lan:4141",
+                "CERTIFICATE_FILE": "33",
+                "KEY_FILE": "32",
+                "HOST_NAME": "certtesthub1.azure-devices.net",
+                "DEVICE_ID": "casigned-device",
+                "PROTOCOL": "amqpws"
+            },
+            "type": "node"
+        }
     ]
 } 

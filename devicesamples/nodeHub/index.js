@@ -30,6 +30,7 @@ console.log(`Using protocol ${Protocol.name}`);
 var Client = require('azure-iot-device').Client;
 var Message = require('azure-iot-device').Message;
 const fs = require('fs');
+const { getCerts, getTrust } = require('../experimental/getcerts');
 
 var counter = 0;
 
@@ -83,7 +84,7 @@ var counter = 0;
   var connectionString = null;
   let options = {};
 
-  [ connectionString, options ] = generateConnectionString();
+  [ connectionString, options ] = await generateConnectionString();
   
   var client = Client.fromConnectionString(connectionString, Protocol);
 
@@ -100,56 +101,76 @@ function printResultFor(op) {
   };
 }
 
-function generateConnectionString() {
-  let connectionString = 'HostName=';
-  let options = {};
+async function generateConnectionString() {
+  return new Promise(async (resolve, _reject) => {
+    let connectionString = 'HostName=';
+    let options = {};
 
-  try {
-    if (!process.env.HOST_NAME) {
-      console.error('HOST_NAME is required');
-      process.exit(4);
-    }
-    else {
-      connectionString += process.env.HOST_NAME;
-    }
-
-    connectionString += ';DeviceId=';
-
-    if (!process.env.DEVICE_ID) {
-      console.error('DEVICE_ID is required');
-      process.exit(4);
-    }
-    else {
-      connectionString += process.env.DEVICE_ID;
-    }
-
-    if (process.env.SHARED_ACCESS_KEY) {
-      connectionString += (';SharedAccessKey=' + process.env.SHARED_ACCESS_KEY);
-    }
-    else if (process.env.CERTIFICATE_FILE) {
-      if (!process.env.KEY_FILE) {
-        console.error('KEY_FILE is required with CERTIFICATE_FILE');
+    try {
+      if (!process.env.HOST_NAME) {
+        console.error('HOST_NAME is required');
         process.exit(4);
       }
-      connectionString += ';X509=true';
-      options = {
-        cert: fs.readFileSync(process.env.CERTIFICATE_FILE, { encoding: 'utf8' }),
-        key: fs.readFileSync(process.env.KEY_FILE, { encoding: 'utf8' }),
+      else {
+        connectionString += process.env.HOST_NAME;
       }
+
+      connectionString += ';DeviceId=';
+
+      if (!process.env.DEVICE_ID) {
+        console.error('DEVICE_ID is required');
+        process.exit(4);
+      }
+      else {
+        connectionString += process.env.DEVICE_ID;
+      }
+
+      if (process.env.SHARED_ACCESS_KEY) {
+        connectionString += (';SharedAccessKey=' + process.env.SHARED_ACCESS_KEY);
+      }
+      else if (process.env.CERTIFICATE_FILE) {
+        if (!process.env.KEY_FILE) {
+          console.error('KEY_FILE is required with CERTIFICATE_FILE');
+          process.exit(4);
+        }
+        else if (process.env.KEY_FILE && !process.env.CERTIFICATE_FILE) {
+          console.err('CERTIFICATE_FILE is required with KEY_FILE');
+          process.exit(4);
+        }
+        connectionString += ';X509=true';
+        if (!process.env.CERTIFICATE_SERVER) {
+          options = {
+            cert: fs.readFileSync(process.env.CERTIFICATE_FILE, { encoding: 'utf8' }),
+            key: fs.readFileSync(process.env.KEY_FILE, { encoding: 'utf8' }),
+          }
+        }
+        else {
+          options = await getCerts(process.env.CERTIFICATE_SERVER, process.env.CERTIFICATE_FILE, process.env.KEY_FILE);
+        }
+      }
+      else {
+        console.error('No authentication method has been provided');
+        process.exit(4);
+      }
+
+      if (process.env.CA_FILE) {
+        if (!process.env.CERTIFICATE_SERVER) {
+          options.ca = process.env.CA_FILE;
+        }
+        else {
+          let parsedUrl = url.parse(process.env.CERTIFICATE_SERVER);
+          let filename = `./${parsedUrl.protocol}-${parsedUrl.hostname}-${parsedUrl.port}-${process.env.CA_FILE}.pem`;
+          let ca = getTrust(process.env.CERTIFICATE_SERVER, process.env.CA_FILE);
+          fs.writeFileSync(filename, ca);
+          options.ca = filename;
+        }
+      }
+
+      resolve([ connectionString, options ]);
     }
-    else {
-      console.error('No authentication method has been provided');
+    catch (err) {
+      console.error(`Error thrown during connection string construction: ${err.message}`);
       process.exit(4);
     }
-
-    if (process.env.CA_FILE) {
-      options.ca = process.env.CA_FILE;
-    }
-  }
-  catch (err) {
-    console.error(`Error thrown during connection string construction: ${err.message}`);
-    process.exit(4);
-  }
-
-  return [ connectionString, options ];
+  });
 }

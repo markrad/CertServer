@@ -13,6 +13,11 @@
     //  SHARED_ACCESS_KEY   Key for SAS authentication
     // CA_FILE              Optional - additional certificate to trust (typically for gateway scenarios)
     // PROTOCOL             Optional - AMQP | AMQPWS | MQTT | MQTTWS - defaults to MQTT
+    //
+    // CertServer usage (https://github.com/markrad/CertServer):
+    // CERTIFICATE_SERVER   URL of your CertServer instance
+    // When using a CertServer to manage certificates, then the values for CERTIFICATE_FILE,
+    // KEY_FILE, and CA_FILE should be the ids from the entries in CertServer.
     "version": "0.2.0",
     "configurations": [
         {
