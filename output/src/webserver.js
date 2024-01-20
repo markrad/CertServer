@@ -454,8 +454,10 @@ class WebServer {
                     certResult.added = certResult.added.concat(keyResult.added);
                     certResult.name = `${certResult.name}/${keyResult.name}`;
                     this._broadcast(certResult);
+                    let certId = certResult.added[0].id;
+                    let keyId = keyResult.added[0].id;
                     return response.status(200)
-                        .json({ message: `Certificate/Key ${certResult.name}/${keyResult.name} added` });
+                        .json({ message: `Certificate/Key ${certResult.name}/${keyResult.name} added`, ids: { certificateId: certId, keyId: keyId } });
                 }
                 catch (err) {
                     return response.status((_c = err.status) !== null && _c !== void 0 ? _c : 500).json({ error: err.message });
@@ -503,8 +505,10 @@ class WebServer {
                     certResult.added = certResult.added.concat(keyResult.added);
                     certResult.name = `${certResult.name}/${keyResult.name}`;
                     this._broadcast(certResult);
+                    let certId = certResult.added[0].id;
+                    let keyId = keyResult.added[0].id;
                     return response.status(200)
-                        .json({ message: `Certificate/Key ${certResult.name}/${keyResult.name} added` });
+                        .json({ message: `Certificate/Key ${certResult.name}/${keyResult.name} added`, ids: { certificateId: certId, keyId: keyId } });
                 }
                 catch (err) {
                     logger.error(`Failed to create intermediate certificate: ${err.message}`);
@@ -555,8 +559,10 @@ class WebServer {
                     certResult.added = certResult.added.concat(keyResult.added);
                     certResult.name = `${certResult.name}/${keyResult.name}`;
                     this._broadcast(certResult);
+                    let certId = certResult.added[0].id;
+                    let keyId = keyResult.added[0].id;
                     return response.status(200)
-                        .json({ message: `Certificate/Key ${certResult.name}/${keyResult.name} added` });
+                        .json({ message: `Certificate/Key ${certResult.name}/${keyResult.name} added`, ids: { certificateId: certId, keyId: keyId } });
                 }
                 catch (err) {
                     logger.error(`Error creating leaf certificate: ${err.message}`);
@@ -657,7 +663,7 @@ class WebServer {
                     }
                     let result = yield this._tryAddCertificate({ pemString: request.body });
                     this._broadcast(result);
-                    return response.status(200).json({ message: `Certificate ${result.name} of type ${CertTypes_1.CertTypes[result.added[0].type]} added` });
+                    return response.status(200).json({ message: `Certificate ${result.name} of type ${CertTypes_1.CertTypes[result.added[0].type]} added`, ids: { certificateId: result.added[0].id } });
                 }
                 catch (err) {
                     response.status((_h = err.status) !== null && _h !== void 0 ? _h : 500).json({ error: err.message });
@@ -729,7 +735,7 @@ class WebServer {
                     }
                     let result = yield this._tryAddKey({ pemString: request.body, password: request.query.password });
                     this._broadcast(result);
-                    return response.status(200).json({ message: `Key ${result.name} added` });
+                    return response.status(200).json({ message: `Key ${result.name} added`, ids: { keyId: result.added[0].id } });
                 }
                 catch (err) {
                     response.status(500).json({ error: err.message });

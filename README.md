@@ -120,7 +120,10 @@ Sample response:
 ```JSON
 {
     "message": "Certificate/Key someName/someName_key added",
-    "types": "root;key"
+    "ids": {
+      "certificateId": <id>,
+      "keyId": <id>
+    }
 }
 ```
 #### Examples
@@ -161,7 +164,10 @@ Sample response:
 ```JSON
 {
     "message": "Certificate/Key intName/intName_key added",
-    "types": "intermediate;key"
+    "ids": {
+      "certificateId": <id>,
+      "keyId": <id>
+    }
 }
 ```
 #### Examples
@@ -208,7 +214,11 @@ _Note, in the post data, the SANArray entries must begin with the string 'DNS: '
 Sample response:
 ```JSON
 {
-    "message": "Certificate/Key leafName/leafName_key added"
+    "message": "Certificate/Key leafName/leafName_key added",
+    "ids": {
+      "certificateId": <id>,
+      "keyId": <id>
+    }
 }
 ```
 #### Examples
@@ -271,7 +281,10 @@ Uploads an existing certificate to the server. The pem string is placed in the p
 Sample response:
 ```json
 {
-  "message":"Certificate Baltimore_CyberTrust_Root of type root added"
+  "message":"Certificate Baltimore_CyberTrust_Root of type root added",
+    "ids": {
+      "certificateId": <id>
+    }
 }
 ```
 ##### Curl
@@ -388,7 +401,10 @@ Uploads an existing key to the server. The pem data is placed in the post data. 
 Sample response:
 ```json
 {
-    "message": "Key intName_key added"
+    "message": "Key intName_key added",
+    "ids": {
+      "keyId": <id>
+    }
 }
 ```
 #### Examples
