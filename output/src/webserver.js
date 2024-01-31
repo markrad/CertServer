@@ -775,7 +775,7 @@ class WebServer {
                     let c = this._resolveCertificateQuery(request.query);
                     let fileData = yield this._getChain(c);
                     response.type('application/text');
-                    response.setHeader('Content-Disposition', `inline; filename=${WebServer._getCertificateFilenameFromRow(c)}_chain.pem`);
+                    response.setHeader('Content-Disposition', `inline; filename=${c.name}_chain.pem`);
                     response.send(fileData);
                 }
                 catch (err) {
@@ -1566,7 +1566,7 @@ class WebServer {
         });
     }
     static _validateCertificateInput(type, bodyIn) {
-        var _a, _b, _c, _d, _e, _f, _g, _h;
+        var _a, _b;
         // FUTURE Needs a mechanism to force parts of the RDA sequence to be omitted
         try {
             if (typeof bodyIn !== 'object') {
@@ -1579,12 +1579,12 @@ class WebServer {
                 signer: (_a = body.signer) !== null && _a !== void 0 ? _a : null,
                 password: (_b = body.password) !== null && _b !== void 0 ? _b : null,
                 subject: {
-                    C: (_c = body.country) !== null && _c !== void 0 ? _c : null,
-                    ST: (_d = body.state) !== null && _d !== void 0 ? _d : null,
-                    L: (_e = body.location) !== null && _e !== void 0 ? _e : null,
-                    O: (_f = body.organization) !== null && _f !== void 0 ? _f : null,
-                    OU: (_g = body.unit) !== null && _g !== void 0 ? _g : null,
-                    CN: (_h = body.commonName) !== null && _h !== void 0 ? _h : null
+                    C: body.country ? body.country : null,
+                    ST: body.state ? body.state : null,
+                    L: body.location ? body.location : null,
+                    O: body.organization ? body.organization : null,
+                    OU: body.unit ? body.unit : null,
+                    CN: body.commonName ? body.commonName : null
                 },
                 san: {
                     domains: [],

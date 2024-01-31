@@ -801,7 +801,7 @@ export class WebServer {
                 let c = this._resolveCertificateQuery(request.query as QueryType);
                 let fileData = await this._getChain(c);
                 response.type('application/text');
-                response.setHeader('Content-Disposition', `inline; filename=${WebServer._getCertificateFilenameFromRow(c)}_chain.pem`);
+                response.setHeader('Content-Disposition', `inline; filename=${c.name}_chain.pem`);
                 response.send(fileData);
             }
             catch (err) {
@@ -1669,12 +1669,12 @@ export class WebServer {
                 signer: body.signer?? null,
                 password: body.password?? null,
                 subject: {
-                    C: body.country ?? null,
-                    ST: body.state ?? null,
-                    L: body.location ?? null,
-                    O: body.organization ?? null,
-                    OU: body.unit ?? null,
-                    CN: body.commonName ?? null
+                    C: body.country? body.country : null,
+                    ST: body.state? body.state : null,
+                    L: body.location? body.location : null,
+                    O: body.organization? body.organization : null,
+                    OU: body.unit? body.unit : null,
+                    CN: body.commonName? body.commonName : null
                 },
                 san: {
                     domains: [],
