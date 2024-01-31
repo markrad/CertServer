@@ -599,7 +599,7 @@ export class WebServer {
                 let certId = certResult.added[0].id;
                 let keyId = keyResult.added[0].id;
                 return response.status(200)
-                    .json({ message: `Certificate/Key ${certResult.name}/${keyResult.name} added`, ids: { certificateId: certId, keyId: keyId } });
+                    .json({ message: `Certificate/Key ${certResult.name} added`, ids: { certificateId: certId, keyId: keyId } });
             }
             catch (err) {
                 logger.error(`Error creating leaf certificate: ${err.message}`);
