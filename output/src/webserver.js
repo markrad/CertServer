@@ -476,16 +476,18 @@ class WebServer {
                     const k = yield (this._pkiKeyFromRow(kRow, certInput.password));
                     const { privateKey, publicKey } = node_forge_1.pki.rsa.generateKeyPair(2048);
                     const attributes = WebServer._setAttributes(certInput.subject);
-                    let sal = {};
-                    sal.domains = certInput.san.domains;
-                    sal.IPs = certInput.san.IPs;
                     const extensions = [
                         new ExtensionBasicConstraints_1.ExtensionBasicConstraints({ cA: true, critical: true }),
                         new ExtensionKeyUsage_1.ExtensionKeyUsage({ keyCertSign: true, cRLSign: true }),
                         new ExtensionAuthorityKeyIdentifier_1.ExtensionAuthorityKeyIdentifier({ keyIdentifier: c.generateSubjectKeyIdentifier().getBytes(), authorityCertSerialNumber: true }),
                         new ExtensionSubjectKeyIdentifier_1.ExtensionSubjectKeyIdentifier({}),
-                        new ExtensionSubjectAltName_1.ExtensionSubjectAltName(sal),
                     ];
+                    if (certInput.san.domains.length > 0 || certInput.san.IPs.length > 0) {
+                        let sal = {};
+                        sal.domains = certInput.san.domains;
+                        sal.IPs = certInput.san.IPs;
+                        extensions.push(new ExtensionSubjectAltName_1.ExtensionSubjectAltName(sal));
+                    }
                     // Create an empty Certificate
                     let cert = node_forge_1.pki.createCertificate();
                     // Set the Certificate attributes for the new Root CA
@@ -508,7 +510,7 @@ class WebServer {
                     let certId = certResult.added[0].id;
                     let keyId = keyResult.added[0].id;
                     return response.status(200)
-                        .json({ message: `Certificate/Key ${certResult.name}/${keyResult.name} added`, ids: { certificateId: certId, keyId: keyId } });
+                        .json({ message: `Certificate/Key ${certResult.name} added`, ids: { certificateId: certId, keyId: keyId } });
                 }
                 catch (err) {
                     logger.error(`Failed to create intermediate certificate: ${err.message}`);
@@ -1610,7 +1612,9 @@ class WebServer {
             if (errString.length > 0) {
                 throw new CertError_1.CertError(500, errString.join(';'));
             }
-            result.san.domains.push(body.commonName);
+            if (type == CertTypes_1.CertTypes.leaf) {
+                result.san.domains.push(body.commonName);
+            }
             if (type != CertTypes_1.CertTypes.root && body.SANArray) {
                 let SANArray = Array.isArray(body.SANArray) ? body.SANArray : [body.SANArray];
                 let domains = SANArray.filter((entry) => entry.startsWith('DNS:')).map((entry) => entry.split(' ')[1]);

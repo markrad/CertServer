@@ -501,16 +501,18 @@ export class WebServer {
         
                 const { privateKey, publicKey } = pki.rsa.generateKeyPair(2048);
                 const attributes = WebServer._setAttributes(certInput.subject);
-                let sal:ExtensionSubjectAltNameOptions = { };
-                sal.domains = certInput.san.domains;
-                sal.IPs = certInput.san.IPs;
                 const extensions: ExtensionParent[] = [
                     new ExtensionBasicConstraints({ cA: true, critical: true }),
                     new ExtensionKeyUsage({ keyCertSign: true, cRLSign: true }),
                     new ExtensionAuthorityKeyIdentifier({ keyIdentifier: c.generateSubjectKeyIdentifier().getBytes(), authorityCertSerialNumber: true }),
                     new ExtensionSubjectKeyIdentifier({ }),
-                    new ExtensionSubjectAltName(sal),
-                ]
+                ];
+                if (certInput.san.domains.length > 0 || certInput.san.IPs.length > 0) {
+                    let sal: ExtensionSubjectAltNameOptions = {};
+                    sal.domains = certInput.san.domains;
+                    sal.IPs = certInput.san.IPs;
+                    extensions.push(new ExtensionSubjectAltName(sal));
+                }
 
                 // Create an empty Certificate
                 let cert = pki.createCertificate();
@@ -537,7 +539,7 @@ export class WebServer {
                 let certId = certResult.added[0].id;
                 let keyId = keyResult.added[0].id;
                 return response.status(200)
-                    .json({ message: `Certificate/Key ${certResult.name}/${keyResult.name} added`, ids: { certificateId: certId, keyId: keyId } });
+                    .json({ message: `Certificate/Key ${certResult.name} added`, ids: { certificateId: certId, keyId: keyId } });
             }
             catch (err) {
                 logger.error(`Failed to create intermediate certificate: ${err.message}`);
@@ -1693,7 +1695,9 @@ export class WebServer {
             if (errString.length > 0) {
                 throw new CertError(500, errString.join(';'));
             }
-            result.san.domains.push(body.commonName);
+            if (type == CertTypes.leaf) {
+                result.san.domains.push(body.commonName);
+            }
             if (type != CertTypes.root && body.SANArray) {
                 let SANArray = Array.isArray(body.SANArray) ? body.SANArray : [body.SANArray];
                 let domains = SANArray.filter((entry: string) => entry.startsWith('DNS:')).map((entry: string) => entry.split(' ')[1]);
