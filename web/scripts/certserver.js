@@ -743,8 +743,10 @@ function createIntermediateCertResponse(result) {
  * Called when the reset button is clicked on the new intermediate form.
  */
 function resetIntermediateForm() {
+    let signer = $('#intermediateSigner').val();
     $('#newIntermediateForm')[0].reset();
     $('#IntermediateSANList').empty();
+    $('#intermediateSigner').val(signer); 
 }
 
 /**
@@ -762,8 +764,10 @@ function createLeafCertResponse(result) {
  * Called when the reset button is clicked on the new leaf form.
  */
 function resetLeafForm() {
+    let signer = $('#leafSigner').val();
     $('#newLeafForm')[0].reset();
     $('#LeafSANList').empty();
+    $('#leafSigner').val(signer);
 }
 
 /**
