@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CertError = void 0;
+exports.CertMultiError = exports.CertError = void 0;
 /** Extends the standard Error type and adds an HTTP status code for return to the client */
 class CertError extends Error {
     /**
@@ -16,4 +16,11 @@ class CertError extends Error {
     }
 }
 exports.CertError = CertError;
+class CertMultiError extends CertError {
+    constructor(status, message, certNumbers) {
+        super(status, message);
+        this.certs = certNumbers;
+    }
+}
+exports.CertMultiError = CertMultiError;
 //# sourceMappingURL=CertError.js.map

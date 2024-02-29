@@ -39,6 +39,7 @@ import { GenerateCertRequest } from './webservertypes/GenerateCertRequest';
 import { QueryType } from './webservertypes/QueryType';
 import { userAgentOS } from './webservertypes/userAgentOS';
 import { CertError } from './webservertypes/CertError';
+import { CertMultiError } from "./webservertypes/CertMultiError";
 import { KeyLine } from './KeyLine';
 import { CertificateInput } from './webservertypes/CertificateInput';
 
@@ -200,6 +201,48 @@ export class WebServer {
                 version: this._version,
             });
         });
+        this._app.get('/api/test', async (request, response) => {
+            response.setHeader('content-type', 'application/text');
+            let userAgent = request.get('User-Agent')
+            let os: userAgentOS;
+
+            if (request.query.os) {
+                if ((request.query.os as string).toUpperCase() in userAgentOS) {
+                    let work: keyof typeof userAgentOS = ((request.query.os as string).toUpperCase() as 'LINUX' | 'WINDOWS' | 'MAC');
+                    os = userAgentOS[work];
+                    logger.debug(`OS specified as ${userAgentOS[os]}`);
+                }
+                else {
+                    return response.status(400).json({ error: `OS invalid or unsupported ${request.query.os as string}` });
+                }
+            }
+            else {
+                os = WebServer._guessOs(userAgent);
+                logger.debug(`${userAgent} guessed to be ${userAgentOS[os]}`);
+            }
+
+            let hostname = `${csHost({ protocol: this._certificate ? 'https' : 'http', hostname: request.hostname, port: this._port })}`;
+            let readable: Readable;
+
+            if (os == userAgentOS.LINUX || os == userAgentOS.MAC) {
+                response.setHeader('content-disposition', `attachment; filename="${request.hostname}-${this._port}.sh"`);
+                readable = Readable.from([
+                    `export CERTSERVER_HOST=${hostname}\n`,
+                    `export REQUEST_PATH=${request.path}\n`,
+                ].concat(((await readFile('src/files/linuxhelperscript.sh', { encoding: 'utf8' })).split('\n').map((l) => l + '\n'))));
+            }
+            else if (os == userAgentOS.WINDOWS) {
+                response.setHeader('content-disposition', `attachment; filename="${request.hostname}-${this._port}.ps1"`);
+                readable = Readable.from([
+                    `Set-Item "env:CERTSERVER_HOST" -Value "${hostname}"\n`,
+                    `Set-Item "env:REQUEST_PATH" -Value "${request.path}"\n`,
+                ].concat(((await readFile('src/files/windowshelperscript.ps1', { encoding: 'utf8' })).split('\n').map((l) => l + '\n'))));
+            }
+            else {
+                return response.status(400).json({ error: `No script for OS ${userAgentOS[os]}}` });
+            }
+            readable.pipe(response);
+        });
         this._app.get('/api/helper', (request, response) => {
             response.setHeader('content-type', 'application/text');
             let userAgent = request.get('User-Agent')
@@ -300,13 +343,13 @@ export class WebServer {
                         `$uri = Get-URIPrefix + "/api/uploadKey"\n`,
                         `Invoke-RestMethod -Method Post -Uri $uri -InFile $keyName -ContentType 'text/plain'\n`,
                     `}\n`,
-        ]);
+                ]);
             }
             else {
                 return response.status(400).json({ error: `No script for OS ${userAgentOS[os]}}` });
             }
             readable.pipe(response);
-        })
+        });
         this._app.post('/createCACert', async (request, _response, next) => {
             request.url = '/api/createCACert'
             next();
@@ -622,7 +665,12 @@ export class WebServer {
                 response.status(200).json(retVal);
             }
             catch (err) {
-                response.status(err.status ?? 500).json({ error: err.message })
+                if (err instanceof CertMultiError) {
+                    response.status(err.status).json({ error: err.message, ids: err.certs });
+                }
+                else {
+                    response.status(err.status ?? 500).json({ error: err.message });
+                }
             }
         })
         this._app.get('/api/keyList', (request, _response, next) => {
@@ -1521,7 +1569,7 @@ export class WebServer {
             throw new CertError(404, `No certificate for ${query.id ? 'id' : 'name'} ${Object.values(selector)[0]} found`);
         }
         else if (c.length > 1) {
-            throw new CertError(400, `Multiple certificates match the name ${Object.values(selector)[0]} - use id instead`);
+            throw new CertMultiError(400, `Multiple certificates match the name ${Object.values(selector)[0]} - use id instead`, c.map((l) => l.$loki));
         }
 
         return c[0];
@@ -1724,9 +1772,11 @@ export class WebServer {
 
         let ua = userAgent.toLowerCase();
 
+        if (ua.includes('powershell')) return userAgentOS.WINDOWS;      // Powershell will always be treated as Windows
         if (ua.includes('windows')) return userAgentOS.WINDOWS;
         if (ua.includes('linux')) return userAgentOS.LINUX;
-        if (ua.includes('curl')) return userAgentOS.LINUX;           // Best guess
+        if (ua.includes('curl')) return userAgentOS.LINUX;              // Best guess
+        if (ua.includes('wget')) return userAgentOS.LINUX               // Another best guess
         if (ua.includes('mac')) return userAgentOS.MAC;
         if (ua.includes('x11')) return userAgentOS.LINUX;
         if (ua.includes('iphone')) return userAgentOS.IPHONE;
