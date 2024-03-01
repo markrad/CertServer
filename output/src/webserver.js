@@ -62,6 +62,7 @@ const ExtensionSubjectAltName_1 = require("./extensions/ExtensionSubjectAltName"
 const CertTypes_1 = require("./webservertypes/CertTypes");
 const userAgentOS_1 = require("./webservertypes/userAgentOS");
 const CertError_1 = require("./webservertypes/CertError");
+const CertMultiError_1 = require("./webservertypes/CertMultiError");
 const logger = log4js.getLogger();
 logger.level = "debug";
 /**
@@ -628,7 +629,7 @@ class WebServer {
                     response.status(200).json(retVal);
                 }
                 catch (err) {
-                    if (err instanceof CertError_1.CertMultiError) {
+                    if (err instanceof CertMultiError_1.CertMultiError) {
                         response.status(err.status).json({ error: err.message, ids: err.certs });
                     }
                     else {
@@ -1482,7 +1483,7 @@ class WebServer {
             throw new CertError_1.CertError(404, `No certificate for ${query.id ? 'id' : 'name'} ${Object.values(selector)[0]} found`);
         }
         else if (c.length > 1) {
-            throw new CertError_1.CertMultiError(400, `Multiple certificates match the name ${Object.values(selector)[0]} - use id instead`, c.map((l) => l.$loki));
+            throw new CertMultiError_1.CertMultiError(400, `Multiple certificates match the name ${Object.values(selector)[0]} - use id instead`, c.map((l) => l.$loki));
         }
         return c[0];
     }
