@@ -72,34 +72,56 @@ const newLeaf = {
         "IP: 55.55.55.55",
     ]
 };
+var TestType;
+(function (TestType) {
+    TestType[TestType["NoRun"] = 0] = "NoRun";
+    TestType[TestType["RunForAPITests"] = 1] = "RunForAPITests";
+    TestType[TestType["RunForBashTests"] = 2] = "RunForBashTests";
+    TestType[TestType["RunForPowerShellTests"] = 4] = "RunForPowerShellTests";
+    TestType[TestType["RunForAllTests"] = 7] = "RunForAllTests";
+})(TestType || (TestType = {}));
+var TestResult;
+(function (TestResult) {
+    TestResult[TestResult["TestNotYetRun"] = 0] = "TestNotYetRun";
+    TestResult[TestResult["TestSucceeded"] = 1] = "TestSucceeded";
+    TestResult[TestResult["TestFailed"] = 2] = "TestFailed";
+    TestResult[TestResult["TestSkippedNotSelected"] = 3] = "TestSkippedNotSelected";
+    TestResult[TestResult["TestSkippedNoEnvironment"] = 4] = "TestSkippedNoEnvironment";
+    TestResult[TestResult["TestSkippedPlaceHolder"] = 5] = "TestSkippedPlaceHolder";
+    TestResult[TestResult["TestSkippedPreviousFailure"] = 6] = "TestSkippedPreviousFailure";
+})(TestResult || (TestResult = {}));
 let tests = [
-    { description: 'Set up', runOnFailure: true, testFunction: setup, result: true },
-    { description: 'Create webserver', runOnFailure: true, testFunction: createWebserver, result: true },
-    { description: 'Connect WebSocket', runOnFailure: true, testFunction: connectWebSocket, result: true },
-    { description: 'Ensure the database is empty', runOnFailure: false, testFunction: checkForEmptyDatabase, result: true },
-    { description: 'Generate CA certificate', runOnFailure: false, testFunction: createCACertificate, result: true },
-    { description: 'Generate intermediate certificate', runOnFailure: false, testFunction: createIntermediateCertificate, result: true },
-    { description: 'Generate leaf certificate', runOnFailure: false, testFunction: createLeafCertificate, result: true },
-    { description: 'Add tags to intermediate certificate', runOnFailure: false, testFunction: addTagsToIntermediate, result: true },
-    { description: 'Get a list of the root certificates', runOnFailure: false, testFunction: getRootCertificateList, result: true },
-    { description: 'Get a list of the intermediate certificates', runOnFailure: false, testFunction: getIntermediateCertificateList, result: true },
-    { description: 'Get a list of the leaf certificates', runOnFailure: false, testFunction: getLeafCertificateList, result: true },
-    { description: 'Get a list of the keys', runOnFailure: false, testFunction: getKeyList, result: true },
-    { description: 'Get certificate details by ID', runOnFailure: false, testFunction: getCertificateDetailsByID, result: true },
-    { description: 'Get key details by ID', runOnFailure: false, testFunction: getKeyDetailsByID, result: true },
-    { description: 'Check the database is populated', runOnFailure: false, testFunction: checkDatabaseIsPopulated, result: true },
-    { description: 'Get root certificate file', runOnFailure: false, testFunction: getRootCertificateFile, result: true },
-    { description: 'Get intermediate certificate file', runOnFailure: false, testFunction: getIntermediateCertificateFile, result: true },
-    { description: 'Get leaf certificate file', runOnFailure: false, testFunction: getLeafCertificateFile, result: true },
-    { description: 'Get key file', runOnFailure: false, testFunction: getKeyFile, result: true },
-    { description: 'Delete root certificate', runOnFailure: false, testFunction: deleteRootCertificate, result: true },
-    { description: 'Upload root certificate', runOnFailure: false, testFunction: uploadRootCertificate, result: true },
-    { description: 'Delete intermediate key', runOnFailure: false, testFunction: deleteIntermediateKey, result: true },
-    { description: 'Delete intermediate key', runOnFailure: false, testFunction: uploadIntermediateKey, result: true },
-    { description: 'Get certificate with bad parameters', runOnFailure: false, testFunction: getCertificateWithBadParameter, result: true },
-    { description: 'Get certificate with nonexistent name', runOnFailure: false, testFunction: getCertificateWithNonexistentName, result: true },
-    { description: 'Get certificate with nonexistent Id', runOnFailure: false, testFunction: getCertificateWithNonexistentId, result: true },
-    { description: 'Clean up', runOnFailure: true, testFunction: cleanUp, result: true },
+    { description: 'Set up', runCondition: TestType.RunForAllTests, runOnFailure: true, testFunction: setup, result: TestResult.TestNotYetRun },
+    { description: 'Create webserver', runCondition: TestType.RunForAllTests, runOnFailure: true, testFunction: createWebserver, result: TestResult.TestNotYetRun },
+    { description: 'Connect WebSocket', runCondition: TestType.RunForAllTests, runOnFailure: true, testFunction: connectWebSocket, result: TestResult.TestNotYetRun },
+    { description: 'Ensure the database is empty', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: checkForEmptyDatabase, result: TestResult.TestNotYetRun },
+    { description: 'Generate CA certificate', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: createCACertificate, result: TestResult.TestNotYetRun },
+    { description: 'Generate intermediate certificate', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: createIntermediateCertificate, result: TestResult.TestNotYetRun },
+    { description: 'Generate leaf certificate', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: createLeafCertificate, result: TestResult.TestNotYetRun },
+    { description: 'Add tags to intermediate certificate', runCondition: TestType.RunForAPITests, runOnFailure: false, testFunction: addTagsToIntermediate, result: TestResult.TestNotYetRun },
+    { description: 'Get a list of the root certificates', runCondition: TestType.RunForAPITests, runOnFailure: false, testFunction: getRootCertificateList, result: TestResult.TestNotYetRun },
+    { description: 'Get a list of the intermediate certificates', runCondition: TestType.RunForAPITests, runOnFailure: false, testFunction: getIntermediateCertificateList, result: TestResult.TestNotYetRun },
+    { description: 'Get a list of the leaf certificates', runCondition: TestType.RunForAPITests, runOnFailure: false, testFunction: getLeafCertificateList, result: TestResult.TestNotYetRun },
+    { description: 'Get a list of the keys', runCondition: TestType.RunForAPITests, runOnFailure: false, testFunction: getKeyList, result: TestResult.TestNotYetRun },
+    { description: 'Get certificate details by ID', runCondition: TestType.RunForAPITests, runOnFailure: false, testFunction: getCertificateDetailsByID, result: TestResult.TestNotYetRun },
+    { description: 'Get key details by ID', runCondition: TestType.RunForAPITests, runOnFailure: false, testFunction: getKeyDetailsByID, result: TestResult.TestNotYetRun },
+    { description: 'Check the database is populated', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: checkDatabaseIsPopulated, result: TestResult.TestNotYetRun },
+    { description: 'Get root certificate file', runCondition: TestType.RunForAPITests, runOnFailure: false, testFunction: getRootCertificateFile, result: TestResult.TestNotYetRun },
+    { description: 'Get intermediate certificate file', runCondition: TestType.RunForAPITests, runOnFailure: false, testFunction: getIntermediateCertificateFile, result: TestResult.TestNotYetRun },
+    { description: 'Get leaf certificate file', runCondition: TestType.RunForAPITests, runOnFailure: false, testFunction: getLeafCertificateFile, result: TestResult.TestNotYetRun },
+    { description: 'Get key file', runCondition: TestType.RunForAPITests, runOnFailure: false, testFunction: getKeyFile, result: TestResult.TestNotYetRun },
+    { description: 'Get certificate with bad parameters', runCondition: TestType.RunForAPITests, runOnFailure: false, testFunction: getCertificateWithBadParameter, result: TestResult.TestNotYetRun },
+    { description: 'Get certificate with nonexistent name', runCondition: TestType.RunForAPITests, runOnFailure: false, testFunction: getCertificateWithNonexistentName, result: TestResult.TestNotYetRun },
+    { description: 'Get certificate with nonexistent Id', runCondition: TestType.RunForAPITests, runOnFailure: false, testFunction: getCertificateWithNonexistentId, result: TestResult.TestNotYetRun },
+    // bash script section
+    { description: 'Download and source bash helper script', runCondition: TestType.RunForBashTests, runOnFailure: false, testFunction: null, result: TestResult.TestNotYetRun },
+    // PowerShell script section
+    { description: 'Download and source PowerShell helper script', runCondition: TestType.RunForPowerShellTests, runOnFailure: false, testFunction: null, result: TestResult.TestNotYetRun },
+    { description: 'Delete root certificate', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: deleteRootCertificate, result: TestResult.TestNotYetRun },
+    { description: 'Upload root certificate', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: uploadRootCertificate, result: TestResult.TestNotYetRun },
+    { description: 'Delete intermediate key', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: deleteIntermediateKey, result: TestResult.TestNotYetRun },
+    { description: 'Delete intermediate key', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: uploadIntermediateKey, result: TestResult.TestNotYetRun },
+    { description: 'Clean up', runCondition: TestType.RunForAPITests, runOnFailure: true, testFunction: cleanUp, result: TestResult.TestNotYetRun },
 ];
 const types = ['root', 'intermediate', 'leaf', 'key'];
 let webServer;
@@ -459,41 +481,74 @@ function cleanUp() {
         return true;
     });
 }
-runTests();
 function runTests() {
     return __awaiter(this, void 0, void 0, function* () {
         console.log(`Running ${tests.length} test${tests.length == 1 ? '' : 's'}`);
+        let testSelection = (process.env.RUN_API_TESTS == '1' ? TestType.RunForAPITests : TestType.NoRun) |
+            (process.env.RUN_BASH_HELPER_TESTS == '1' ? TestType.RunForBashTests : TestType.NoRun) |
+            (process.env.RUN_POWERSHELL_HELPER_TESTS == '1' ? TestType.RunForPowerShellTests : TestType.NoRun);
+        let shells = getAvailableShells();
+        let testAvailable = TestType.RunForAPITests |
+            (shells.bash.available ? TestType.RunForBashTests : TestType.NoRun) |
+            (shells.powershell.available ? TestType.RunForPowerShellTests : TestType.NoRun);
         for (let test in tests) {
-            let succeeded = tests.map((entry) => entry.result).reduce((previousValue, currentValue) => {
-                return currentValue == false ? currentValue : previousValue;
-            }, true);
-            let run = (succeeded == true || tests[test].runOnFailure == true);
-            console.log(`Test ${test}: ${tests[test].description} ${run ? '' : ' - Skipped due to previous failure'}`);
-            if (run) {
-                try {
-                    tests[test].result = yield tests[test].testFunction();
-                    if (!tests[test].result) {
-                        console.error(`Test ${test}: ${fgRed('failed')}`);
+            // Don't run if the test type was not selected
+            if (!(tests[test].runCondition & testSelection)) {
+                console.log(`Test ${test}: ${tests[test].description} - Function skipped because test type was not selected`);
+                tests[test].result = TestResult.TestSkippedNotSelected;
+            }
+            // Don't run if the environment is not available (bash or PowerShell)
+            else if ((tests[test].runCondition & testAvailable) == 0) {
+                console.log(`Test ${test}: ${tests[test].description} - Function skipped because test environment is not available`);
+                tests[test].result = TestResult.TestSkippedNoEnvironment;
+            }
+            // Don't run if the test function is null
+            else if (tests[test].testFunction == null) {
+                console.log(`Test ${test}: ${tests[test].description} - Skipped due to function is a placeholder`);
+                tests[test].result = TestResult.TestSkippedPlaceHolder;
+            }
+            else {
+                let succeeded = tests.map((entry) => entry.result).reduce((previousValue, currentValue) => {
+                    return currentValue == TestResult.TestFailed ? currentValue : previousValue;
+                }, TestResult.TestSucceeded);
+                // Don't run if there has been a failure and this test is not set to run on failure
+                if (succeeded == TestResult.TestSucceeded || tests[test].runOnFailure == true) {
+                    console.log(`Test ${test}: ${tests[test].description}`);
+                    try {
+                        tests[test].result = (yield tests[test].testFunction()) ? TestResult.TestSucceeded : TestResult.TestFailed;
+                        if (!tests[test].result) {
+                            console.error(`Test ${test}: ${fgRed('failed')}`);
+                        }
+                        else {
+                            console.log(`Test ${test}: ${fgGreen('succeeded')}`);
+                        }
                     }
-                    else {
-                        console.log(`Test ${test}: ${fgGreen('succeeded')}`);
+                    catch (err) {
+                        console.error(`Error caught in test ${test} - ${err.message}`);
+                        tests[test].result = TestResult.TestFailed;
                     }
                 }
-                catch (err) {
-                    console.error(`Error caught in test ${test} - ${err.message}`);
-                    tests[test].result = false;
+                else {
+                    console.log(`Test ${test}: ${tests[test].description} - Skipped due to previous failure`);
                 }
             }
         }
-        let failedCount = tests.filter((entry) => !entry.result);
-        if (failedCount.length > 0) {
-            console.error(`The following test${failedCount.length == 1 ? '' : 's'} failed:`);
+        let work;
+        work = tests.filter((entry) => entry.result == TestResult.TestSkippedNoEnvironment);
+        console.log(`${work.length} test${work.length == 1 ? '' : 's'} skipped due to no available environment`);
+        work = tests.filter((entry) => entry.result == TestResult.TestSkippedNotSelected);
+        console.log(`${work.length} test${work.length == 1 ? '' : 's'} skipped due to not selected`);
+        work = tests.filter((entry) => entry.result == TestResult.TestSkippedPlaceHolder);
+        console.log(`${work.length} test${work.length == 1 ? '' : 's'} skipped due to the function is only a placeholder`);
+        work = tests.filter((entry) => entry.result == TestResult.TestFailed);
+        if (work.length > 0) {
+            console.error(`The following test${work.length == 1 ? '' : 's'} failed:`);
             for (let test in tests) {
                 if (!tests[test].result) {
                     console.error(`${test} - ${tests[test].description}`);
                 }
             }
-            console.error(`${failedCount.length} test${failedCount.length == 1 ? '' : 's'} failed`);
+            console.error(`${work.length} test${work.length == 1 ? '' : 's'} failed`);
             process.exit(4);
         }
         else {
@@ -585,4 +640,52 @@ function fgGreen(s) {
 function fgRed(s) {
     return `${FG_RED}${s}${RESET}`;
 }
+function getAvailableShells() {
+    let shells = { bash: { available: false, command: null }, powershell: { available: false, command: null } };
+    let output;
+    if (process.platform == 'linux') {
+        try {
+            console.log('OS is Linux');
+            output = (0, child_process_1.execSync)('which bash').toString().trim();
+            shells.bash = { available: true, command: output };
+            console.log(`bash is available at ${shells.bash.command}`);
+        }
+        catch (e) {
+            console.log(`bash not found - failed with ${e}`);
+            shells.bash.available = false;
+        }
+        try {
+            output = (0, child_process_1.execSync)('which pwsh').toString().trim();
+            shells.powershell = { available: true, command: output };
+            console.log(`PowerShell is available at ${shells.powershell.command}`);
+        }
+        catch (e) {
+            console.log(`PowerShell not found - failed with ${e}`);
+            shells.powershell.available = false;
+        }
+    }
+    else if (process.platform.startsWith('win')) {
+        console.log(`OS is ${process.platform}`);
+        try {
+            output = (0, child_process_1.execSync)('cmd /C "where pwsh"').toString().trim();
+            shells.powershell = { available: true, command: output };
+            console.log(`PowerShell is available at ${shells.powershell.command}`);
+        }
+        catch (e) {
+            console.log(`PowerShell not found - failed with ${e}`);
+            shells.powershell.available = false;
+        }
+        try {
+            output = (0, child_process_1.execSync)('cmd /C "where bash"').toString().split('\n');
+            shells.bash = { available: true, command: output[0] };
+            console.log(`bash is available at ${shells.bash.command}`);
+        }
+        catch (e) {
+            console.log(`bash not found - failed with ${e}`);
+            shells.bash.available = false;
+        }
+    }
+    return shells;
+}
+runTests();
 //# sourceMappingURL=tests.js.map
