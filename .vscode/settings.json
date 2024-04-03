@@ -1,5 +1,6 @@
 {
     "cSpell.words": [
+        "Amark",
         "autoload",
         "certcache",
         "certdetails",
@@ -10,6 +11,8 @@
         "deepmerge",
         "devcontainers",
         "fileupload",
+        "gendevice",
+        "generatesastoken",
         "getcert",
         "getcertandkey",
         "getcerts",
@@ -17,6 +20,7 @@
         "getchain",
         "getchainandkey",
         "getkey",
+        "getservicestatistics",
         "iaki",
         "iski",
         "jsbn",
@@ -37,21 +41,26 @@
         "orphanedkey",
         "pathlen",
         "pems",
+        "popd",
         "privatekeys",
         "pushcert",
+        "pushd",
         "pushkey",
         "pwsh",
+        "remdevice",
         "rnas",
         "rski",
         "simplesort",
         "testdata",
         "tswebscripts",
+        "urlencode",
         "webserver",
         "webservertypes",
         "windowshelperscript",
         "wsonclose",
         "wsonerror",
         "wsonmessage",
-        "wsonopen"
+        "wsonopen",
+        "wtfnode"
     ]
 }

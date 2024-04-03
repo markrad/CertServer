@@ -25,13 +25,15 @@
             "env": {
                 "LOG_SERVER_STDOUT": "1",
                 "RUN_API_TESTS": "1",
-                "RUN_BASH_HELPER_TESTS": "1",
-                "RUN_POWERSHELL_HELPER_TESTS": "0"
+                "RUN_BASH_HELPER_TESTS": "0",
+                "RUN_POWERSHELL_HELPER_TESTS": "1",
+                "RUN_IOTHUB_TESTS": "0",
             },
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "type": "node"
+            "type": "node",
+            "console": "integratedTerminal"
         },
         {
             "type": "bashdb",
@@ -41,6 +43,24 @@
             "program": "${workspaceFolder}/build/build.sh",
             "terminalKind": "integrated",
             "args": [ "--patch" ]
+        },
+        {
+            "type": "bashdb",
+            "request": "launch",
+            "name": "Launch bash helper function",
+            "cwd": "${workspaceFolder}",
+            "program": "${workspaceFolder}/test.sh",
+            "terminalKind": "integrated",
+            "args": [
+                "--patch"
+            ]
+        },
+        {
+            "name": "Launch PowerShell helper function",
+            "type": "PowerShell",
+            "request": "launch",
+            "script": "${workspaceFolder}/x.ps1",
+            "cwd": "${cwd}"
         },
         {
             "name": "Launch Experimental",

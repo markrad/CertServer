@@ -2,7 +2,7 @@ echo Exported CERTSERVER_HOST=$CERTSERVER_HOST
 echo To make this permanent add export CERTSERVER_HOST=$CERTSERVER_HOST to your .bashrc file
 echo 
 echo To source in one step run
-echo "source <(curl ${CERTSERVER_HOST}${REQUEST_PATH}})"
+echo "source <(curl ${CERTSERVER_HOST}${REQUEST_PATH})"
 echo 
 command -v curl &> /dev/null
 if [ $? -ne 0 ]; then
@@ -112,12 +112,12 @@ function generate_sas_token() {
     endpoint=$(echo "$connection_string" | grep -o -E "HostName=([^;]+)" | cut -d'=' -f2)
     key_name=$(echo "$connection_string" | grep -o -E "SharedAccessKeyName=([^;]+)" | cut -d'=' -f2)
     key_value=$(echo "$connection_string" | grep -o -E "SharedAccessKey=([^;]+)" | cut -c17-)
-    key_hex=$(echo -n $key_value | base64 -d)
-    if [ -z $endpoint ] || [ -z $key_name ] || [ -z $key_value ]; then
+    if [ -z "$endpoint" ] || [ -z "$key_name" ] || [ -z "$key_value" ]; then
         echo Connection string is invalid
         return 4
     else
         # Generate SAS token
+        key_hex=$(echo -n $key_value | base64 -d)
         expiry=$(($(date +%s) + 3600))  # Expiry time: current time + 1 hour
         to_encrypt="$endpoint"$'\n'"$expiry"
         signature=$(echo -n "$to_encrypt" | openssl dgst -sha256 -binary -hmac "$key_hex" -binary | base64)
@@ -126,17 +126,36 @@ function generate_sas_token() {
         echo "$token"
     fi
 }
+function getservicestatistics() {
+    # Queries service statistics
+    # $1: SAS token generated from connection string
+    # $2: IoT hub URI
+    # Return codes:
+    #   200: Statistics returned
+    #   Other: Call failed
+    local sas_token=$1
+    local res=$?
+    if [ $res -ne 0 ]; then
+        echo Error $sas_token
+        return 4
+    fi
+    local url="${2}/statistics/service?api-version=2020-05-31-preview"
+    stats=$(curl -s --fail-with-body -H "Authorization: $sas_token" "$url")
+    local res=$?
+    echo $stats
+    return $res
+}
 function getcertserver() { 
     echo $CERTSERVER_HOST;
 }
 function getcert() { 
-    wget --content-disposition $CERTSERVER_HOST/api/getCertificatePem?id=$@; 
+    wget --content-disposition $CERTSERVER_HOST/api/getCertificatePem?id=$@ 2>&1; 
 }
 function getkey() { 
-    wget --content-disposition $CERTSERVER_HOST/api/getKeyPem?id=$@; 
+    wget --content-disposition $CERTSERVER_HOST/api/getKeyPem?id=$@ 2>&1; 
 }
 function getchain() { 
-    wget --content-disposition $CERTSERVER_HOST/api/chainDownload?id=$@; 
+    wget --content-disposition $CERTSERVER_HOST/api/chainDownload?id=$@ 2>&1; 
 }
 function pushcert() { 
     curl -X POST -H "Content-Type: text/plain" --data-binary @$@ $CERTSERVER_HOST/api/uploadCert; 
@@ -182,7 +201,7 @@ function extractetag() {
     # Returns:
     #   0: etag found and returned
     #   1: etag not found
-    FIND_ETAG='"etag":("[a-zA-Z0-9]*")'
+    FIND_ETAG='"etag":("[a-zA-Z0-9=]*")'
     if [[ $1 =~ $FIND_ETAG ]]; then
         echo ${BASH_REMATCH[1]}
         return 0
@@ -239,7 +258,7 @@ function getcertdetailsbyname() {
     # 2: Certificate does not exist
     # 3: CertServer returned an error - returns { "error": "<message" }
     # 4: Missing arguments
-    if [ -z $1 ]; then
+    if [ -z "$1" ]; then
         echo Missing arguments
         echo "Usage getcertdetailsbyname <device identity>"
         return 4
@@ -267,15 +286,17 @@ function remdevice() {
     # Removes the device from the hub and the associated certificate from the certserver if there is one
     # $1: Connection string
     # $2: Device identity
-    if [ -z $1 ] || [ -z $2 ]; then
+    set connection_string=$1
+    set device_id=$2
+    if [ -z "$connection_string" ] || [ -z "$device_id" ]; then
         echo Missing arguments
         echo "Usage remdevice <connection string> <device identity>"
         return 4
     fi
-    details=$(getcertdetailsbyname $2)
+    details=$(getcertdetailsbyname $device_id)
     res=$?
     if [ $res -eq 1 ]; then
-        echo Multiple certificates for $3 - cannot continue
+        echo Multiple certificates for $device_id - cannot continue
         return 4
     elif [ $res -eq 2 ]; then
         echo Certificate does not exist - will delete device
@@ -312,14 +333,15 @@ function remdevice() {
         fi
         echo Certificate deleted
     fi
-    echo Deleting device $2
-    sas_token=$(generate_sas_token $1)
-    if [ $? -ne 0 ]; then
+    echo Deleting device $device_id
+    sas_token=$(generate_sas_token $connection_string)
+    res=$?
+    if [ $res -ne 0 ]; then
         echo $sas_token
-        return $?
+        return $res
     fi
     hub_uri=$(echo "$1" | grep -o -E "HostName=([^;]+)" | cut -d'=' -f2)
-    device=$(_get_device "$sas_token" "$hub_uri" "$2")
+    device=$(_get_device "$sas_token" "$hub_uri" "$device_id")
     res=$?
     if [ $res -ne 0 ]; then
         echo Cannot find device: $device
@@ -331,37 +353,44 @@ function remdevice() {
         echo $etag
         return 4
     fi
-    local uri="https://${hub_uri}/devices/{$2}?api-version=2020-05-31-preview"
+    local uri="https://${hub_uri}/devices/{$device_id}?api-version=2020-05-31-preview"
     device=$(curl -s -X DELETE -H "Authorization: $sas_token" -H "If-Match: $etag" "$uri")
     local res=$?
-    echo $device
+    if [ $res -eq 0 ]; then
+        echo "Device ${device_id} deleted"
+    else
+        echo "Failed to delete device ${device_id}: ${device}"
+    fi
 }
 function gendevice() {
     # Creates a device and generates X.509 certificate and key for authorization with the hub
     # $1: Connection string
     # $2: Certserver id of IoT hub root certificate
     # $3: New device identity
-    if [ -z $1 ] || [ -z $2 ] || [ -z $3 ]; then
+    connection_string=$1
+    root_id=$2
+    device_id=$3
+    if [ -z "$connection_string" ] || [ -z "$root_id" ] || [ -z "$device_id" ]; then
         echo Missing arguments
         echo "Usage gendevice <connection string> <root certificate id> <new device identity>"
         return 4
     fi
-    details=$(getcertdetailsbyname $3)
+    details=$(getcertdetailsbyname "$device_id")
     res=$?
     if [ $res -eq 0 ]; then
-        echo Certificate for $3 already exists
+        echo Certificate for $device_id already exists
         return 4
     elif [ $res -ne 2 ]; then
         echo An error occured: $details
         return 4
     fi
-    sas_token=$(generate_sas_token $1)
-    if [ $? -ne 0 ]; then
+    sas_token=$(generate_sas_token "$connection_string")
+    res=$?
+    if [ $res -ne 0 ]; then
         echo $sas_token
-        return $?
+        return $res
     fi
-    hub_uri=$(echo "$1" | grep -o -E "HostName=([^;]+)" | cut -d'=' -f2)
-    device_id=$3
+    hub_uri=$(echo "$connection_string" | grep -o -E "HostName=([^;]+)" | cut -d'=' -f2)
     msg=$(_check_device "$sas_token" "$hub_uri" "$device_id")
     res=$?
     if [ "$res" -eq 0 ]; then

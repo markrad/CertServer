@@ -178,9 +178,15 @@ class WebServer {
             this._app.use('/files', express_1.default.static(path_1.default.join(__dirname, '../../web/files')));
             this._app.use('/images', express_1.default.static(path_1.default.join(__dirname, '../../web/images')));
             this._app.use((0, express_fileupload_1.default)());
-            this._app.use((request, _response, next) => {
-                logger.debug(`${request.method} ${request.url}`);
-                next();
+            this._app.use((request, response, next) => {
+                var _a;
+                try {
+                    logger.debug(`${request.method} ${request.url}`);
+                    next();
+                }
+                catch (err) {
+                    response.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).json({ error: err.message });
+                }
             });
             this._app.get('/', (_request, response) => {
                 response.render('index', {
@@ -830,6 +836,16 @@ class WebServer {
                     return response.status((_p = err.status) !== null && _p !== void 0 ? _p : 500).json({ error: err.message });
                 }
             }));
+            this._app.use((request, response, _next) => {
+                var _a;
+                try {
+                    logger.warn(`No paths match ${request.path}`);
+                    response.status(404).json({ error: `No paths match ${request.path}` });
+                }
+                catch (err) {
+                    response.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).json({ error: err.message });
+                }
+            });
             let server;
             try {
                 if (this._certificate) {

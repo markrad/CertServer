@@ -1,3 +1,5 @@
+Set-Item "env:CERTSERVER_HOST" -Value "https://rr-frigate.lan:4141"
+Set-Item "env:REQUEST_PATH" -Value "/api/test"
 Write-Host Exported CERTSERVER_HOST =((Get-Item -Path "Env:/CERTSERVER_HOST").Value)
 
 function Get-Filename_ {
@@ -30,8 +32,8 @@ function Get-File_ {
         [string]$UriSuffix
     )
     $filename = Get-Filename_ $UriSuffix
-    Invoke-WebRequest -Uri (Get-URIPrefix $UriSuffix) -OutFile ".\\$filename"
-    Write-Host ".\\$filename written"
+    Invoke-WebRequest -Uri (Get-URIPrefix $UriSuffix) -OutFile ".\$filename"
+    Write-Host ".\$filename written"
 }
 function New-SAS-Token {
     param (
@@ -67,7 +69,18 @@ function Get-CertDetailsById {
         [Parameter(Mandatory)]
         [int]$CertificateId
     )
-    return Invoke-RestMethod -Uri (Get-URIPrefix "certdetails?id=$CertificateId")
+    $resp = [Internal]::GetCertDetailsById($CertificateId)
+    if ($resp.Success -eq $false) {
+        if ($resp.ReturnCode -eq 404) {
+            Write-Host -ForegroundColor Yellow Certificate $CertificateId does not exist
+        }
+        else {
+            Write-Host -ForegroundColor Red Error occured getting device: $resp.ReturnCode $resp.Error
+        }
+    }
+    else {
+        return $resp.Result
+    }
 }
 function Get-CertKeyId {
     param (
@@ -75,7 +88,12 @@ function Get-CertKeyId {
         [int]$CertificateId
     )
     $key = (Get-CertDetailsById $CertificateId).keyId
-    return $key
+    if ($null -eq $key) {
+        Write-Host -ForegroundColor Yellow Certificate $CertificateId does not have a key
+    }
+    else {
+        return $key
+    }
 }
 function Get-CertPem {
     param (
@@ -90,16 +108,23 @@ function Get-ChainAndKey {
         [Parameter(Mandatory)]
         [int]$CertificateId
     )
-    $key = Get-CertKeyId $CertificateId
-
-    if (!$key) {
-        Write-Host Certificate does not have a key available
+    $resp = [Internal]::GetCertDetailsById($CertificateId)
+    if ($resp.Success -eq $false) {
+        if ($resp.ReturnCode -eq 404) {
+            Write-Host -ForegroundColor Yellow Certificate $CertificateId does not exist
+        }
+        else {
+            Write-Host -ForegroundColor Red Error occured getting device: $resp.ReturnCode $resp.Error
+        }
+    }
+    elseif ($null -eq $resp.Result.keyId) {
+        Write-Host -ForegroundColor Yellow Certifcate $CertificateId does not have a key
     }
     else {
         Write-Host Getting chain $CertificateId
         Get-Chain $CertificateId
-        Write-Host Getting key $key
-        Get-KeyPem $key
+        Write-Host Getting key $resp.Result.keyId
+        Get-KeyPem $resp.Result.keyId
     }
 }
 function Get-CertAndKey {
@@ -107,10 +132,17 @@ function Get-CertAndKey {
         [Parameter(Mandatory)]
         [int]$CertificateId
     )
-    $key = Get-CertKeyId $CertificateId
-
-    if (!$key) {
-        Write-Host Certificate does not have a key available
+    $resp = [Internal]::GetCertDetailsById($CertificateId)
+    if ($resp.Success -eq $false) {
+        if ($resp.ReturnCode -eq 404) {
+            Write-Host -ForegroundColor Yellow Certificate $CertificateId does not exist
+        }
+        else {
+            Write-Host -ForegroundColor Red Error occured getting device: $resp.ReturnCode $resp.Error
+        }
+    }
+    elseif ($null -eq $resp.Result.keyId) {
+        Write-Host -ForegroundColor Yellow Certifcate $CertificateId does not have a key
     }
     else {
         Write-Host Getting certificate $CertificateId
@@ -154,15 +186,355 @@ function Get-CertDetailsByName {
         [Parameter(Mandatory)]
         [string]$CertificateCommonName
     )
-    Invoke-RestMethod -Uri (Get-URIPrefix "certdetails?name=$CertificateCommonName")
+    $resp = [Internal]::GetCertDetailsByName($CertificateCommonName)
+    if ($resp.Success -eq $false) {
+        if ($resp.ReturnCode -eq 404) {
+            Write-Host -ForegroundColor Yellow Certificate $CertificateCommonName does not exist
+        }
+        elseif ($resp.ReturnCode -eq 400) {
+            Write-Host -ForegroundColor Yellow Multiple Certificates with common name $CertificateCommonName exist
+        }
+        else {
+            Write-Host -ForegroundColor Red Error occured getting device: $resp.ReturnCode $resp.Error
+        }
+    }
+    else {
+        return $resp.Result
+    }
 }
-function Set-Exit-Code {
-    param (
-        [Parameter(Mandatory)]
-        [int]$ExitCode
-    )
-    $LASTEXITCODE = $ExitCode
-    return
+class ReturnCode {
+    [Boolean] $Success
+    [int] $ReturnCode
+    [string] $Error
+    [System.Object] $Result
+    ReturnCode([hashtable]$Properties) { $this.Init($Properties) }
+    [void] Init([hashtable]$Properties) {
+        foreach ($Property in $Properties.Keys) {
+            $this.$Property = $Properties.$Property
+        }
+    }
+}
+class Internal {
+    static [ReturnCode] GetCertDetailsByName([string]$CertificateCommonName) {
+        try {
+            $httprc = -1
+            $resp = Invoke-RestMethod -Uri (Get-URIPrefix "certdetails?name=$CertificateCommonName") -SkipHttpErrorCheck -StatusCodeVariable "httprc"
+            if ($httprc -ne 200) {
+                return [ReturnCode]::new(
+                    @{
+                        Success    = $false
+                        ReturnCode = $httprc
+                        Error      = $resp
+                        Result     = $null
+                    }
+                )
+            }
+            else {
+                return [ReturnCode]::new(
+                    @{
+                        Success    = $true
+                        ReturnCode = $httprc
+                        Error      = ''
+                        Result     = $resp
+                    }
+                )
+            }
+        }
+        catch {
+            return [ReturnCode]::new(
+                @{
+                    Success    = $false
+                    ReturnCode = 1
+                    Error      = $_
+                    Result     = ''
+                }
+            )
+        }
+    }
+    static [ReturnCode] GetCertDetailsById([int]$CertificateId) {
+        try {
+            $httprc = -1
+            $resp = Invoke-RestMethod -Uri (Get-URIPrefix "certdetails?id=$CertificateId") -SkipHttpErrorCheck -StatusCodeVariable "httprc"
+            if ($httprc -ne 200) {
+                return [ReturnCode]::new(
+                    @{
+                        Success    = $false
+                        ReturnCode = $httprc
+                        Error      = $resp
+                        Result     = $null
+                    }
+                )
+            }
+            else {
+                return [ReturnCode]::new(
+                    @{
+                        Success    = $true
+                        ReturnCode = $httprc
+                        Error      = ''
+                        Result     = $resp
+                    }
+                )
+            }
+        }
+        catch {
+            return [ReturnCode]::new(
+                @{
+                    Success    = $false
+                    ReturnCode = 1
+                    Error      = $_
+                    Result     = ''
+                }
+            )
+        }
+    }
+    static [ReturnCode] CreateLeafCertificate([string]$CertificateCommonName, [int]$SignerId, [int]$ValidDays) {
+        try {
+            $ValidTo = (Get-Date).AddDays($ValidDays)
+            $body = @{
+                signer = $SignerId
+                commonName = $CertificateCommonName
+                validTo = $ValidTo.toString('MM/dd/yyyy')
+            }
+            $jsonBody = ConvertTo-Json $body
+            $httprc = -1
+            $headers = @{
+                'Content-Type' = "application/json"
+            }
+            $resp = Invoke-RestMethod -Method POST -Uri (Get-URIPrefix "createleafcert") -Headers $headers -Body $jsonBody -SkipHttpErrorCheck -StatusCodeVariable "httprc"
+            if ($httprc -ne 200) {
+                return [ReturnCode]::new(
+                    @{
+                        Success    = $false
+                        ReturnCode = $httprc
+                        Error      = $resp
+                        Result     = $null
+                    }
+                )
+            }
+            else {
+                return [ReturnCode]::new(
+                    @{
+                        Success    = $true
+                        ReturnCode = $httprc
+                        Error      = ''
+                        Result     = $resp
+                    }
+                )
+            }
+        }
+        catch {
+            return [ReturnCode]::new(
+                @{
+                    Success    = $false
+                    ReturnCode = 1
+                    Error      = $_
+                    Result     = ''
+                }
+            )
+        }
+    }
+    static [ReturnCode] DeleteDeviceCertificate([int] $CertificateId) {
+        try {
+            $httprc = -1
+            $resp = Invoke-RestMethod -Method DELETE -Uri (Get-URIPrefix "deletecert?id=${CertificateId}") -SkipHttpErrorCheck -StatusCodeVariable "httprc"
+            if ($httprc -ne 200) {
+                return [ReturnCode]::new(
+                    @{
+                        Success    = $false
+                        ReturnCode = $httprc
+                        Error      = $resp
+                        Result     = $null
+                    }
+                )
+            }
+            else {
+                return [ReturnCode]::new(
+                    @{
+                        Success    = $true
+                        ReturnCode = $httprc
+                        Error      = $null
+                        Result     = $resp
+                    }
+                )
+            }
+        }
+        catch {
+            return [ReturnCode]::new(
+                @{
+                    Success    = $false
+                    ReturnCode = 1
+                    Error      = $_
+                    Result     = ''
+                }
+            )
+        }
+    }
+    static [ReturnCode] DeleteDeviceKey([int] $KeyId) {
+        try {
+            $httprc = -1
+            $resp = Invoke-RestMethod -Method DELETE -Uri (Get-URIPrefix "deletekey?id=${KeyId}") -SkipHttpErrorCheck -StatusCodeVariable "httprc"
+            if ($httprc -ne 200) {
+                return [ReturnCode]::new(
+                    @{
+                        Success    = $false
+                        ReturnCode = $httprc
+                        Error      = $resp
+                        Result     = $null
+                    }
+                )
+            }
+            else {
+                return [ReturnCode]::new(
+                    @{
+                        Success    = $true
+                        ReturnCode = $httprc
+                        Error      = $null
+                        Result     = $resp
+                    }
+                )
+            }
+        }
+        catch {
+            return [ReturnCode]::new(
+                @{
+                    Success    = $false
+                    ReturnCode = 1
+                    Error      = $_
+                    Result     = ''
+                }
+            )
+        }
+    }
+    static [ReturnCode] GetDevice([string]$SASToken, [string]$Url, [string]$DeviceId) {
+        $headers = @{
+            'Authorization' = $SASToken
+        }
+        try {
+            $httprc = -1
+            $resp = Invoke-RestMethod -Uri "https://$Url/devices/$($DeviceId)?api-version=2020-05-31-preview" -Headers $headers -SkipHttpErrorCheck -StatusCodeVariable "httprc"
+            if ($httprc -ne 200) {
+                return [ReturnCode]::new(
+                    @{
+                        Success    = $false
+                        ReturnCode = $httprc
+                        Error      = $resp
+                        Result     = $null
+                    }
+                )
+            }
+            else {
+                return [ReturnCode]::new(
+                    @{
+                        Success    = $true
+                        ReturnCode = $httprc
+                        Error      = ''
+                        Result     = $resp
+                    }
+                )
+            }
+        }
+        catch {
+            return [ReturnCode]::new(
+                @{
+                    Success    = $false
+                    ReturnCode = 1
+                    Error      = $_
+                    Result     = ''
+                }
+            )
+        }
+    }
+    static [ReturnCode] AddDevice([string]$SASToken, [string]$Url, [string]$DeviceId) {
+        try {
+            $headers = @{
+                'Authorization' = $SASToken
+                'Content-Type' = 'application/json'
+            }
+            $body = @{
+                'deviceid' = $DeviceId
+                'status' = 'enabled'
+                'authentication' = @{
+                    'type' = 'certificateAuthority'
+                }
+                'capabilities' = @{
+                    'iotEdge' = $false
+                }
+            }
+            $jsonBody = ConvertTo-Json $body
+            $httprc = -1
+            $resp = Invoke-RestMethod -Method PUT -Uri "https://$Url/devices/$($DeviceId)?api-version=2020-05-31-preview" -Headers $headers -Body $jsonBody -SkipHttpErrorCheck -StatusCodeVariable "httprc"
+            if ($httprc -ne 200) {
+                return [ReturnCode]::new(
+                    @{
+                        Success    = $false
+                        ReturnCode = $httprc
+                        Error      = $resp
+                        Result     = $null
+                    }
+                )
+            }
+            else {
+                return [ReturnCode]::new(
+                    @{
+                        Success    = $true
+                        ReturnCode = $httprc
+                        Error      = ''
+                        Result     = $resp
+                    }
+                )
+            }
+        }
+        catch {
+            return [ReturnCode]::new(
+                @{
+                    Success    = $false
+                    ReturnCode = 1
+                    Error      = $_
+                    Result     = ''
+                }
+            )
+        }
+    }
+    static [ReturnCode] RemoveDevice([string]$SASToken, [string]$Url, [string]$DeviceId, [string]$eTag) {
+        $headers = @{
+            'Authorization' = $SASToken
+            'If-Match' = $eTag
+        }
+        try {
+            $httprc = -1
+            $resp = Invoke-RestMethod -Method DELETE -Uri "https://$Url/devices/$($DeviceId)?api-version=2020-05-31-preview" -Headers $headers -SkipHttpErrorCheck -StatusCodeVariable "httprc" -SkipHeaderValidation
+            if ($httprc -ne 204) {
+                return [ReturnCode]::new(
+                    @{
+                        Success    = $false
+                        ReturnCode = $httprc
+                        Error      = $resp
+                        Result     = $null
+                    }
+                )
+            }
+            else {
+                return [ReturnCode]::new(
+                    @{
+                        Success    = $true
+                        ReturnCode = $httprc
+                        Error      = ''
+                        Result     = $resp
+                    }
+                )
+            }
+        }
+        catch {
+            return [ReturnCode]::new(
+                @{
+                    Success    = $false
+                    ReturnCode = 1
+                    Error      = $_
+                    Result     = ''
+                }
+            )
+        }
+    }
 }
 function Get-Device {
     param (
@@ -173,6 +545,11 @@ function Get-Device {
     )
     try {
         $SASToken = New-SAS-Token $ConnectionString
+    }
+    catch {
+        Write-Host -ForegroundColor Red Failed to generate SAS token: $_
+    }
+    try {
         if ($ConnectionString -match "HostName=([^;]+)") {
             $endpoint = $Matches.1
         }
@@ -180,33 +557,167 @@ function Get-Device {
             # This will probably never happen
             throw "Invalid connection string passed"
         }
-        $headers = @{
-            'Authorization' = $SASToken
-        }
-        $resp = Invoke-RestMethod -Uri "https://$endpoint/devices/$($DeviceId)?api-version=2020-05-31-preview" -Headers $headers
-        return $resp
-    }
-    catch {
-        if ($_.ErrorDetails) {
-            if ($_.ErrorDetails.Message -match "ErrorCode:([^;]+)") {
-                $msg = $Matches.1
-                if ($msg -eq "DeviceNotFound") {
-                    Write-Host "$DeviceId was not found"
-                    return Set-Exit-Code 1
-                }
-                else {
-                    Write-Host "Error $msg"
-                    return Set-Exit-Code 2
-                }
+        $resp = [Internal]::GetDevice($SASToken, $endpoint, $DeviceId)
+        if ($resp.Success -eq $false) {
+            if ($resp.ReturnCode -eq 404) {
+                Write-Host -ForegroundColor Yellow Device $DeviceId does not exist
             }
             else {
-                Write-Host $_.ErrorDetails.Message
-                return  Set-Exit-Code 3
+                Write-Host -ForegroundColor Red Error occured getting device: $resp.Error
             }
         }
         else {
-            Write-Host "An unexpected error occured: $_"
-            return  Set-Exit-Code 4
+            return $resp.Result
         }
+    }
+    catch {
+        Write-Host "An unexpected error occured: $_"
+    }
+}
+
+function Remove-Device {
+    param (
+        [Parameter(Mandatory)]
+        [string]$ConnectionString,
+        [Parameter(Mandatory)]
+        [string]$DeviceId
+    )
+
+    try {
+        $resp = [Internal]::GetCertDetailsByName($DeviceId)
+        if ($resp.Success -eq $false) {
+            if ($resp.ReturnCode -eq 404) {
+                Write-Host -ForegroundColor Yellow Certificate $DeviceId does not exist - will delete device
+            }
+            elseif ($resp.ReturnCode -eq 400) {
+                Write-Host -ForegroundColor Yellow Multiple Certificates with common name $DeviceId exist
+            }
+            else {
+                Write-Host -ForegroundColor Red Error occured getting device: $resp.ReturnCode $resp.Error
+            }
+        }
+        else {
+            $keyId = $resp.Result.keyId
+            $resp = [Internal]::DeleteDeviceCertificate($resp.Result.id)
+            if ($resp.Success -ne $true) {
+                Write-Host -ForegroundColor Red Failed to delete device certificate: $resp.Error
+                return 4
+            }
+            else {
+                Write-Host Certificate deleted
+            }
+            $resp = [Internal]::DeleteDeviceKey($keyId)
+            if ($resp.Success -ne $true) {
+                Write-Host -ForegroundColor Red Failed to delete device key: $resp.Error
+                return 4
+            }
+            else {
+                Write-Host Key deleted
+            }
+        }
+        $SasToken = New-SAS-Token $ConnectionString
+        $ConnectionString -match "HostName=([^;]+)"
+        $Url = $Matches.1
+        $resp = [Internal]::GetDevice($SasToken, $Url, $DeviceId)
+        if ($resp.Success -ne $true) {
+            Write-Host -ForegroundColor Red Error retrieving device from hub $resp.Error
+            return 4
+        }
+        else {
+            $resp = [Internal]::RemoveDevice($SasToken, $Url, $DeviceId, $resp.Result.etag)
+            if ($resp.Success -eq $true) {
+                Write-Host Device deleted
+            }
+            else {
+                Write-Host -ForegroundColor Red Error deleting device from hub $resp.Error
+                return 4
+            }
+        }
+    }
+    catch {
+        Write-Host -ForegroundColor Red Unexpected error occured: $_
+    }
+
+    if ($deleteDevice) {
+        
+    }
+}
+
+function New-Device {
+    param (
+        [Parameter(Mandatory)]
+        [string]$ConnectionString,
+        [Parameter(Mandatory)]
+        [int]$ParentCertificateId,
+        [Parameter(Mandatory)]
+        [string]$DeviceId
+    )
+    try {
+        $createCert = $true
+        $newCertId = $null
+        $resp = [Internal]::GetCertDetailsByName($DeviceId)
+        if ($resp.Success -eq $true) {
+            if ($resp.Result.certType -ne 'leaf') {
+                Write-Host -ForegroundColor Red Certificate is not a leaf certificate
+                return 4
+            }
+            elseif ($null -eq $resp.Result.keyId) {
+                Write-Host -ForegroundColor Red Certificate does not have a key available
+                return 4
+            }
+            elseif ($resp.Result.signerId -ne $ParentCertificateId) {
+                Write-Host -ForegroundColor Red Certificate is not signed by the specified parent
+                return 4
+            }
+            Write-Host Certificate $DeviceId already exists and is suitable for X.509 authenticaton
+            $newCertId = $resp.Result.id
+            $createCert = $false
+        }
+        elseif ($resp.ReturnCode -ne 404) {
+            Write-Host -ForegroundColor Red An error occured acquire $DeviceId details
+            return 4
+        }
+        $resp = [Internal]::GetCertDetailsById($ParentCertificateId)
+        if ($resp.ReturnCode -ne 200) {
+            Write-Host -ForegroundColor Red Could not find the parent certificate with id $ParentCertificateId
+            return 4
+        }
+        if ($resp.Response.certType -eq 'leaf') {
+            Write-Host -ForegroundColor Red Specified parent certificate cannot sign a child
+            return 4
+        }
+        $SasToken = New-SAS-Token $ConnectionString
+        $ConnectionString -match "HostName=([^;]+)"
+        $Url = $Matches.1
+        $resp = [Internal]::GetDevice($SasToken, $Url, $DeviceId)
+        if ($resp.Success) {
+            Write-Host -ForegroundColor Red Device $DeviceId already exists
+            return 4
+        }
+        elseif ($resp.ReturnCode -ne 404) {
+            Write-Host -ForegroundColor Red Failed read device information $resp.Error
+            return 4
+        }
+
+        $resp = [Internal]::AddDevice($SasToken, $Url, $DeviceId)
+        if ($resp.Success -ne $true) {
+            Write-Host -ForegroundColor Red Failed to create device $resp.Error
+            return 4
+        }
+        Write-Host Device created
+        if ($createCert -eq $true) {
+            $resp = [Internal]::CreateLeafCertificate($DeviceId, $ParentCertificateId, 800)
+            if ($resp.Success -eq $false) {
+                Write-Host -ForegroundColor Red Failed to create certificate: $resp.Error
+                return 4
+            }
+            Write-Host Certificate created
+            $newCertId = $resp.Result.ids.certificateId
+        }
+        Write-Host Downloading new certificate chain and key
+        Get-ChainAndKey $newCertId
+    }
+    catch {
+        Write-Host -ForegroundColor Red Unexpected error occured: $_
     }
 }

@@ -13,13 +13,20 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const fs_1 = __importDefault(require("fs"));
+const promises_1 = require("fs/promises");
 const path_1 = __importDefault(require("path"));
 const child_process_1 = require("child_process");
 const node_assert_1 = __importDefault(require("node:assert"));
 const http_1 = __importDefault(require("http"));
+const https_1 = __importDefault(require("https"));
 const node_forge_1 = require("node-forge");
+const stream_1 = require("stream");
+const node_readline_1 = __importDefault(require("node:readline"));
+const node_process_1 = require("node:process");
 const ws_1 = __importDefault(require("ws"));
+// import * as wtfnode from 'wtfnode';
 const eventWaiter_1 = require("../utility/eventWaiter");
+const generatesastoken_1 = require("../utility/generatesastoken");
 const testPath = path_1.default.join(__dirname, '../testdata');
 const testConfig = path_1.default.join(testPath, 'testconfig.yml');
 const url = 'http://localhost:9997';
@@ -72,6 +79,8 @@ const newLeaf = {
         "IP: 55.55.55.55",
     ]
 };
+const bashHelperScript = 'bashHelper.sh';
+const pwshHelperScript = 'pwshHelper.ps1';
 var TestType;
 (function (TestType) {
     TestType[TestType["NoRun"] = 0] = "NoRun";
@@ -80,6 +89,9 @@ var TestType;
     TestType[TestType["RunForPowerShellTests"] = 4] = "RunForPowerShellTests";
     TestType[TestType["RunForAllTests"] = 7] = "RunForAllTests";
 })(TestType || (TestType = {}));
+let shells;
+let sasToken;
+let connectionString;
 var TestResult;
 (function (TestResult) {
     TestResult[TestResult["TestNotYetRun"] = 0] = "TestNotYetRun";
@@ -89,6 +101,7 @@ var TestResult;
     TestResult[TestResult["TestSkippedNoEnvironment"] = 4] = "TestSkippedNoEnvironment";
     TestResult[TestResult["TestSkippedPlaceHolder"] = 5] = "TestSkippedPlaceHolder";
     TestResult[TestResult["TestSkippedPreviousFailure"] = 6] = "TestSkippedPreviousFailure";
+    TestResult[TestResult["TestSkippedMissingOrInvalidConnectionString"] = 7] = "TestSkippedMissingOrInvalidConnectionString";
 })(TestResult || (TestResult = {}));
 let tests = [
     { description: 'Set up', runCondition: TestType.RunForAllTests, runOnFailure: true, testFunction: setup, result: TestResult.TestNotYetRun },
@@ -109,18 +122,28 @@ let tests = [
     { description: 'Get root certificate file', runCondition: TestType.RunForAPITests, runOnFailure: false, testFunction: getRootCertificateFile, result: TestResult.TestNotYetRun },
     { description: 'Get intermediate certificate file', runCondition: TestType.RunForAPITests, runOnFailure: false, testFunction: getIntermediateCertificateFile, result: TestResult.TestNotYetRun },
     { description: 'Get leaf certificate file', runCondition: TestType.RunForAPITests, runOnFailure: false, testFunction: getLeafCertificateFile, result: TestResult.TestNotYetRun },
+    { description: 'Get leaf chain file', runCondition: TestType.RunForAPITests, runOnFailure: false, testFunction: getLeafChainFile, result: TestResult.TestNotYetRun },
     { description: 'Get key file', runCondition: TestType.RunForAPITests, runOnFailure: false, testFunction: getKeyFile, result: TestResult.TestNotYetRun },
     { description: 'Get certificate with bad parameters', runCondition: TestType.RunForAPITests, runOnFailure: false, testFunction: getCertificateWithBadParameter, result: TestResult.TestNotYetRun },
     { description: 'Get certificate with nonexistent name', runCondition: TestType.RunForAPITests, runOnFailure: false, testFunction: getCertificateWithNonexistentName, result: TestResult.TestNotYetRun },
     { description: 'Get certificate with nonexistent Id', runCondition: TestType.RunForAPITests, runOnFailure: false, testFunction: getCertificateWithNonexistentId, result: TestResult.TestNotYetRun },
-    // bash script section
-    { description: 'Download and source bash helper script', runCondition: TestType.RunForBashTests, runOnFailure: false, testFunction: null, result: TestResult.TestNotYetRun },
-    // PowerShell script section
-    { description: 'Download and source PowerShell helper script', runCondition: TestType.RunForPowerShellTests, runOnFailure: false, testFunction: null, result: TestResult.TestNotYetRun },
     { description: 'Delete root certificate', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: deleteRootCertificate, result: TestResult.TestNotYetRun },
     { description: 'Upload root certificate', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: uploadRootCertificate, result: TestResult.TestNotYetRun },
     { description: 'Delete intermediate key', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: deleteIntermediateKey, result: TestResult.TestNotYetRun },
-    { description: 'Delete intermediate key', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: uploadIntermediateKey, result: TestResult.TestNotYetRun },
+    { description: 'Upload intermediate key', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: uploadIntermediateKey, result: TestResult.TestNotYetRun },
+    // bash script section
+    { description: 'Download and source bash helper script', runCondition: TestType.RunForBashTests, runOnFailure: false, testFunction: bashDownloadAndSource, result: TestResult.TestNotYetRun },
+    { description: 'Ensure urlencode works', runCondition: TestType.RunForBashTests, runOnFailure: false, testFunction: bashTestUrlEncode, result: TestResult.TestNotYetRun },
+    { description: 'Ensure environment variable points to server', runCondition: TestType.RunForBashTests, runOnFailure: false, testFunction: bashGetServer, result: TestResult.TestNotYetRun },
+    { description: 'Get service statistics', runCondition: TestType.RunForBashTests, runRequiresSASToken: true, runOnFailure: false, testFunction: bashGetIoTStats, result: TestResult.TestNotYetRun },
+    { description: 'Connect to hub with garbage connection string', runCondition: TestType.RunForBashTests, runRequiresSASToken: true, runOnFailure: false, testFunction: bashContactHubWithGarbageConnectionString, result: TestResult.TestNotYetRun },
+    { description: 'Connect to hub with bad connection string', runCondition: TestType.RunForBashTests, runRequiresSASToken: true, runOnFailure: false, testFunction: bashContactHubWithBadConnectionString, result: TestResult.TestNotYetRun },
+    { description: 'Create device and X.509 authorization files', runCondition: TestType.RunForBashTests, runRequiresSASToken: true, runOnFailure: false, testFunction: bashGenDevice, result: TestResult.TestNotYetRun },
+    { description: 'Delete device created by above', runCondition: TestType.RunForBashTests, runRequiresSASToken: true, runOnFailure: true, testFunction: bashRemDevice, result: TestResult.TestNotYetRun },
+    // PowerShell script section
+    { description: 'Download and source PowerShell helper script', runCondition: TestType.RunForPowerShellTests, runOnFailure: false, testFunction: pwshDownloadAndSource, result: TestResult.TestNotYetRun },
+    { description: 'Ensure environment variable points to server', runCondition: TestType.RunForPowerShellTests, runOnFailure: false, testFunction: pwshGetServer, result: TestResult.TestNotYetRun },
+    // Clean up section
     { description: 'Clean up', runCondition: TestType.RunForAPITests, runOnFailure: true, testFunction: cleanUp, result: TestResult.TestNotYetRun },
 ];
 const types = ['root', 'intermediate', 'leaf', 'key'];
@@ -135,8 +158,8 @@ let iski;
 function setup() {
     return __awaiter(this, void 0, void 0, function* () {
         if (!fs_1.default.existsSync(testPath))
-            fs_1.default.mkdirSync(testPath);
-        fs_1.default.writeFileSync(testConfig, config);
+            yield (0, promises_1.mkdir)(testPath);
+        yield (0, promises_1.writeFile)(testConfig, config);
         return true;
     });
 }
@@ -186,53 +209,49 @@ function checkForEmptyDatabase() {
 }
 function createCACertificate() {
     return __awaiter(this, void 0, void 0, function* () {
-        res = yield httpRequest('post', url + '/api/createCACert', JSON.stringify(newCA));
+        res = yield httpRequest('post', url + '/api/createCACert', null, JSON.stringify(newCA));
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode} ${res.body.error}`);
         yield ew.EventWait();
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
         checkPacket(msg, 'someName/someName_key', 2, 0, 0);
         checkItems(msg.added, [{ type: 1, id: 1 }, { type: 4, id: 1 }]);
-        console.log('passed');
         return true;
     });
 }
 function createIntermediateCertificate() {
     return __awaiter(this, void 0, void 0, function* () {
-        res = yield httpRequest('post', url + '/api/createIntermediateCert', JSON.stringify(newInt));
+        res = yield httpRequest('post', url + '/api/createIntermediateCert', null, JSON.stringify(newInt));
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body.error}`);
         yield ew.EventWait();
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
         checkPacket(msg, 'intName/intName_key', 2, 0, 0);
         checkItems(msg.added, [{ type: 2, id: 2 }, { type: 4, id: 2 }]);
-        console.log('passed');
         return true;
     });
 }
 function createLeafCertificate() {
     return __awaiter(this, void 0, void 0, function* () {
-        res = yield httpRequest('post', url + '/api/createLeafCert', JSON.stringify(newLeaf));
+        res = yield httpRequest('post', url + '/api/createLeafCert', null, JSON.stringify(newLeaf));
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         yield ew.EventWait();
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
         checkPacket(msg, 'leafName/leafName_key', 2, 0, 0);
         checkItems(msg.added, [{ type: 3, id: 3 }, { type: 4, id: 3 }]);
-        console.log('passed');
         return true;
     });
 }
 function addTagsToIntermediate() {
     return __awaiter(this, void 0, void 0, function* () {
-        res = yield httpRequest('post', url + '/api/updateCertTag?id=2', JSON.stringify({ tags: ['tag1', 'tag2'] }));
+        res = yield httpRequest('post', url + '/api/updateCertTag?id=2', null, JSON.stringify({ tags: ['tag1', 'tag2'] }));
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         yield ew.EventWait();
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
         checkPacket(msg, 'intName', 0, 1, 0);
         checkItems(msg.updated, [{ type: 2, id: 2 }]);
-        console.log('passed');
         return true;
     });
 }
@@ -247,7 +266,6 @@ function getRootCertificateList() {
         node_assert_1.default.equal(res.body.files[0].id, 1, `File has incorrect id ${res.body.files[0].id}`);
         node_assert_1.default.equal(res.body.files[0].keyId, 1, `File has missing or incorrect key pair id ${res.body.files[0].keyId}`);
         node_assert_1.default.deepEqual(res.body.files[0].tags, [], 'Tags are incorrect');
-        console.log('passed');
         return true;
     });
 }
@@ -262,7 +280,6 @@ function getIntermediateCertificateList() {
         node_assert_1.default.equal(res.body.files[0].id, 2, `File has incorrect id ${res.body.files[0].id}`);
         node_assert_1.default.equal(res.body.files[0].keyId, 2, `File has missing or incorrect key pair id ${res.body.files[0].keyId}`);
         node_assert_1.default.deepEqual(res.body.files[0].tags, ['tag1', 'tag2'], 'Tags are incorrect');
-        console.log('passed');
         return true;
     });
 }
@@ -276,7 +293,6 @@ function getLeafCertificateList() {
         node_assert_1.default.equal(res.body.files[0].type, 'leaf', `File has incorrect type ${res.body.files[0].type}`);
         node_assert_1.default.equal(res.body.files[0].id, 3, `File has incorrect id ${res.body.files[0].id}`);
         node_assert_1.default.equal(res.body.files[0].keyId, 3, `File has missing or incorrect key pair id ${res.body.files[0].keyId}`);
-        console.log('passed');
         return true;
     });
 }
@@ -289,7 +305,6 @@ function getCertificateDetailsByID() {
         node_assert_1.default.equal(res.body.keyId, 2, `Wrong key id ${res.body.keyId} returned`);
         node_assert_1.default.equal(res.body.name, 'intName', `Wrong name ${res.body.name} returned`);
         node_assert_1.default.deepEqual(res.body.tags, ['tag1', 'tag2'], 'Tags are incorrect');
-        console.log('passed');
         return true;
     });
 }
@@ -297,7 +312,6 @@ function getKeyDetailsByID() {
     return __awaiter(this, void 0, void 0, function* () {
         res = yield httpRequest('get', url + '/keyDetails?id=3');
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
-        console.log('passed');
         return true;
     });
 }
@@ -331,7 +345,6 @@ function getKeyList() {
             node_assert_1.default.equal(res.body.files[i].type, 'key', `File has incorrect type ${res.body.files[i].type}`);
             node_assert_1.default.equal(res.body.files[i].id, names[i][1], `File has incorrect id ${res.body.files[i].id}`);
         }
-        console.log('passed');
         return true;
     });
 }
@@ -339,10 +352,9 @@ function getRootCertificateFile() {
     return __awaiter(this, void 0, void 0, function* () {
         res = yield httpRequest('get', url + '/api/getCertificatePem?id=' + '1');
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
-        fs_1.default.writeFileSync(path_1.default.join(testPath, 'someName.pem'), res.body);
+        yield (0, promises_1.writeFile)(path_1.default.join(testPath, 'someName.pem'), res.body);
         let rootCert = node_forge_1.pki.certificateFromPem(res.body);
         rski = rootCert.getExtension('subjectKeyIdentifier');
-        console.log('passed');
         return true;
     });
 }
@@ -350,12 +362,11 @@ function getIntermediateCertificateFile() {
     return __awaiter(this, void 0, void 0, function* () {
         res = yield httpRequest('get', url + '/api/getCertificatePem?id=' + '2');
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
-        fs_1.default.writeFileSync(path_1.default.join(testPath, 'intName.pem'), res.body);
+        yield (0, promises_1.writeFile)(path_1.default.join(testPath, 'intName.pem'), res.body);
         let intermediateCert = node_forge_1.pki.certificateFromPem(res.body);
         iski = intermediateCert.getExtension('subjectKeyIdentifier');
         let iaki = intermediateCert.getExtension('authorityKeyIdentifier');
         node_assert_1.default.equal(rski.value.slice(1), iaki.value.slice(3), 'Authority key identifier does not match parent\'s subject key identifier');
-        console.log('passed');
         return true;
     });
 }
@@ -363,7 +374,7 @@ function getLeafCertificateFile() {
     return __awaiter(this, void 0, void 0, function* () {
         res = yield httpRequest('get', url + '/api/getCertificatePem?id=' + '3');
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
-        fs_1.default.writeFileSync(path_1.default.join(testPath, 'leafName.pem'), res.body);
+        yield (0, promises_1.writeFile)(path_1.default.join(testPath, 'leafName.pem'), res.body);
         let leafCert = node_forge_1.pki.certificateFromPem(res.body);
         let laki = leafCert.getExtension('authorityKeyIdentifier');
         node_assert_1.default.equal(iski.value.slice(1), laki.value.slice(3), 'Authority key identifier does not match parent\'s subject key identifier');
@@ -371,7 +382,17 @@ function getLeafCertificateFile() {
         node_assert_1.default.notEqual(san, null, 'Failed to get the subject alternate names');
         node_assert_1.default.equal(san.altNames.length, 3, 'Incorrect number of alt names on leaf');
         node_assert_1.default.deepEqual(san.altNames, [{ type: 2, value: 'leafName' }, { type: 2, value: 'leafy.com' }, { type: 7, value: "7777", ip: '55.55.55.55' }], 'Alt names do not match expected list');
-        console.log('passed');
+        return true;
+    });
+}
+function getLeafChainFile() {
+    return __awaiter(this, void 0, void 0, function* () {
+        let certHeader = '-----BEGIN CERTIFICATE-----';
+        res = yield httpRequest('get', url + '/api/chainDownload?id=' + '3');
+        node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
+        let filename = res.headers['content-disposition'].split('=')[1];
+        node_assert_1.default.equal('leafName_chain.pem', filename, 'The content-disposition header was incorrect');
+        node_assert_1.default.equal(res.body.split(certHeader).length, 4, `Incorrect number of certificates returned in chain: ${res.body.split(certHeader).length}`);
         return true;
     });
 }
@@ -379,7 +400,7 @@ function getKeyFile() {
     return __awaiter(this, void 0, void 0, function* () {
         res = yield httpRequest('get', url + '/api/getKeyPem?id=2');
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
-        fs_1.default.writeFileSync(path_1.default.join(testPath, 'intName_key.pem'), res.body);
+        yield (0, promises_1.writeFile)(path_1.default.join(testPath, 'intName_key.pem'), res.body);
         return true;
     });
 }
@@ -396,14 +417,13 @@ function deleteRootCertificate() {
         res = yield httpRequest('get', url + '/certDetails?id=2');
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         node_assert_1.default.equal(res.body.signerId, null, 'Signed certificate still references nonexistent parent');
-        console.log('passed');
         return true;
     });
 }
 function uploadRootCertificate() {
     return __awaiter(this, void 0, void 0, function* () {
-        let cert = fs_1.default.readFileSync(path_1.default.join(testPath, 'someName.pem'), { encoding: 'utf8' });
-        res = yield httpRequest('post', url + '/api/uploadCert', cert, 'text/plain');
+        let cert = yield (0, promises_1.readFile)(path_1.default.join(testPath, 'someName.pem'), { encoding: 'utf8' });
+        res = yield httpRequest('post', url + '/api/uploadCert', null, cert, 'text/plain');
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode} ${res.body.error}`);
         yield ew.EventWait();
         ew.EventReset();
@@ -428,15 +448,13 @@ function deleteIntermediateKey() {
         checkPacket(msg, '', 0, 1, 1);
         checkItems(msg.updated, [{ type: 2, id: 2 }]);
         checkItems(msg.deleted, [{ type: 4, id: 2 }]);
-        // console.log(msg);
-        console.log('passed');
         return true;
     });
 }
 function uploadIntermediateKey() {
     return __awaiter(this, void 0, void 0, function* () {
-        let key = fs_1.default.readFileSync(path_1.default.join(testPath, 'intName_key.pem'), { encoding: 'utf8' });
-        res = yield httpRequest('post', url + '/api/uploadKey', key, 'text/plain');
+        let key = yield (0, promises_1.readFile)(path_1.default.join(testPath, 'intName_key.pem'), { encoding: 'utf8' });
+        res = yield httpRequest('post', url + '/api/uploadKey', null, key, 'text/plain');
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         yield ew.EventWait();
         ew.EventReset();
@@ -452,7 +470,6 @@ function getCertificateWithBadParameter() {
     return __awaiter(this, void 0, void 0, function* () {
         res = yield httpRequest('get', url + '/api/getCertificatePem?xx=bad');
         node_assert_1.default.equal(res.statusCode, 400, 'This should have failed');
-        console.log('passed');
         return true;
     });
 }
@@ -460,7 +477,6 @@ function getCertificateWithNonexistentName() {
     return __awaiter(this, void 0, void 0, function* () {
         res = yield httpRequest('get', url + '/api/getCertificatePem?name=bad');
         node_assert_1.default.equal(res.statusCode, 404, 'This should have failed');
-        console.log('passed');
         return true;
     });
 }
@@ -468,16 +484,164 @@ function getCertificateWithNonexistentId() {
     return __awaiter(this, void 0, void 0, function* () {
         res = yield httpRequest('get', url + '/api/getCertificatePem?id=bad');
         node_assert_1.default.equal(res.statusCode, 404, 'This should have failed');
-        console.log('passed');
         return true;
+    });
+}
+function bashDownloadAndSource() {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            let scriptLoc = path_1.default.join(testPath, bashHelperScript);
+            res = yield httpRequest('get', url + '/api/test?os=linux');
+            node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
+            yield (0, promises_1.writeFile)(scriptLoc, res.body);
+            (0, child_process_1.execSync)(`${shells.bash.command} -c "source ${scriptLoc}"`);
+            return true;
+        }
+        catch (e) {
+            console.log(`Failed: ${e}`);
+            return false;
+        }
+    });
+}
+function bashTestUrlEncode() {
+    return __awaiter(this, void 0, void 0, function* () {
+        // Assumes script has already been downloaded
+        const test = '%2Amark~%21%40%23%24%25%5E%26%2A%28%29_-%2B%3D%2C.%3C%3E%2F%3F%3A%3B';
+        let response = yield runShellCommands(['urlencode "*mark~!@#$%^&*()_-+=,.<>/?:;"'], shells.bash);
+        node_assert_1.default.equal(response[0], test, `urlencode created an invalid encoded string: returned ${response[0]} - should be ${test}`);
+        return true;
+    });
+}
+function bashGetServer() {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            let response = yield runShellCommands(['echo $CERTSERVER_HOST'], shells.bash);
+            node_assert_1.default.equal(response[0], url, `Environment variable CERTSERVER_HOST is incorrect - returned ${response[0]} - should be ${url}`);
+            return true;
+        }
+        catch (e) {
+            console.log(`Failed: ${e}`);
+            return false;
+        }
+    });
+}
+function bashGetIoTStats() {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            let response = yield runShellCommands([`getservicestatistics "${sasToken.SASToken}" ${sasToken.url}`], shells.bash);
+            // console.log(JSON.stringify(JSON.parse(response[0]), null, 4));
+            node_assert_1.default.match(response[0], /\{"connectedDeviceCount":\d*\}/);
+            // assert.equal(response[0], '{"connectedDeviceCount":3}', `Failed to retrieve hub statistics: ${response[0]}`);
+            return true;
+        }
+        catch (e) {
+            console.log(`Failed: ${e}`);
+            return false;
+        }
+    });
+}
+function bashContactHubWithGarbageConnectionString() {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            let response = yield runShellCommands([`sasToken=$(generate_sas_token "garbageConnectionString") && getservicestatistics "$sasToken" ${sasToken.url} || echo Error: $sasToken`], shells.bash);
+            node_assert_1.default.equal(response[0], 'Error: Connection string is invalid');
+            return true;
+        }
+        catch (e) {
+            console.log(`Failed: ${e}`);
+            return false;
+        }
+    });
+}
+function bashContactHubWithBadConnectionString() {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            let badString = "HostName=CertTestHub1.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=qEpAdhXkKWw2uyGPWSft9RQ7kKnPKG1wFiGQ6IK1111=";
+            let response = yield runShellCommands([`sasToken=$(generate_sas_token "${badString}") && getservicestatistics "$sasToken" ${sasToken.url}`], shells.bash);
+            node_assert_1.default.match(response[0], /Unauthorized/);
+            return true;
+        }
+        catch (e) {
+            console.log(`Failed: ${e}`);
+            return false;
+        }
+    });
+}
+function bashGenDevice() {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            let response = yield runShellCommands([`pushd ${testPath}`, `gendevice "${connectionString}" 4 serverTest`, 'popd'], shells.bash);
+            node_assert_1.default.equal(response[2], 'Device serverTest created', `Device creation failed: ${response[1]}`);
+            node_assert_1.default.equal(response[4], 'Certificate created', `Certificate creation failed: ${response[3]}`);
+            node_assert_1.default.match(response[17], /‘serverTest_chain.pem’ saved/);
+            node_assert_1.default.match(response[29], /‘serverTest_key.pem’ saved/);
+            yield ew.EventWait();
+            ew.EventReset();
+            msg = JSON.parse(wsQueue.shift());
+            return true;
+        }
+        catch (e) {
+            console.log(`Failed: ${e}`);
+            return false;
+        }
+    });
+}
+function bashRemDevice() {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            let response = yield runShellCommands([`remdevice "${connectionString}" serverTest`], shells.bash);
+            node_assert_1.default.equal(response[1], 'Key deleted', `Failed to delete key: ${response[1]}`);
+            node_assert_1.default.equal(response[3], 'Certificate deleted', `Failed to delete certificate: ${response[3]}`);
+            node_assert_1.default.equal(response[5], 'Device serverTest deleted', `Failed to delete device: ${response[5]}`);
+            yield ew.EventWait();
+            ew.EventReset();
+            msg = JSON.parse(wsQueue.shift());
+            // await ew.EventWait();
+            // ew.EventReset();
+            msg = JSON.parse(wsQueue.shift());
+            return true;
+        }
+        catch (e) {
+            console.log(`Failed: ${e}`);
+            return false;
+        }
+    });
+}
+function pwshDownloadAndSource() {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            let scriptLoc = path_1.default.join(testPath, pwshHelperScript);
+            res = yield httpRequest('get', url + '/api/test?os=windows');
+            node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
+            yield (0, promises_1.writeFile)(scriptLoc, res.body);
+            (0, child_process_1.execSync)(`${shells.powershell.command} -c ". ${scriptLoc}"`);
+            return true;
+        }
+        catch (e) {
+            console.log(`Failed: ${e}`);
+            return false;
+        }
+    });
+}
+function pwshGetServer() {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            let response = yield runShellCommands(['Write-Output(Get-ChildItem env:\CERTSERVER_HOST).Value'], shells.powershell);
+            node_assert_1.default.equal(response[1], url, `Environment variable CERTSERVER_HOST is incorrect - returned ${response[1]} - should be ${url}`);
+            return true;
+        }
+        catch (e) {
+            console.log(`Failed: ${e}`);
+            return false;
+        }
     });
 }
 function cleanUp() {
     return __awaiter(this, void 0, void 0, function* () {
         ws.close();
         webServer.kill('SIGTERM');
-        fs_1.default.unlinkSync(path_1.default.join(testPath, 'testconfig.yml'));
-        fs_1.default.rmSync(testPath, { recursive: true, force: true });
+        yield (0, promises_1.unlink)(path_1.default.join(testPath, 'testconfig.yml'));
+        yield (0, promises_1.rm)(testPath, { recursive: true, force: true });
         return true;
     });
 }
@@ -487,10 +651,33 @@ function runTests() {
         let testSelection = (process.env.RUN_API_TESTS == '1' ? TestType.RunForAPITests : TestType.NoRun) |
             (process.env.RUN_BASH_HELPER_TESTS == '1' ? TestType.RunForBashTests : TestType.NoRun) |
             (process.env.RUN_POWERSHELL_HELPER_TESTS == '1' ? TestType.RunForPowerShellTests : TestType.NoRun);
-        let shells = getAvailableShells();
+        shells = getAvailableShells();
         let testAvailable = TestType.RunForAPITests |
             (shells.bash.available ? TestType.RunForBashTests : TestType.NoRun) |
             (shells.powershell.available ? TestType.RunForPowerShellTests : TestType.NoRun);
+        if ((testSelection & TestType.RunForBashTests) && (!(testAvailable & TestType.RunForBashTests))) {
+            console.warn('Unable to run bash tests - bash is not available');
+        }
+        if ((testSelection & TestType.RunForPowerShellTests) && (!(testAvailable & TestType.RunForPowerShellTests))) {
+            console.warn('Unable to run PowerShell tests - PowerShell is not available');
+        }
+        let runIoTHubTests = process.env.RUN_IOTHUB_TESTS == '1';
+        if (runIoTHubTests && (shells.bash.available && (testSelection & TestType.RunForBashTests) || (shells.powershell.available && (testSelection & TestType.RunForPowerShellTests)))) {
+            console.log('Extended tests for bash or powershell scripts require access to an IoT hub.');
+            connectionString = yield getResponse('If you wish to run those please enter a service connection string or enter to skip: ');
+            try {
+                sasToken = (0, generatesastoken_1.getSASToken)(connectionString);
+                let res = yield httpRequest('get', `${sasToken.url}/statistics/service?api-version=2020-05-31-preview`, { 'Authorization': sasToken.SASToken });
+                if (res.statusCode != 200) {
+                    console.error(`SAS token did not work: ${res.body.Message}`);
+                    sasToken = null;
+                }
+            }
+            catch (e) {
+                console.error('SAS token is invalid - IoT hub tests skipped');
+                sasToken = null;
+            }
+        }
         for (let test in tests) {
             // Don't run if the test type was not selected
             if (!(tests[test].runCondition & testSelection)) {
@@ -507,6 +694,10 @@ function runTests() {
                 console.log(`Test ${test}: ${tests[test].description} - Skipped due to function is a placeholder`);
                 tests[test].result = TestResult.TestSkippedPlaceHolder;
             }
+            else if (tests[test].runRequiresSASToken && runIoTHubTests && sasToken == null) {
+                console.log(`Test ${test}: ${tests[test].description} - Skipped due to missing or invalid SAS token`);
+                tests[test].result = TestResult.TestSkippedMissingOrInvalidConnectionString;
+            }
             else {
                 let succeeded = tests.map((entry) => entry.result).reduce((previousValue, currentValue) => {
                     return currentValue == TestResult.TestFailed ? currentValue : previousValue;
@@ -516,7 +707,7 @@ function runTests() {
                     console.log(`Test ${test}: ${tests[test].description}`);
                     try {
                         tests[test].result = (yield tests[test].testFunction()) ? TestResult.TestSucceeded : TestResult.TestFailed;
-                        if (!tests[test].result) {
+                        if (tests[test].result != TestResult.TestSucceeded) {
                             console.error(`Test ${test}: ${fgRed('failed')}`);
                         }
                         else {
@@ -529,24 +720,33 @@ function runTests() {
                     }
                 }
                 else {
+                    tests[test].result = TestResult.TestSkippedPreviousFailure;
                     console.log(`Test ${test}: ${tests[test].description} - Skipped due to previous failure`);
                 }
             }
         }
         let work;
         work = tests.filter((entry) => entry.result == TestResult.TestSkippedNoEnvironment);
-        console.log(`${work.length} test${work.length == 1 ? '' : 's'} skipped due to no available environment`);
+        if (work.length > 0)
+            console.log(`${work.length} test${work.length == 1 ? '' : 's'} skipped due to no available environment`);
         work = tests.filter((entry) => entry.result == TestResult.TestSkippedNotSelected);
-        console.log(`${work.length} test${work.length == 1 ? '' : 's'} skipped due to not selected`);
+        if (work.length > 0)
+            console.log(`${work.length} test${work.length == 1 ? '' : 's'} skipped due to not selected`);
         work = tests.filter((entry) => entry.result == TestResult.TestSkippedPlaceHolder);
-        console.log(`${work.length} test${work.length == 1 ? '' : 's'} skipped due to the function is only a placeholder`);
-        work = tests.filter((entry) => entry.result == TestResult.TestFailed);
+        if (work.length > 0)
+            console.log(`${work.length} test${work.length == 1 ? '' : 's'} skipped due to the function is only a placeholder`);
+        work = tests.filter((entry) => entry.result == TestResult.TestSkippedMissingOrInvalidConnectionString);
+        if (work.length > 0)
+            console.log(`${work.length} test${work.length == 1 ? '' : 's'} skipped due to missing or invalid connection string`);
+        work = tests.filter((entry) => entry.result == TestResult.TestSkippedPreviousFailure);
+        if (work.length > 0)
+            console.log(`${work.length} test${work.length == 1 ? '' : 's'} skipped due to previous failure`);
+        work = tests.map((entry, index) => { if (entry.result == TestResult.TestFailed)
+            return index; }).filter((entry) => entry != null);
         if (work.length > 0) {
             console.error(`The following test${work.length == 1 ? '' : 's'} failed:`);
-            for (let test in tests) {
-                if (!tests[test].result) {
-                    console.error(`${test} - ${tests[test].description}`);
-                }
+            for (let test in work) {
+                console.error(`${work[test]} - ${tests[work[test]].description}`);
             }
             console.error(`${work.length} test${work.length == 1 ? '' : 's'} failed`);
             process.exit(4);
@@ -554,6 +754,23 @@ function runTests() {
         else {
             console.log(fgGreen('All tests passed'));
         }
+    });
+}
+function getResponse(question) {
+    return __awaiter(this, void 0, void 0, function* () {
+        return new Promise((resolve, reject) => {
+            try {
+                const rl = node_readline_1.default.createInterface({ input: node_process_1.stdin, output: node_process_1.stdout });
+                rl.question(question, (answer) => {
+                    resolve(answer);
+                    rl.close();
+                });
+            }
+            catch (e) {
+                console.log('Failed to get response');
+                reject(e);
+            }
+        });
     });
 }
 function checkPacket(packet, name, added, updated, deleted) {
@@ -568,7 +785,7 @@ function checkItems(items, test) {
         node_assert_1.default.deepStrictEqual(items[i], test[i], `Item type ${i} does not match the test version`);
     }
 }
-function httpRequest(method, url, body = null, contentType = 'application/json') {
+function httpRequest(method, url, headers = null, body = null, contentType = 'application/json') {
     return __awaiter(this, void 0, void 0, function* () {
         return new Promise((resolve, reject) => {
             if (!['get', 'post', 'head', 'delete'].includes(method)) {
@@ -594,7 +811,11 @@ function httpRequest(method, url, body = null, contentType = 'application/json')
             if (body) {
                 options.headers = { 'Content-Length': Buffer.byteLength(body), 'Content-Type': contentType };
             }
-            const clientRequest = http_1.default.request(url, { method: method.toUpperCase(), headers: options.headers }, incomingMessage => {
+            if (headers) {
+                options.headers = Object.assign(Object.assign({}, options.headers), headers);
+            }
+            let worker = urlObject.protocol == 'https:' ? https_1.default : http_1.default;
+            const clientRequest = worker.request(url, { method: method.toUpperCase(), headers: options.headers }, incomingMessage => {
                 // Response object.
                 let response = {
                     statusCode: incomingMessage.statusCode,
@@ -631,6 +852,61 @@ function httpRequest(method, url, body = null, contentType = 'application/json')
         });
     });
 }
+function runShellCommands(commands, shellInfo) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const outputStart = '>>>>';
+        const outputEnd = '<<<<';
+        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            try {
+                // Assumes script has already been downloaded
+                const scriptWaiter = new eventWaiter_1.EventWaiter();
+                const cmdStream = [
+                    `${shellInfo.sourceCmd} ${shellInfo.scriptLoc}\n`,
+                    `${shellInfo.consoleOutCmd}"${outputStart}"\n`,
+                ]
+                    .concat(commands.map((cmd) => cmd + '\n'))
+                    .concat([
+                    `${shellInfo.consoleOutCmd}"${outputEnd}"\n`,
+                ]);
+                const input = stream_1.Readable.from(cmdStream);
+                const runner = (0, child_process_1.spawn)(shellInfo.command, { stdio: ["pipe", "pipe", "pipe"] });
+                let response = [];
+                let output = '';
+                runner.stdout.on("data", (data) => {
+                    output += data.toString();
+                });
+                runner.stderr.on("data", (data) => {
+                    reject(data.toString());
+                });
+                runner.on("error", (err) => {
+                    reject(err);
+                });
+                runner.on("exit", (_code) => {
+                    try {
+                        let lines = output.split('\n').map((line) => shellInfo.consolePostProcessor(line));
+                        let startLine = lines.findIndex((line) => line == outputStart);
+                        let endLine = lines.findIndex((line) => line == outputEnd);
+                        if (startLine == -1)
+                            throw new Error('Unable to find start of relevant command output');
+                        if (endLine == -1)
+                            throw new Error('Unable to find end of relevant command output');
+                        response = lines.slice(startLine + 1, endLine);
+                        scriptWaiter.EventSet();
+                    }
+                    catch (e) {
+                        reject(e);
+                    }
+                });
+                input.pipe(runner.stdin);
+                yield scriptWaiter.EventWait();
+                resolve(response);
+            }
+            catch (err) {
+                reject(err);
+            }
+        }));
+    });
+}
 const RESET = '\x1b[0m';
 const FG_GREEN = '\x1b[32m';
 const FG_RED = '\x1b[31m';
@@ -641,13 +917,30 @@ function fgRed(s) {
     return `${FG_RED}${s}${RESET}`;
 }
 function getAvailableShells() {
-    let shells = { bash: { available: false, command: null }, powershell: { available: false, command: null } };
+    let shells = {
+        bash: {
+            available: false,
+            command: null,
+            scriptLoc: path_1.default.join(testPath, bashHelperScript),
+            sourceCmd: 'source',
+            consoleOutCmd: 'echo ',
+            consolePostProcessor: (line) => line,
+        },
+        powershell: {
+            available: false,
+            command: null,
+            scriptLoc: path_1.default.join(testPath, pwshHelperScript),
+            sourceCmd: '.',
+            consoleOutCmd: 'Write-Host ',
+            consolePostProcessor: (line) => line.replace(/\x1b\[\?1./, ''), // Remove pwsh color strings decorations
+        }
+    };
     let output;
     if (process.platform == 'linux') {
         try {
             console.log('OS is Linux');
             output = (0, child_process_1.execSync)('which bash').toString().trim();
-            shells.bash = { available: true, command: output };
+            shells.bash = Object.assign(Object.assign({}, shells.bash), { available: true, command: output });
             console.log(`bash is available at ${shells.bash.command}`);
         }
         catch (e) {
@@ -656,7 +949,7 @@ function getAvailableShells() {
         }
         try {
             output = (0, child_process_1.execSync)('which pwsh').toString().trim();
-            shells.powershell = { available: true, command: output };
+            shells.powershell = Object.assign(Object.assign({}, shells.powershell), { available: true, command: output });
             console.log(`PowerShell is available at ${shells.powershell.command}`);
         }
         catch (e) {
@@ -668,7 +961,7 @@ function getAvailableShells() {
         console.log(`OS is ${process.platform}`);
         try {
             output = (0, child_process_1.execSync)('cmd /C "where pwsh"').toString().trim();
-            shells.powershell = { available: true, command: output };
+            shells.powershell = Object.assign(Object.assign({}, shells.powershell), { available: true, command: output });
             console.log(`PowerShell is available at ${shells.powershell.command}`);
         }
         catch (e) {
@@ -677,7 +970,7 @@ function getAvailableShells() {
         }
         try {
             output = (0, child_process_1.execSync)('cmd /C "where bash"').toString().split('\n');
-            shells.bash = { available: true, command: output[0] };
+            shells.bash = Object.assign(Object.assign({}, shells.bash), { available: true, command: output[0] });
             console.log(`bash is available at ${shells.bash.command}`);
         }
         catch (e) {
@@ -688,4 +981,5 @@ function getAvailableShells() {
     return shells;
 }
 runTests();
+// .then(() => wtfnode.dump());
 //# sourceMappingURL=tests.js.map

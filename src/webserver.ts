@@ -186,9 +186,14 @@ export class WebServer {
         this._app.use('/files', Express.static(path.join(__dirname, '../../web/files')));
         this._app.use('/images', Express.static(path.join(__dirname, '../../web/images')));
         this._app.use(FileUpload());
-        this._app.use((request, _response, next) => {
-            logger.debug(`${request.method} ${request.url}`);
-            next();
+        this._app.use((request, response, next) => {
+            try {
+                logger.debug(`${request.method} ${request.url}`);
+                next();
+            }
+            catch (err) {
+                response.status(err.status ?? 500).json({ error: err.message });
+            }
         });
         this._app.get('/', (_request, response) => {
             response.render('index', { 
@@ -857,6 +862,15 @@ export class WebServer {
             catch (err) {
                 logger.error('Chain download failed: ' + err.message);
                 return response.status(err.status?? 500).json({ error: err.message });
+            }
+        });
+        this._app.use((request, response, _next) => {
+            try {
+                logger.warn(`No paths match ${request.path}`);
+                response.status(404).json({ error: `No paths match ${request.path}` });
+            }
+            catch (err) {
+                response.status(err.status ?? 500).json({ error: err.message });
             }
         });
 
