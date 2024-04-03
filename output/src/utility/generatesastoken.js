@@ -5,7 +5,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getSASToken = void 0;
 const crypto_1 = __importDefault(require("crypto"));
-// const connectionString = 'HostName=L300Lab.azure-devices.net;DeviceId=L300Device;SharedAccessKey=l7AY4Lyst0zbD+vJJ/8NOvmGWGviF1llFiJG2+v4Amc=';
 function getSASToken(connectionString) {
     try {
         let credentials = parseConnectionString(connectionString);

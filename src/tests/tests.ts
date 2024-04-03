@@ -118,7 +118,7 @@ type Shells = {
 }
 
 let shells: Shells;
-let sasToken: ConnectionInfo;
+let sasToken: ConnectionInfo = null;
 let connectionString: string;
 
 enum TestResult {
@@ -161,17 +161,18 @@ let tests: Test[] = [
     { description: 'Delete intermediate key', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: deleteIntermediateKey, result: TestResult.TestNotYetRun },
     { description: 'Upload intermediate key', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: uploadIntermediateKey, result: TestResult.TestNotYetRun },
     // bash script section
-    { description: 'Download and source bash helper script', runCondition: TestType.RunForBashTests, runOnFailure: false, testFunction: bashDownloadAndSource, result: TestResult.TestNotYetRun },
-    { description: 'Ensure urlencode works', runCondition: TestType.RunForBashTests, runOnFailure: false, testFunction: bashTestUrlEncode, result:TestResult.TestNotYetRun },
-    { description: 'Ensure environment variable points to server', runCondition: TestType.RunForBashTests, runOnFailure: false, testFunction: bashGetServer, result: TestResult.TestNotYetRun},
-    { description: 'Get service statistics', runCondition: TestType.RunForBashTests, runRequiresSASToken: true, runOnFailure: false, testFunction: bashGetIoTStats, result: TestResult.TestNotYetRun},
-    { description: 'Connect to hub with garbage connection string', runCondition: TestType.RunForBashTests, runRequiresSASToken: true, runOnFailure: false, testFunction: bashContactHubWithGarbageConnectionString, result: TestResult.TestNotYetRun },
-    { description: 'Connect to hub with bad connection string', runCondition: TestType.RunForBashTests, runRequiresSASToken: true, runOnFailure: false, testFunction: bashContactHubWithBadConnectionString, result: TestResult.TestNotYetRun },
-    { description: 'Create device and X.509 authorization files', runCondition: TestType.RunForBashTests, runRequiresSASToken: true, runOnFailure: false, testFunction: bashGenDevice, result: TestResult.TestNotYetRun },
-    { description: 'Delete device created by above', runCondition: TestType.RunForBashTests, runRequiresSASToken: true, runOnFailure: true, testFunction: bashRemDevice, result: TestResult.TestNotYetRun },
+    { description: '[bash] Download and source bash helper script', runCondition: TestType.RunForBashTests, runOnFailure: false, testFunction: bashDownloadAndSource, result: TestResult.TestNotYetRun },
+    { description: '[bash] Ensure urlencode works', runCondition: TestType.RunForBashTests, runOnFailure: false, testFunction: bashTestUrlEncode, result:TestResult.TestNotYetRun },
+    { description: '[bash] Ensure environment variable points to server', runCondition: TestType.RunForBashTests, runOnFailure: false, testFunction: bashGetServer, result: TestResult.TestNotYetRun},
+    { description: '[bash] Get service statistics', runCondition: TestType.RunForBashTests, runRequiresSASToken: true, runOnFailure: false, testFunction: bashGetIoTStats, result: TestResult.TestNotYetRun},
+    { description: '[bash] Connect to hub with garbage connection string', runCondition: TestType.RunForBashTests, runRequiresSASToken: true, runOnFailure: false, testFunction: bashContactHubWithGarbageConnectionString, result: TestResult.TestNotYetRun },
+    { description: '[bash] Connect to hub with bad connection string', runCondition: TestType.RunForBashTests, runRequiresSASToken: true, runOnFailure: false, testFunction: bashContactHubWithBadConnectionString, result: TestResult.TestNotYetRun },
+    { description: '[bash] Create device and X.509 authorization files', runCondition: TestType.RunForBashTests, runRequiresSASToken: true, runOnFailure: false, testFunction: bashGenDevice, result: TestResult.TestNotYetRun },
+    { description: '[bash] Delete device created by above', runCondition: TestType.RunForBashTests, runRequiresSASToken: true, runOnFailure: true, testFunction: bashRemDevice, result: TestResult.TestNotYetRun },
     // PowerShell script section
-    { description: 'Download and source PowerShell helper script', runCondition: TestType.RunForPowerShellTests, runOnFailure: false, testFunction: pwshDownloadAndSource, result: TestResult.TestNotYetRun },
-    { description: 'Ensure environment variable points to server', runCondition: TestType.RunForPowerShellTests, runOnFailure: false, testFunction: pwshGetServer, result: TestResult.TestNotYetRun },
+    { description: '[pwsh] Download and source PowerShell helper script', runCondition: TestType.RunForPowerShellTests, runOnFailure: false, testFunction: pwshDownloadAndSource, result: TestResult.TestNotYetRun },
+    { description: '[pwsh] Ensure environment variable points to server', runCondition: TestType.RunForPowerShellTests, runOnFailure: false, testFunction: pwshGetServer, result: TestResult.TestNotYetRun },
+    { description: '[pwsh] Get service statistics', runCondition: TestType.RunForPowerShellTests, runRequiresSASToken: true, runOnFailure: false, testFunction: pwshGetIoTStats, result: TestResult.TestNotYetRun },
     // Clean up section
     { description: 'Clean up', runCondition: TestType.RunForAPITests, runOnFailure: true, testFunction: cleanUp, result: TestResult.TestNotYetRun },
 ];
@@ -621,8 +622,22 @@ async function pwshDownloadAndSource(): Promise<boolean> {
 
 async function pwshGetServer(): Promise<boolean> {
     try {
-        let response = await runShellCommands(['Write-Output(Get-ChildItem env:\CERTSERVER_HOST).Value'], shells.powershell);
+        let response = await runShellCommands(['Write-Output(Get-ChildItem env:\\CERTSERVER_HOST).Value'], shells.powershell);
         assert.equal(response[1], url, `Environment variable CERTSERVER_HOST is incorrect - returned ${response[1]} - should be ${url}`);
+        return true;
+    }
+    catch (e) {
+        console.log(`Failed: ${e}`);
+        return false;
+    }
+}
+
+async function pwshGetIoTStats(): Promise<boolean> {
+    try {
+        let response = await runShellCommands([`Get-Server-Statistics "${connectionString}" | ConvertTo-Json`], shells.powershell);
+        // console.log(JSON.stringify(JSON.parse(response[0]), null, 4));
+        assert.match(response[3], /\"connectedDeviceCount\":\d*/);
+        // assert.equal(response[0], '{"connectedDeviceCount":3}', `Failed to retrieve hub statistics: ${response[0]}`);
         return true;
     }
     catch (e) {
@@ -696,9 +711,15 @@ async function runTests() {
             console.log(`Test ${test}: ${tests[test].description} - Skipped due to function is a placeholder`);
             tests[test].result = TestResult.TestSkippedPlaceHolder;
         }
-        else if (tests[test].runRequiresSASToken && runIoTHubTests && sasToken == null) {
-            console.log(`Test ${test}: ${tests[test].description} - Skipped due to missing or invalid SAS token`);
-            tests[test].result = TestResult.TestSkippedMissingOrInvalidConnectionString
+        else if (tests[test].runRequiresSASToken && (!runIoTHubTests || sasToken == null)) {
+            if (!runIoTHubTests) {
+                console.log(`Test ${test}: ${tests[test].description} - Skipped because IoT hub tests was not selected`);
+                tests[test].result = TestResult.TestSkippedNotSelected;
+            }
+            else {
+                console.log(`Test ${test}: ${tests[test].description} - Skipped due to missing or invalid SAS token`);
+                tests[test].result = TestResult.TestSkippedMissingOrInvalidConnectionString
+            }
         }
         else {
             let succeeded = tests.map((entry) => entry.result).reduce((previousValue, currentValue): TestResult => {

@@ -1,4 +1,3 @@
-Set-Item "env:CERTSERVER_HOST" -Value "https://rr-frigate.lan:4141"
 Set-Item "env:REQUEST_PATH" -Value "/api/test"
 Write-Host Exported CERTSERVER_HOST =((Get-Item -Path "Env:/CERTSERVER_HOST").Value)
 
@@ -405,6 +404,45 @@ class Internal {
             )
         }
     }
+    static [ReturnCode] GetServerStatistics([string]$SASToken, [string]$Url) {
+        $headers = @{
+            'Authorization' = $SASToken
+        }
+        try {
+            $httprc = -1
+            $resp = Invoke-RestMethod -Uri "https://$Url/statistics/service?api-version=2020-05-31-preview" -Headers $headers -SkipHttpErrorCheck -StatusCodeVariable "httprc"
+            if ($httprc -ne 200) {
+                return [ReturnCode]::new(
+                    @{
+                        Success    = $false
+                        ReturnCode = $httprc
+                        Error      = $resp
+                        Result     = $null
+                    }
+                )
+            }
+            else {
+                return [ReturnCode]::new(
+                    @{
+                        Success    = $true
+                        ReturnCode = $httprc
+                        Error      = ''
+                        Result     = $resp
+                    }
+                )
+            }
+        }
+        catch {
+            return [ReturnCode]::new(
+                @{
+                    Success    = $false
+                    ReturnCode = 1
+                    Error      = $_
+                    Result     = ''
+                }
+            )
+        }
+    }
     static [ReturnCode] GetDevice([string]$SASToken, [string]$Url, [string]$DeviceId) {
         $headers = @{
             'Authorization' = $SASToken
@@ -534,6 +572,38 @@ class Internal {
                 }
             )
         }
+    }
+}
+function Get-Server-Statistics {
+    param (
+        [Parameter(Mandatory)]
+        [string]$ConnectionString
+    )
+    try {
+        Write-Host $ConnectionString
+        $SASToken = New-SAS-Token $ConnectionString
+    }
+    catch {
+        Write-Host -ForegroundColor Red Failed to generate SAS token: $_
+    }
+    try {
+        if ($ConnectionString -match "HostName=([^;]+)") {
+            $endpoint = $Matches.1
+        }
+        else {
+            # This will probably never happen
+            throw "Invalid connection string passed"
+        }
+        $resp = [Internal]::GetServerStatistics($SASToken, $endpoint)
+        if ($resp.Success -eq $false) {
+            Write-Host -ForegroundColor Red Error occured getting server statistics: $resp.Error
+        }
+        else {
+            return $resp.Result
+        }
+    }
+    catch {
+        Write-Host "An unexpected error occured: $_"
     }
 }
 function Get-Device {
