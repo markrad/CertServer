@@ -199,7 +199,15 @@ class WebServer {
                     version: this._version,
                 });
             });
-            this._app.get('/api/test', (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.get('/api/helpers', (request, _response, next) => {
+                request.url = '/api/helper';
+                next();
+            });
+            this._app.get('/api/script', (request, _response, next) => {
+                request.url = '/api/helper';
+                next();
+            });
+            this._app.get('/api/helper', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     response.setHeader('content-type', 'application/text');
                     let userAgent = request.get('User-Agent');
@@ -244,110 +252,6 @@ class WebServer {
                     logger.error(err);
                 }
             }));
-            this._app.get('/api/helper', (request, response) => {
-                response.setHeader('content-type', 'application/text');
-                let userAgent = request.get('User-Agent');
-                let os;
-                if (request.query.os) {
-                    if (request.query.os.toUpperCase() in userAgentOS_1.userAgentOS) {
-                        let work = request.query.os.toUpperCase();
-                        os = userAgentOS_1.userAgentOS[work];
-                        logger.debug(`OS specified as ${userAgentOS_1.userAgentOS[os]}`);
-                    }
-                    else {
-                        return response.status(400).json({ error: `OS invalid or unsupported ${request.query.os}` });
-                    }
-                }
-                else {
-                    os = WebServer._guessOs(userAgent);
-                    logger.debug(`${userAgent} guessed to be ${userAgentOS_1.userAgentOS[os]}`);
-                }
-                let readable;
-                if (os == userAgentOS_1.userAgentOS.LINUX || os == userAgentOS_1.userAgentOS.MAC) {
-                    response.setHeader('content-disposition', `attachment; filename="${request.hostname}-${this._port}.sh"`);
-                    readable = stream_1.Readable.from([
-                        `function getcert(){ wget --content-disposition ${csHost({ protocol: this._certificate ? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getCertificatePem?id=$@; }\n`,
-                        `function getkey(){ wget --content-disposition ${csHost({ protocol: this._certificate ? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/getKeyPem?id=$@; }\n`,
-                        `function getchain(){ wget --content-disposition ${csHost({ protocol: this._certificate ? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/chainDownload?id=$@; }\n`,
-                        `function pushcert(){ curl -X POST -H "Content-Type: text/plain" --data-binary @$@ ${csHost({ protocol: this._certificate ? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/uploadCert; }\n`,
-                        `function pushkey(){ curl -X POST -H "Content-Type: text/plain" --data-binary @$@ ${csHost({ protocol: this._certificate ? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/uploadKey; }\n`
-                    ]);
-                }
-                else if (os == userAgentOS_1.userAgentOS.WINDOWS) {
-                    response.setHeader('content-disposition', `attachment; filename="${request.hostname}-${this._port}.ps1"`);
-                    readable = stream_1.Readable.from([
-                        `function Get-Filename {\n`,
-                        `param (\n`,
-                        `$url\n`,
-                        `)\n`,
-                        `$filename = ''\n`,
-                        `try {\n`,
-                        `$req = Invoke-WebRequest -Uri $url\n`,
-                        `$filename = $req.Headers.'Content-Disposition'.split(';')[1].Split('=')[1].Replace('"', '')\n`,
-                        `}\n`,
-                        `catch {\n`,
-                        `Write-Host 'Request failed'\n`,
-                        `Write-Host $_.ErrorDetails\n`,
-                        `}\n`,
-                        `return $filename\n`,
-                        `}\n`,
-                        `function Get-URIPrefix {\n`,
-                        `return "${csHost({ protocol: this._certificate ? 'https' : 'http', hostname: request.hostname, port: this._port })}/api/"\n`,
-                        `}\n`,
-                        `function Get-File {\n`,
-                        `param (\n`,
-                        `$uriSuffix\n`,
-                        `)\n`,
-                        `$prefix = Get-URIPrefix\n`,
-                        `$uri = $prefix + $uriSuffix\n`,
-                        `$filename = Get-Filename $uri\n`,
-                        `if ($filename -ne '') {\n`,
-                        `Invoke-WebRequest -Uri $uri -OutFile ".\\$filename"\n`,
-                        `Write-Output ".\\$filename written"\n`,
-                        `}\n`,
-                        `}\n`,
-                        `function Get-CertPem {\n`,
-                        `param (\n`,
-                        `$certificateId\n`,
-                        `)\n`,
-                        `$uri = "getCertificatePem?id=$certificateId"\n`,
-                        `Get-File $uri\n`,
-                        `}\n`,
-                        `function Get-Chain {\n`,
-                        `param (\n`,
-                        `$certificateId\n`,
-                        `)\n`,
-                        `$uri = "chainDownload?id=$certificateId"\n`,
-                        `Get-File $uri\n`,
-                        `}\n`,
-                        `function Get-KeyPem {\n`,
-                        `param (\n`,
-                        `$keyId\n`,
-                        `)\n`,
-                        `$uri = "getKeyPem?id=$keyId"\n`,
-                        `Get-File $uri\n`,
-                        `}\n`,
-                        `function Push-CertPem {\n`,
-                        `param (\n`,
-                        `$certName\n`,
-                        `)\n`,
-                        `$uri = Get-URIPrefix + "/api/uploadCert"\n`,
-                        `Invoke-RestMethod -Method Post -Uri $uri -InFile $certName -ContentType 'text/plain'\n`,
-                        `}\n`,
-                        `function Push-KeyPem {\n`,
-                        `param (\n`,
-                        `$keyName\n`,
-                        `)\n`,
-                        `$uri = Get-URIPrefix + "/api/uploadKey"\n`,
-                        `Invoke-RestMethod -Method Post -Uri $uri -InFile $keyName -ContentType 'text/plain'\n`,
-                        `}\n`,
-                    ]);
-                }
-                else {
-                    return response.status(400).json({ error: `No script for OS ${userAgentOS_1.userAgentOS[os]}}` });
-                }
-                readable.pipe(response);
-            });
             this._app.post('/createCACert', (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
                 request.url = '/api/createCACert';
                 next();
