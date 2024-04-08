@@ -496,7 +496,7 @@ async function getCertificateWithNonexistentId(): Promise<boolean> {
 async function bashDownloadAndSource(): Promise<boolean> {
     try {
         let scriptLoc = path.join(testPath, bashHelperScript);
-        res = await httpRequest('get', url + '/api/test?os=linux');
+        res = await httpRequest('get', url + '/api/helper?os=linux');
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         await writeFile(scriptLoc, res.body);
         execSync(`${shells.bash.command} -c "source ${scriptLoc}"`);
@@ -607,7 +607,7 @@ async function bashRemDevice(): Promise<boolean> {
 async function pwshDownloadAndSource(): Promise<boolean> {
     try {
         let scriptLoc = path.join(testPath, pwshHelperScript);
-        res = await httpRequest('get', url + '/api/test?os=windows');
+        res = await httpRequest('get', url + '/api/helper?os=windows');
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         await writeFile(scriptLoc, res.body);
         execSync(`${shells.powershell.command} -c ". ${scriptLoc}"`);

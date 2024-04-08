@@ -493,7 +493,7 @@ function bashDownloadAndSource() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             let scriptLoc = path_1.default.join(testPath, bashHelperScript);
-            res = yield httpRequest('get', url + '/api/test?os=linux');
+            res = yield httpRequest('get', url + '/api/helper?os=linux');
             node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
             yield (0, promises_1.writeFile)(scriptLoc, res.body);
             (0, child_process_1.execSync)(`${shells.bash.command} -c "source ${scriptLoc}"`);
@@ -611,7 +611,7 @@ function pwshDownloadAndSource() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             let scriptLoc = path_1.default.join(testPath, pwshHelperScript);
-            res = yield httpRequest('get', url + '/api/test?os=windows');
+            res = yield httpRequest('get', url + '/api/helper?os=windows');
             node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
             yield (0, promises_1.writeFile)(scriptLoc, res.body);
             (0, child_process_1.execSync)(`${shells.powershell.command} -c ". ${scriptLoc}"`);
