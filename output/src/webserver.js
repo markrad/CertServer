@@ -200,43 +200,49 @@ class WebServer {
                 });
             });
             this._app.get('/api/test', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                response.setHeader('content-type', 'application/text');
-                let userAgent = request.get('User-Agent');
-                let os;
-                if (request.query.os) {
-                    if (request.query.os.toUpperCase() in userAgentOS_1.userAgentOS) {
-                        let work = request.query.os.toUpperCase();
-                        os = userAgentOS_1.userAgentOS[work];
-                        logger.debug(`OS specified as ${userAgentOS_1.userAgentOS[os]}`);
+                try {
+                    response.setHeader('content-type', 'application/text');
+                    let userAgent = request.get('User-Agent');
+                    let os;
+                    if (request.query.os) {
+                        if (request.query.os.toUpperCase() in userAgentOS_1.userAgentOS) {
+                            let work = request.query.os.toUpperCase();
+                            os = userAgentOS_1.userAgentOS[work];
+                            logger.debug(`OS specified as ${userAgentOS_1.userAgentOS[os]}`);
+                        }
+                        else {
+                            return response.status(400).json({ error: `OS invalid or unsupported ${request.query.os}` });
+                        }
                     }
                     else {
-                        return response.status(400).json({ error: `OS invalid or unsupported ${request.query.os}` });
+                        os = WebServer._guessOs(userAgent);
+                        logger.debug(`${userAgent} guessed to be ${userAgentOS_1.userAgentOS[os]}`);
                     }
+                    let hostname = `${csHost({ protocol: this._certificate ? 'https' : 'http', hostname: request.hostname, port: this._port })}`;
+                    let readable;
+                    if (os == userAgentOS_1.userAgentOS.LINUX || os == userAgentOS_1.userAgentOS.MAC) {
+                        response.setHeader('content-disposition', `attachment; filename="${request.hostname}-${this._port}.sh"`);
+                        readable = stream_1.Readable.from([
+                            `export CERTSERVER_HOST=${hostname}\n`,
+                            `export REQUEST_PATH=${request.path}\n`,
+                        ].concat(((yield (0, promises_1.readFile)('src/files/linuxhelperscript.sh', { encoding: 'utf8' })).split('\n').map((l) => l + '\n'))));
+                    }
+                    else if (os == userAgentOS_1.userAgentOS.WINDOWS) {
+                        response.setHeader('content-disposition', `attachment; filename="${request.hostname}-${this._port}.ps1"`);
+                        readable = stream_1.Readable.from([
+                            `Set-Item "env:CERTSERVER_HOST" -Value "${hostname}"\n`,
+                            `Set-Item "env:REQUEST_PATH" -Value "${request.path}"\n`,
+                        ].concat(((yield (0, promises_1.readFile)('src/files/windowshelperscript.ps1', { encoding: 'utf8' })).split('\n').map((l) => l + '\n'))));
+                    }
+                    else {
+                        return response.status(400).json({ error: `No script for OS ${userAgentOS_1.userAgentOS[os]}}` });
+                    }
+                    logger.debug('Sending file');
+                    readable.pipe(response);
                 }
-                else {
-                    os = WebServer._guessOs(userAgent);
-                    logger.debug(`${userAgent} guessed to be ${userAgentOS_1.userAgentOS[os]}`);
+                catch (err) {
+                    logger.error(err);
                 }
-                let hostname = `${csHost({ protocol: this._certificate ? 'https' : 'http', hostname: request.hostname, port: this._port })}`;
-                let readable;
-                if (os == userAgentOS_1.userAgentOS.LINUX || os == userAgentOS_1.userAgentOS.MAC) {
-                    response.setHeader('content-disposition', `attachment; filename="${request.hostname}-${this._port}.sh"`);
-                    readable = stream_1.Readable.from([
-                        `export CERTSERVER_HOST=${hostname}\n`,
-                        `export REQUEST_PATH=${request.path}\n`,
-                    ].concat(((yield (0, promises_1.readFile)('src/files/linuxhelperscript.sh', { encoding: 'utf8' })).split('\n').map((l) => l + '\n'))));
-                }
-                else if (os == userAgentOS_1.userAgentOS.WINDOWS) {
-                    response.setHeader('content-disposition', `attachment; filename="${request.hostname}-${this._port}.ps1"`);
-                    readable = stream_1.Readable.from([
-                        `Set-Item "env:CERTSERVER_HOST" -Value "${hostname}"\n`,
-                        `Set-Item "env:REQUEST_PATH" -Value "${request.path}"\n`,
-                    ].concat(((yield (0, promises_1.readFile)('src/files/windowshelperscript.ps1', { encoding: 'utf8' })).split('\n').map((l) => l + '\n'))));
-                }
-                else {
-                    return response.status(400).json({ error: `No script for OS ${userAgentOS_1.userAgentOS[os]}}` });
-                }
-                readable.pipe(response);
             }));
             this._app.get('/api/helper', (request, response) => {
                 response.setHeader('content-type', 'application/text');

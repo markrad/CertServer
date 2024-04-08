@@ -25,9 +25,9 @@
             "env": {
                 "LOG_SERVER_STDOUT": "1",
                 "RUN_API_TESTS": "1",
-                "RUN_BASH_HELPER_TESTS": "0",
+                "RUN_BASH_HELPER_TESTS": "1",
                 "RUN_POWERSHELL_HELPER_TESTS": "1",
-                "RUN_IOTHUB_TESTS": "1",
+                "RUN_IOTHUB_TESTS": "0",
             },
             "skipFiles": [
                 "<node_internals>/**"
@@ -42,7 +42,7 @@
             "cwd": "${workspaceFolder}/build",
             "program": "${workspaceFolder}/build/build.sh",
             "terminalKind": "integrated",
-            "args": [ "--patch" ]
+            "args": [ "--test" ]
         },
         {
             "type": "bashdb",

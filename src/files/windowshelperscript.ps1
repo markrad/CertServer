@@ -1,7 +1,7 @@
 Set-Item "env:REQUEST_PATH" -Value "/api/test"
 Write-Host Exported CERTSERVER_HOST =((Get-Item -Path "Env:/CERTSERVER_HOST").Value)
 
-function Get-Filename_ {
+function Get-ContentDispositionHeader {
     param (
         [Parameter(Mandatory)]
         [string]$UrlSuffix
@@ -30,7 +30,7 @@ function Get-File_ {
         [Parameter(Mandatory)]
         [string]$UriSuffix
     )
-    $filename = Get-Filename_ $UriSuffix
+    $filename = Get-ContentDispositionHeader $UriSuffix
     Invoke-WebRequest -Uri (Get-URIPrefix $UriSuffix) -OutFile ".\$filename"
     Write-Host ".\$filename written"
 }
@@ -199,6 +199,100 @@ function Get-CertDetailsByName {
     }
     else {
         return $resp.Result
+    }
+}
+function New-LeafCertificate {
+    param (
+        [Parameter(Mandatory)]
+        [string]$CertificateCommonName,
+        [Parameter(Mandatory)]
+        [int]$SignerId,
+        [Parameter(Mandatory)]
+        [int]$ValidDays
+    )
+    try {
+        $resp = [Internal]::CreateLeafCertificate($CertificateCommonName, $SignerId, $ValidDays)
+        if ($resp.Success -eq $false) {
+            Write-Host -ForegroundColor Red Error creating certificate: $resp.Error
+        }
+        else {
+            return $resp.Result
+        }
+    }
+    catch {
+        Write-Host -ForegroundColor Red "An unexpected error occured: $_"
+    }
+}
+function Remove-CertificateAndKey {
+    param (
+        [Parameter(Mandatory)]
+        [int]$CertificateId
+    )
+    try {
+        $resp = [Internal]::GetCertDetailsById($CertificateId)
+        if ($resp.Success -eq $false) {
+            Write-Host -ForegroundColor Red Error acquiring certificate details $resp.Error
+            Exit 4
+        }
+        if ($null -eq $resp.Result.keyId) {
+            Write-Host -ForegroundColor Yellow The key for this certificate was not found
+            Exit 1
+        }
+        $name = $resp.Result.name
+        $resp = [Internal]::DeleteDeviceKey($resp.Result.keyId)
+        if ($resp.Success -eq $false) {
+            Write-Host -ForegroundColor Red Failed to delete key: $resp.error
+            Exit 4
+        }
+        $resp = [Internal]::DeleteDeviceCertificate($CertificateId)
+        if ($resp.Success -eq $false) {
+            Write-Host -ForegroundColor Red Failed to delete certificate: $resp.error
+            Exit 4
+        }
+        Write-Host Certificate and key for $name ($CertificateId) deleted
+    }
+    catch {
+        Write-Host -ForegroundColor Red Unexpected error occured: $_
+    }
+}
+function Remove-Certificate {
+    param (
+        [Parameter(Mandatory)]
+        [int]$CertificateId
+    )
+    try {
+        $resp = [Internal]::GetCertDetailsById($CertificateId)
+        if ($resp.Success -eq $false) {
+            Write-Host -ForegroundColor Red Error acquiring certificate details $resp.Error
+            Exit 4
+        }
+        $name = $resp.Result.name
+        $resp = [Internal]::DeleteDeviceCertificate($CertificateId)
+        if ($resp.Success -eq $false) {
+            Write-Host -ForegroundColor Red Failed to delete certificate: $resp.error
+            Exit 4
+        }
+        Write-Host Certificate for $name ($CertificateId) deleted
+    }
+    catch {
+        Write-Host -ForegroundColor Red Unexpected error occured: $_
+    }
+}
+function Remove-Key {
+    param (
+        [Parameter(Mandatory)]
+        [int]$KeyId
+    )
+    try {
+        $resp = [Internal]::DeleteDeviceKey($KeyId)
+        if ($resp.Success -eq $false) {
+            Write-Host -ForegroundColor Red Failed to delete key: $resp.error
+            Exit 4
+        }
+        Write-Host Key $KeyId deleted
+    }
+    catch {
+        Write-Host -ForegroundColor Red Unexpected error occured: $_
     }
 }
 class ReturnCode {
@@ -674,7 +768,7 @@ function Remove-Device {
                 return 4
             }
             else {
-                Write-Host Certificate deleted
+                Write-Host Certificate $DeviceId deleted
             }
             $resp = [Internal]::DeleteDeviceKey($keyId)
             if ($resp.Success -ne $true) {
@@ -696,7 +790,7 @@ function Remove-Device {
         else {
             $resp = [Internal]::RemoveDevice($SasToken, $Url, $DeviceId, $resp.Result.etag)
             if ($resp.Success -eq $true) {
-                Write-Host Device deleted
+                Write-Host Device $DeviceId deleted
             }
             else {
                 Write-Host -ForegroundColor Red Error deleting device from hub $resp.Error
@@ -774,7 +868,7 @@ function New-Device {
             Write-Host -ForegroundColor Red Failed to create device $resp.Error
             return 4
         }
-        Write-Host Device created
+        Write-Host Device $DeviceId created
         if ($createCert -eq $true) {
             $resp = [Internal]::CreateLeafCertificate($DeviceId, $ParentCertificateId, 800)
             if ($resp.Success -eq $false) {

@@ -173,6 +173,8 @@ let tests: Test[] = [
     { description: '[pwsh] Download and source PowerShell helper script', runCondition: TestType.RunForPowerShellTests, runOnFailure: false, testFunction: pwshDownloadAndSource, result: TestResult.TestNotYetRun },
     { description: '[pwsh] Ensure environment variable points to server', runCondition: TestType.RunForPowerShellTests, runOnFailure: false, testFunction: pwshGetServer, result: TestResult.TestNotYetRun },
     { description: '[pwsh] Get service statistics', runCondition: TestType.RunForPowerShellTests, runRequiresSASToken: true, runOnFailure: false, testFunction: pwshGetIoTStats, result: TestResult.TestNotYetRun },
+    { description: '[pwsh] Create device and X.509 authorization files', runCondition: TestType.RunForPowerShellTests, runRequiresSASToken: true, runOnFailure: false, testFunction: pwshGenDevice, result: TestResult.TestNotYetRun },
+    { description: '[pwsh] Delete device created by above', runCondition: TestType.RunForPowerShellTests, runRequiresSASToken: true, runOnFailure: false, testFunction: pwshRemDevice, result: TestResult.TestNotYetRun },
     // Clean up section
     { description: 'Clean up', runCondition: TestType.RunForAPITests, runOnFailure: true, testFunction: cleanUp, result: TestResult.TestNotYetRun },
 ];
@@ -470,7 +472,6 @@ async function uploadIntermediateKey(): Promise<boolean> {
     checkPacket(msg, 'intName_key', 1, 1, 0);
     checkItems(msg.added, [{ type: 4, id: 4 }]);
     checkItems(msg.updated, [{ type: 2, id:2 }]);
-    console.log('passed')
     return true;
 }
 
@@ -530,9 +531,7 @@ async function bashGetServer(): Promise<boolean> {
 async function bashGetIoTStats(): Promise<boolean> {
     try {
         let response = await runShellCommands([`getservicestatistics "${sasToken.SASToken}" ${sasToken.url}`], shells.bash);
-        // console.log(JSON.stringify(JSON.parse(response[0]), null, 4));
         assert.match(response[0], /\{"connectedDeviceCount":\d*\}/);
-        // assert.equal(response[0], '{"connectedDeviceCount":3}', `Failed to retrieve hub statistics: ${response[0]}`);
         return true;
     }
     catch (e) {
@@ -635,9 +634,43 @@ async function pwshGetServer(): Promise<boolean> {
 async function pwshGetIoTStats(): Promise<boolean> {
     try {
         let response = await runShellCommands([`Get-Server-Statistics "${connectionString}" | ConvertTo-Json`], shells.powershell);
-        // console.log(JSON.stringify(JSON.parse(response[0]), null, 4));
         assert.match(response[3], /\"connectedDeviceCount\":\d*/);
-        // assert.equal(response[0], '{"connectedDeviceCount":3}', `Failed to retrieve hub statistics: ${response[0]}`);
+        return true;
+    }
+    catch (e) {
+        console.log(`Failed: ${e}`);
+        return false;
+    }
+}
+
+async function pwshGenDevice(): Promise<boolean> {
+    try {
+        let response = await runShellCommands([`Push-Location ${testPath}`, `New-Device "${connectionString}" 4 serverTest`, 'Pop-Location'], shells.powershell)
+        assert.equal(response[3], 'Device serverTest created', `Device creation failed: ${response[3]}`);
+        assert.equal(response[4], 'Certificate created', `Certificate creation failed: ${response[4]}`);
+        assert.match(response[7], /serverTest_chain.pem written/);
+        assert.match(response[9], /serverTest_key.pem written/);
+        await ew.EventWait();
+        ew.EventReset();
+        msg = JSON.parse(wsQueue.shift() as string);
+        return true;
+    }
+    catch (e) {
+        console.log(`Failed: ${e}`);
+        return false;
+    }
+}
+
+async function pwshRemDevice(): Promise<boolean> {
+    try {
+        let response = await runShellCommands([`Remove-Device "${connectionString}" serverTest`], shells.powershell);
+        assert.equal(response[1], 'Certificate serverTest deleted', `Failed to delete certificate: ${response[1]}`);
+        assert.equal(response[2], 'Key deleted', `Failed to delete key: ${response[2]}`);
+        assert.equal(response[4], 'Device serverTest deleted', `Failed to delete device: ${response[4]}`);
+        await ew.EventWait();
+        ew.EventReset();
+        msg = JSON.parse(wsQueue.shift() as string);
+        msg = JSON.parse(wsQueue.shift() as string);
         return true;
     }
     catch (e) {
@@ -657,6 +690,11 @@ async function cleanUp(): Promise<boolean> {
 
 async function runTests() {
     console.log(`Running ${tests.length} test${tests.length == 1? '' : 's'}`);
+    console.log(`LOG_SERVER_STDOUT: ${process.env.LOG_SERVER_STDOUT}`);
+    console.log(`RUN_API_TESTS: ${process.env.RUN_API_TESTS}`);
+    console.log(`RUN_IOTHUB_TESTS: ${process.env.RUN_IOTHUB_TESTS}`);
+    console.log(`RUN_BASH_HELPER_TESTS: ${process.env.RUN_BASH_HELPER_TESTS}`);
+    console.log(`RUN_POWERSHELL_HELPER_TESTS: ${process.env.RUN_POWERSHELL_HELPER_TESTS}`);
     let testSelection: TestType = 
         (process.env.RUN_API_TESTS == '1'? TestType.RunForAPITests : TestType.NoRun) |
         (process.env.RUN_BASH_HELPER_TESTS == '1' ? TestType.RunForBashTests : TestType.NoRun) |
