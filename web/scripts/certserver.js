@@ -642,12 +642,15 @@ function tagChooserSubmit() {
  * @param {string} msg message to display
  */
 function showMessage(msg) {
+    let timerHandle = null;
     $('#messageDialogMessage').text(msg);
     $('#messageDialog').dialog({
         title: 'Informational',
         resizable: false,
         maxheight: 260,
-        modal: true,
+        modal: false,
+        show: ('fade', 700),
+        hide: ('fade', 700),
         classes: {
             'ui-dialog': 'ui-state-default'
         },
@@ -655,9 +658,17 @@ function showMessage(msg) {
             "Ok": function() {
                 $('#messageDialogMessage').text('');
                 $(this).dialog('close');
+                if (timerHandle) {
+                    clearTimeout(timerHandle);
+                    timerHandle = null;
+                }
             }
         }
     });
+    timerHandle = setTimeout(() => {
+        $('#messageDialogMessage').text('');
+        $('#messageDialog').dialog('close');
+    }, 3000);
 }
 
 /**
