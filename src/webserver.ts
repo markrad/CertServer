@@ -620,6 +620,10 @@ export class WebServer {
                 response.status(200).json({ files: retVal });
             }
         });
+        this._app.get('/api/getCertPem', async (request, _response, next) => {
+            request.url = '/api/getCertificatePem';
+            next();
+        });
         this._app.get('/api/getCertificatePem', async (request, response) => {
             try {
                 let c = this._resolveCertificateQuery(request.query as QueryType);
