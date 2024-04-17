@@ -637,7 +637,7 @@ function tagChooserSubmit() {
 }
 
 /**
- * Displays a modal dialog with an informational message.
+ * Displays a modeless dialog with an informational message which fades out after 3 seconds
  * 
  * @param {string} msg message to display
  */
