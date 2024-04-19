@@ -7,10 +7,11 @@
 	"features": {
 		"ghcr.io/devcontainers-contrib/features/express-generator:2": {
 			"version": "latest"
-		},
+		}
 	},
+	"runArgs": [ "-p=4141:4141" ]
 	// "runArgs": [ "--network=host" ],
-	"forwardPorts": [ 5501 ]
+	// "forwardPorts": [ 4141 ]
 
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
