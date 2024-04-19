@@ -16,5 +16,5 @@ var CertTypes;
     CertTypes[CertTypes["leaf"] = 3] = "leaf";
     /** Private key */
     CertTypes[CertTypes["key"] = 4] = "key";
-})(CertTypes = exports.CertTypes || (exports.CertTypes = {}));
+})(CertTypes || (exports.CertTypes = CertTypes = {}));
 //# sourceMappingURL=CertTypes.js.map

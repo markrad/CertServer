@@ -12,5 +12,5 @@ var userAgentOS;
     userAgentOS[userAgentOS["LINUX"] = 3] = "LINUX";
     userAgentOS[userAgentOS["ANDROID"] = 4] = "ANDROID";
     userAgentOS[userAgentOS["IPHONE"] = 5] = "IPHONE";
-})(userAgentOS = exports.userAgentOS || (exports.userAgentOS = {}));
+})(userAgentOS || (exports.userAgentOS = userAgentOS = {}));
 //# sourceMappingURL=userAgentOS.js.map

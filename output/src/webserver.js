@@ -588,6 +588,10 @@ class WebServer {
                     response.status(200).json({ files: retVal });
                 }
             });
+            this._app.get('/api/getCertPem', (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
+                request.url = '/api/getCertificatePem';
+                next();
+            }));
             this._app.get('/api/getCertificatePem', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 var _g;
                 try {
