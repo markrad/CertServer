@@ -9,7 +9,12 @@
 			"version": "latest"
 		}
 	},
-	"runArgs": [ "-p=4141:4141" ]
+	"runArgs": [ "-p=4141:4141" ],
+	"mounts": [{
+		"type": "bind",
+		"source": "/home/markrad/.ssh",
+		"target": "/home/node/.ssh"
+	}]
 	// "runArgs": [ "--network=host" ],
 	// "forwardPorts": [ 4141 ]
 
