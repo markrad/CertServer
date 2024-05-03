@@ -235,6 +235,18 @@ input[type=file]::file-selector-button:hover {
     width: 50%;
 }
 
+#UploadDrop {
+    display: flex;
+    height: 120px;
+    width: 160px;
+    text-align: center;
+    justify-content: center;
+    align-items: center;
+    background-color: lightgray;
+    border: 3px solid rgb(34, 116, 34);
+    border-radius: 15px;
+}
+
 button.button1 {
     background-color: rgb(34, 116, 34);
     border: none;
