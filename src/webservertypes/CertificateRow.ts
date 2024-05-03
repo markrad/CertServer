@@ -4,7 +4,7 @@ import { CertificateSubject } from './CertificateSubject';
 /**
  * The LokiDb certificate row definition
  */
-export type CertificateRow = {
+export interface CertificateRow {
     /** A sanitized version of the common name suitable to use as a filename (no blanks etc.) */
     name: string;
     /** The certificate type - root, intermediate, or leaf */

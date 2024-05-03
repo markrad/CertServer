@@ -4,7 +4,7 @@ import { CertTypes } from './CertTypes';
 /**
  * Data structure for the keys in the database
  */
-export type PrivateKeyRow = {
+export interface PrivateKeyRow {
     /** CN from the certificate otherwise 'unknown_key' - used with the $loki to generate the filename */
     name: string;
     /** Will always have the value CertTypes.key - may get deprecated */

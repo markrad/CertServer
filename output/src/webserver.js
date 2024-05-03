@@ -42,7 +42,7 @@ const http_1 = __importDefault(require("http"));
 const https_1 = __importDefault(require("https"));
 const fs_1 = __importDefault(require("fs"));
 const promises_1 = require("fs/promises");
-const crypto_1 = __importDefault(require("crypto"));
+// import crypto from 'crypto';
 const node_forge_1 = require("node-forge");
 const lokijs_1 = __importStar(require("lokijs"));
 const express_1 = __importDefault(require("express"));
@@ -59,10 +59,17 @@ const ExtensionAuthorityKeyIdentifier_1 = require("./extensions/ExtensionAuthori
 const ExtensionSubjectKeyIdentifier_1 = require("./extensions/ExtensionSubjectKeyIdentifier");
 const ExtensionExtKeyUsage_1 = require("./extensions/ExtensionExtKeyUsage");
 const ExtensionSubjectAltName_1 = require("./extensions/ExtensionSubjectAltName");
+const OperationResult_1 = require("./webservertypes/OperationResult");
 const CertTypes_1 = require("./webservertypes/CertTypes");
 const userAgentOS_1 = require("./webservertypes/userAgentOS");
 const CertError_1 = require("./webservertypes/CertError");
 const CertMultiError_1 = require("./webservertypes/CertMultiError");
+const keyStores_1 = require("./database/keyStores");
+const keyUtil_1 = require("./database/keyUtil");
+const certificateStores_1 = require("./database/certificateStores");
+const certificateUtil_1 = require("./database/certificateUtil");
+const OperationResultItem_1 = require("./webservertypes/OperationResultItem");
+// import { CertificateUtil } from './database/certificateUtil';
 const logger = log4js.getLogger();
 logger.level = "debug";
 /**
@@ -159,6 +166,8 @@ class WebServer {
                 this._certificates = certificates;
                 this._privateKeys = privateKeys;
                 this._dbVersion = dbVersion;
+                certificateStores_1.CertificateStores.Init(certificates, path_1.default.join(this._dataPath, 'certificates'));
+                keyStores_1.KeyStores.Init(privateKeys, path_1.default.join(this._dataPath, 'privatekeys'));
                 yield this._dbInit();
             }
             catch (err) {
@@ -280,40 +289,18 @@ class WebServer {
                     return response.status(400).json({ error: 'No file selected' });
                 }
                 try {
-                    let compareResultItem = (l, r) => {
-                        return l.type == r.type && l.id == r.id;
-                    };
-                    let mergeResults = (accumulator, next) => {
-                        let i;
-                        for (i in next.added) {
-                            if (!accumulator.added.some((a) => compareResultItem(a, next.added[i]))) {
-                                accumulator.added.push(next.added[i]);
-                            }
-                        }
-                        for (i in next.updated) {
-                            if (!accumulator.updated.some((a) => compareResultItem(a, next.updated[i]))) {
-                                accumulator.updated.push(next.updated[i]);
-                            }
-                        }
-                        for (i in next.deleted) {
-                            if (!accumulator.deleted.some((a) => compareResultItem(a, next.deleted[i]))) {
-                                accumulator.deleted.push(next.deleted[i]);
-                            }
-                        }
-                        return accumulator;
-                    };
                     let files = request.files.certFile;
                     if (!Array.isArray(files)) {
                         files = [files];
                     }
-                    let result = { name: 'multiple', added: [], updated: [], deleted: [] };
+                    let result = new OperationResult_1.OperationResult('multiple');
                     let messages = [];
                     for (let i in files) {
                         let msg = node_forge_1.pem.decode(files[i].data);
                         for (let j in msg) {
                             logger.debug(`Received ${msg[j].type}`);
                             try {
-                                let oneRes = null;
+                                let oneRes;
                                 if (msg[j].type.includes('CERTIFICATE')) {
                                     oneRes = yield this._tryAddCertificate({ filename: files[i].name, pemString: node_forge_1.pem.encode(msg[j], { maxline: 64 }) });
                                     messages.push({ level: 0, message: `Certificate ${files[i].name} uploaded` });
@@ -325,7 +312,7 @@ class WebServer {
                                 else {
                                     throw new CertError_1.CertError(409, `File ${files[i].name} is not a certificate or a key`);
                                 }
-                                result = mergeResults(result, oneRes);
+                                result.merge(oneRes);
                             }
                             catch (err) {
                                 messages.push({ level: 1, message: err.message });
@@ -367,7 +354,7 @@ class WebServer {
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     if (k) {
-                        let retVal = this._getKeyBrief(k);
+                        let retVal = k.keyBrief;
                         response.status(200).json(retVal);
                     }
                     else {
@@ -407,7 +394,7 @@ class WebServer {
                     // Convert to PEM format
                     let certResult = yield this._tryAddCertificate({ pemString: node_forge_1.pki.certificateToPem(cert) });
                     let keyResult = yield this._tryAddKey({ pemString: node_forge_1.pki.privateKeyToPem(privateKey) });
-                    certResult.added = certResult.added.concat(keyResult.added);
+                    certResult.merge(keyResult);
                     certResult.name = `${certResult.name}/${keyResult.name}`;
                     this._broadcast(certResult);
                     let certId = certResult.added[0].id;
@@ -423,13 +410,15 @@ class WebServer {
                 try {
                     logger.debug(request.body);
                     let certInput = WebServer._validateCertificateInput(CertTypes_1.CertTypes.intermediate, request.body);
-                    const cRow = this._certificates.findOne({ $loki: parseInt(certInput.signer) });
-                    const kRow = this._privateKeys.findOne({ $loki: cRow.keyId });
+                    const cRow = certificateStores_1.CertificateStores.findOne({ $loki: parseInt(certInput.signer) });
+                    const kRow = keyStores_1.KeyStores.findOne({ $loki: cRow.keyId });
+                    // const cRow = this._certificates.findOne({ $loki: parseInt(certInput.signer) });
+                    // const kRow = this._privateKeys.findOne({ $loki: cRow.keyId });
                     if (!cRow || !kRow) {
                         return response.status(404).json({ error: 'Signing certificate or key are either missing or invalid' });
                     }
-                    const c = yield this._pkiCertFromRow(cRow);
-                    const k = yield (this._pkiKeyFromRow(kRow, certInput.password));
+                    const c = yield cRow.getpkiCert();
+                    const k = yield kRow.getpkiKey(certInput.password);
                     const { privateKey, publicKey } = node_forge_1.pki.rsa.generateKeyPair(2048);
                     const attributes = WebServer._setAttributes(certInput.subject);
                     const extensions = [
@@ -460,7 +449,7 @@ class WebServer {
                     // Convert to PEM format
                     let certResult = yield this._tryAddCertificate({ pemString: node_forge_1.pki.certificateToPem(cert) });
                     let keyResult = yield this._tryAddKey({ pemString: node_forge_1.pki.privateKeyToPem(privateKey) });
-                    certResult.added = certResult.added.concat(keyResult.added);
+                    certResult.merge(keyResult);
                     certResult.name = `${certResult.name}/${keyResult.name}`;
                     this._broadcast(certResult);
                     let certId = certResult.added[0].id;
@@ -477,14 +466,15 @@ class WebServer {
                 try {
                     logger.debug(request.body);
                     let certInput = WebServer._validateCertificateInput(CertTypes_1.CertTypes.leaf, request.body);
-                    const cRow = this._certificates.findOne({ $loki: parseInt(certInput.signer) });
-                    const kRow = this._privateKeys.findOne({ pairId: cRow.$loki });
+                    const cRow = certificateStores_1.CertificateStores.findOne({ $loki: parseInt(certInput.signer) });
+                    const kRow = keyStores_1.KeyStores.findOne({ $loki: cRow.keyId });
+                    // const cRow = this._certificates.findOne({ $loki: parseInt(certInput.signer) });
+                    // const kRow = this._privateKeys.findOne({ pairId: cRow.$loki });
                     if (!cRow || !kRow) {
                         return response.status(500).json({ error: 'Signing certificate or key are either missing or invalid' });
                     }
-                    const c = yield this._pkiCertFromRow(cRow);
-                    const k = yield (this._pkiKeyFromRow(kRow, certInput.password));
-                    ;
+                    const c = yield cRow.getpkiCert();
+                    const k = yield kRow.getpkiKey(certInput.password);
                     const { privateKey, publicKey } = node_forge_1.pki.rsa.generateKeyPair(2048);
                     const attributes = WebServer._setAttributes(certInput.subject);
                     let sal = {};
@@ -514,7 +504,7 @@ class WebServer {
                     // Convert to PEM format
                     let certResult = yield this._tryAddCertificate({ pemString: node_forge_1.pki.certificateToPem(cert) });
                     let keyResult = yield this._tryAddKey({ pemString: node_forge_1.pki.privateKeyToPem(privateKey) });
-                    certResult.added = certResult.added.concat(keyResult.added);
+                    certResult.merge(keyResult);
                     certResult.name = `${certResult.name}/${keyResult.name}`;
                     this._broadcast(certResult);
                     let certId = certResult.added[0].id;
@@ -566,18 +556,18 @@ class WebServer {
                 else {
                     let retVal = [];
                     if (type != CertTypes_1.CertTypes.key) {
-                        retVal = this._certificates.chain().find({ type: type }).sort((l, r) => l.name.localeCompare(r.name)).data().map((entry) => {
+                        retVal = certificateStores_1.CertificateStores.find({ type: type }).sort((l, r) => l.name.localeCompare(r.name)).map((entry) => {
                             var _a;
                             return { name: entry.subject.CN, type: CertTypes_1.CertTypes[type].toString(), id: entry.$loki, tags: (_a = entry.tags) !== null && _a !== void 0 ? _a : [], keyId: entry.keyId };
                         });
                     }
                     else {
-                        retVal = this._privateKeys.chain().find().sort((l, r) => {
+                        retVal = keyStores_1.KeyStores.find().sort((l, r) => {
                             // Circumvent bug that caused broken keys
                             // let lStr = l.pairCN? l.pairCN : '';
                             // let rStr = r.pairCN? r.pairCN : '';
                             return l.name.localeCompare(r.name);
-                        }).data().map((entry) => {
+                        }).map((entry) => {
                             return {
                                 name: entry.name,
                                 type: CertTypes_1.CertTypes[type].toString(),
@@ -669,7 +659,6 @@ class WebServer {
                 }
                 catch (err) {
                     return response.status((_k = err.status) !== null && _k !== void 0 ? _k : 500).json({ error: err.message });
-                    // return response.status(err.status?? 500).json(`{"error": "${err.message}"}`);
                 }
             }));
             this._app.get('/api/keyname', (request, response) => __awaiter(this, void 0, void 0, function* () {
@@ -724,7 +713,7 @@ class WebServer {
                 var _o;
                 try {
                     let k = this._resolveKeyQuery(request.query);
-                    response.download(this._getKeysDir(WebServer._getKeyFilenameFromRow(k)), k.name + '.pem', (err) => {
+                    response.download(k.absoluteFilename, k.name + '.pem', (err) => {
                         if (err) {
                             return response.status(500).json({ error: `Failed to file for ${request.query.id}: ${err.message}` });
                         }
@@ -742,7 +731,7 @@ class WebServer {
                     let c = this._resolveCertificateQuery(request.query);
                     let fileData = yield this._getChain(c);
                     response.type('application/text');
-                    response.setHeader('Content-Disposition', `inline; filename=${c.name}_chain.pem`);
+                    response.setHeader('Content-Disposition', `attachment; filename="${c.name}_chain.pem"`);
                     response.send(fileData);
                 }
                 catch (err) {
@@ -824,43 +813,40 @@ class WebServer {
                         process.exit(4);
                     }
                     let files;
-                    let certRows = this._certificates.chain().simplesort('name').data();
+                    let certRows = certificateStores_1.CertificateStores.find().sort((l, r) => l.name.localeCompare(r.name));
                     certRows.forEach((row) => {
-                        if (!fs_1.default.existsSync(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(row)))) {
+                        if (!fs_1.default.existsSync(row.absoluteFilename)) {
                             logger.warn(`Certificate ${row.name} not found - removed`);
-                            this._certificates.remove(row);
-                            this._certificates.chain().find({ $loki: row.signedById }).update((r) => {
+                            row.remove();
+                            certificateStores_1.CertificateStores.bulkUpdate({ $loki: row.signedById }, (r) => {
                                 r.signedById = null;
                                 logger.warn(`Removed signedBy from ${r.name}`);
                             });
-                            this._privateKeys.chain().find({ pairId: row.$loki }).update((k) => {
-                                // k.pairSerial = null;
-                                k.pairCN = null;
-                                k.pairId = null;
-                                logger.warn(`Removed relationship to private key from ${k.name}`);
+                            keyStores_1.KeyStores.find({ pairId: row.$loki }).forEach((row) => {
+                                row.clearCertificateKeyPair();
+                                logger.warn(`Removed relationship to private key from ${row.name}`);
                             });
                         }
                     });
                     files = fs_1.default.readdirSync(this._certificatesPath);
                     let adding = [];
                     files.forEach((file) => __awaiter(this, void 0, void 0, function* () {
-                        let cert = this._certificates.findOne({ $loki: WebServer._getIdFromFileName(file) });
+                        // TODO: Move _getIdFromFileName to CertificateStores
+                        let cert = certificateStores_1.CertificateStores.findOne({ $loki: WebServer._getIdFromFileName(file) });
                         if (!cert) {
                             try {
-                                adding.push(this._tryAddCertificate({ filename: this._getCertificatesDir(file) }));
+                                adding.push(this._tryAddCertificate({ filename: cert.absoluteFilename }));
                             }
                             catch (err) { }
                         }
                     }));
                     yield Promise.all(adding);
-                    let nonRoot = this._certificates.find({ '$and': [{ 'type': { '$ne': CertTypes_1.CertTypes.root } }, { signedById: null }] });
+                    let nonRoot = certificateStores_1.CertificateStores.find({ '$and': [{ 'type': { '$ne': CertTypes_1.CertTypes.root } }, { signedById: null }] });
                     for (let i = 0; i < nonRoot.length; i++) {
                         let signer = yield this._findSigner(node_forge_1.pki.certificateFromPem(fs_1.default.readFileSync(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(nonRoot[i])), { encoding: 'utf8' })));
                         if (signer != null) {
                             logger.info(`${nonRoot[i].name} is signed by ${signer.name}`);
-                            // nonRoot[i].signedBy = signer.serialNumber;
-                            nonRoot[i].signedById = signer.$loki;
-                            this._certificates.update(nonRoot[i]);
+                            nonRoot[i].updateSignedById(signer.$loki);
                         }
                     }
                     let keyRows = this._privateKeys.chain().simplesort('name').data();
@@ -910,7 +896,6 @@ class WebServer {
     _tryAddCertificate(input) {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
-                var _a, _b;
                 try {
                     if (!input.pemString) {
                         logger.info(`Trying to add ${path_1.default.basename(input.filename)}`);
@@ -924,91 +909,93 @@ class WebServer {
                     if (msg.type != 'CERTIFICATE') {
                         throw new CertError_1.CertError(400, 'Unsupported type ' + msg.type);
                     }
-                    let result = { name: '', added: [], updated: [], deleted: [] };
-                    let c = node_forge_1.pki.certificateFromPem(input.pemString);
-                    logger.debug(`Adding certificate ${c.subject.getField('CN').value}`);
-                    let signedById = null;
+                    let result = new OperationResult_1.OperationResult('');
+                    let cRow = yield certificateUtil_1.CertificateUtil.createFromPem(input.pemString);
+                    // let c: pki.Certificate = pki.certificateFromPem(input.pemString);
+                    logger.debug(`Adding certificate ${cRow.name}`);
+                    // let signedById: number = null;
                     // See if we already have this certificate
-                    let fingerprint256 = new crypto_1.default.X509Certificate(input.pemString).fingerprint256;
-                    if (this._certificates.findOne({ fingerprint256: fingerprint256 }) != null) {
-                        throw new CertError_1.CertError(409, `${c.subject.getField('CN').value} serial number ${c.serialNumber} is a duplicate - ignored`);
-                    }
+                    // let fingerprint256 = new crypto.X509Certificate(input.pemString).fingerprint256;
+                    // if (this._certificates.findOne({ fingerprint256: fingerprint256 }) != null) {
+                    //     throw new CertError(409, `${c.subject.getField('CN').value} already exists (fingerprint256: ${fingerprint256}) - ignored`);
+                    // }
                     // See if this is a root, intermediate, or leaf
-                    let type;
-                    if (c.isIssuer(c)) {
-                        type = CertTypes_1.CertTypes.root;
-                        signedById = -1;
-                    }
-                    else {
-                        let bc = c.getExtension('basicConstraints');
-                        if ((bc != null) && ((_a = bc.cA) !== null && _a !== void 0 ? _a : false) == true && ((_b = bc.pathlenConstraint) !== null && _b !== void 0 ? _b : 1) > 0) {
-                            type = CertTypes_1.CertTypes.intermediate;
-                        }
-                        else {
-                            type = CertTypes_1.CertTypes.leaf;
-                        }
-                        // See if any existing certificates signed this one
-                        let signer = yield this._findSigner(c);
-                        if (signer != null) {
-                            signedById = signer.$loki;
-                        }
-                    }
+                    // let type: CertTypes;
+                    // if (c.isIssuer(c)) {
+                    //     type = CertTypes.root;
+                    //     signedById = -1;
+                    // }
+                    // else {
+                    //     let bc: any = c.getExtension('basicConstraints');
+                    //     if ((bc != null) && (bc.cA ?? false) == true && (bc.pathlenConstraint ?? 1) > 0) {
+                    //         type = CertTypes.intermediate;
+                    //     }
+                    //     else {
+                    //         type = CertTypes.leaf;
+                    //     }
+                    //     // See if any existing certificates signed this one
+                    //     let signer = await this._findSigner(c);
+                    //     if (signer != null) {
+                    //         signedById = signer.$loki;
+                    //     }
+                    // }
                     // Generate a filename for the common name
-                    let name = WebServer._sanitizeName(c.subject.getField('CN').value);
-                    result.name = c.subject.getField('CN').value;
-                    logger.info(`Certificate ${name} added`);
+                    // let name = WebServer._sanitizeName(c.subject.getField('CN').value);
+                    result.name = cRow.name;
+                    // let newC: CertificateUtil = await CertificateUtil.createFrompkiCertificate(c);
+                    result.merge(yield cRow.insert());
+                    logger.info(`Certificate ${cRow.name} added`);
                     // This is declared as returning the wrong type hence cast below
-                    let newRecord = (this._certificates.insert({
-                        name: name,
-                        type: type,
-                        serialNumber: c.serialNumber,
-                        publicKey: c.publicKey,
-                        // privateKey: null, 
-                        signedById: signedById,
-                        issuer: WebServer._getSubject(c.issuer),
-                        subject: WebServer._getSubject(c.subject),
-                        notBefore: c.validity.notBefore,
-                        notAfter: c.validity.notAfter,
-                        // havePrivateKey: undefined,
-                        fingerprint: new crypto_1.default.X509Certificate(input.pemString).fingerprint,
-                        fingerprint256: fingerprint256,
-                        tags: [],
-                        keyId: null
-                    })); // Return value erroneously omits LokiObj
-                    result.added.push({ type: type, id: newRecord.$loki });
-                    // If the certificate is self-signed update the id in the record
-                    if (signedById == -1) {
-                        let c = this._certificates.findOne({ $loki: newRecord.$loki });
-                        if (c) {
-                            c.signedById = newRecord.$loki;
-                            this._certificates.update(c);
-                        }
-                    }
-                    // Update any certificates signed by this one
-                    if (type != CertTypes_1.CertTypes.leaf) {
-                        // Update certificates that this one signed
-                        let list = yield this._findSigned(c, newRecord.$loki);
-                        result.updated = result.updated.concat(list);
-                    }
-                    // See if we have a private key for this certificate
-                    let keys = this._privateKeys.chain().find({ pairId: null }).data();
-                    for (let i in keys) {
-                        if (WebServer._isKeyPair(c, keys[i].n, keys[i].e)) {
-                            logger.info('Found private key for ' + name);
-                            yield (0, promises_1.rename)(this._getKeysDir(WebServer._getKeyFilenameFromRow(keys[i])), this._getKeysDir(WebServer._getKeyFilename(name + '_key', keys[i].$loki)));
-                            keys[i].name = name + '_key';
-                            keys[i].pairId = newRecord.$loki;
-                            this._privateKeys.update(keys[i]);
-                            result.updated.push({ type: CertTypes_1.CertTypes.key, id: keys[i].$loki });
-                            newRecord.keyId = keys[i].$loki;
-                            this._certificates.update(newRecord);
-                            break;
-                        }
-                    }
+                    // let newRecord: CertificateRow & LokiObj = (this._certificates.insert({ 
+                    //     name: name, 
+                    //     type: type,
+                    //     serialNumber: c.serialNumber, 
+                    //     publicKey: c.publicKey, 
+                    //     // privateKey: null, 
+                    //     signedById: signedById,
+                    //     issuer: WebServer._getSubject(c.issuer),
+                    //     subject: WebServer._getSubject(c.subject),
+                    //     notBefore: c.validity.notBefore,
+                    //     notAfter: c.validity.notAfter, 
+                    //     // havePrivateKey: undefined,
+                    //     fingerprint: new crypto.X509Certificate(input.pemString).fingerprint,
+                    //     fingerprint256: fingerprint256,
+                    //     tags: [], 
+                    //     keyId: null
+                    // })) as CertificateRow & LokiObj;    // Return value erroneously omits LokiObj
+                    // result.pushAdded(new OperationResultItem2(type, newRecord.$loki));
+                    // // If the certificate is self-signed update the id in the record
+                    // if (signedById == -1) {
+                    //     let c = CertificateStores.findOne({ $loki: newRecord.$loki });
+                    //     if (c) {
+                    //         c.updateSignedById(newRecord.$loki);
+                    //     }
+                    // }
+                    // // Update any certificates signed by this one
+                    // if (type != CertTypes.leaf) {
+                    //     // Update certificates that this one signed
+                    //     result.merge(await this._findSigned(c, newRecord.$loki))
+                    // }
+                    // // See if we have a private key for this certificate
+                    // let keys: (PrivateKeyRow & LokiObj)[] = this._privateKeys.chain().find({ pairId: null }).data();
+                    // for (let i in keys) {
+                    //     if (WebServer._isKeyPair(c, keys[i].n, keys[i].e)) {
+                    //         logger.info('Found private key for ' + name);
+                    //         await rename(this._getKeysDir(WebServer._getKeyFilenameFromRow(keys[i])), this._getKeysDir(WebServer._getKeyFilename(name + '_key', keys[i].$loki)));
+                    //         keys[i].name = name + '_key';
+                    //         keys[i].pairId = newRecord.$loki;
+                    //         this._privateKeys.update(keys[i]);
+                    //         result.pushUpdated(new OperationResultItem2(CertTypes.key, keys[i].$loki));
+                    //         newRecord.keyId = keys[i].$loki;
+                    //         this._certificates.update(newRecord);
+                    //         break;
+                    //     }
+                    // }
                     // This guarantees a unique filename
-                    let newName = WebServer._getCertificateFilenameFromRow(newRecord);
-                    yield (0, promises_1.writeFile)(this._getCertificatesDir(newName), input.pemString, { encoding: 'utf8' });
-                    logger.info(`Written file ${newName}`);
+                    // let newName = WebServer._getCertificateFilenameFromRow(newRecord);
+                    // await writeFile(this._getCertificatesDir(newName), input.pemString, { encoding: 'utf8' });
+                    cRow.writeFile();
+                    logger.info(`Written file ${cRow.name}`);
                     resolve(result);
                 }
                 catch (err) {
@@ -1031,13 +1018,12 @@ class WebServer {
         var _a;
         let c2 = null;
         if (c.signedById != null) {
-            c2 = this._certificates.findOne({ $loki: c.signedById });
+            c2 = certificateStores_1.CertificateStores.findOne({ $loki: c.signedById });
             if (c2 == null) {
-                logger.warn(`Signed by certificate missing for ${c.name}`);
+                logger.warn(`Signing certificate missing for ${c.name}`);
             }
         }
-        // let k = this._privateKeys.findOne({ pairId: c.$loki });
-        let s = this._certificates.find({ signedById: c.$loki }).map((r) => r.$loki);
+        let s = certificateStores_1.CertificateStores.find({ signedById: c.$loki }).map((r) => r.$loki);
         return {
             id: c.$loki,
             certType: CertTypes_1.CertTypes[c.type],
@@ -1066,37 +1052,19 @@ class WebServer {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
                 try {
-                    let filename = this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(c));
-                    if (yield (0, exists_1.exists)(filename)) {
-                        yield (0, promises_1.unlink)(filename);
+                    if (!c.deleteFile()) {
+                        logger.error(`Could not find file ${c.absoluteFilename}`);
                     }
-                    else {
-                        logger.error(`Could not find file ${filename}`);
-                    }
-                    let result = {
-                        name: '',
-                        added: [],
-                        updated: [],
-                        deleted: [],
-                    };
-                    result.deleted.push({ type: c.type, id: c.$loki });
-                    let key = this._privateKeys.findOne({ $loki: c.keyId });
+                    let result = new OperationResult_1.OperationResult('');
+                    let key = keyStores_1.KeyStores.findOne({ $loki: c.keyId });
                     if (key) {
-                        key.pairId = null;
-                        key.pairCN = null;
-                        let unknownName = WebServer._getKeyFilename('unknown_key', key.$loki);
-                        yield (0, promises_1.rename)(this._getKeysDir(WebServer._getKeyFilenameFromRow(key)), this._getKeysDir(unknownName));
-                        key.name = WebServer._getDisplayName(unknownName);
-                        this._privateKeys.update(key);
-                        result.updated.push({ type: CertTypes_1.CertTypes.key, id: key.$loki });
+                        result.pushUpdated(yield key.clearCertificateKeyPair());
                     }
-                    this._certificates.chain().find({ signedById: c.$loki }).update((cert) => {
-                        if (c.$loki != cert.$loki) {
-                            cert.signedById = null;
-                            result.updated.push({ type: cert.type, id: cert.$loki });
-                        }
+                    certificateStores_1.CertificateStores.bulkUpdate({ $and: [{ signedById: c.$loki }, { $loki: { $ne: c.$loki } }] }, (cert) => {
+                        cert.signedById = null;
+                        result.pushUpdated(new OperationResultItem_1.OperationResultItem(cert.type, cert.$loki));
                     });
-                    this._certificates.remove(c);
+                    result.pushDeleted(c.remove());
                     resolve(result);
                 }
                 catch (err) {
@@ -1118,76 +1086,38 @@ class WebServer {
     _tryAddKey(input) {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
-                var _a;
                 try {
                     if (!input.pemString) {
                         logger.info(`Trying to add ${path_1.default.basename(input.filename)}`);
                         if (!(yield (0, exists_1.exists)(input.filename))) {
-                            reject(new CertError_1.CertError(404, `${path_1.default.basename(input.filename)} does not exist`));
+                            throw new CertError_1.CertError(404, `${path_1.default.basename(input.filename)} does not exist`);
+                            return;
                         }
                         input.pemString = yield (0, promises_1.readFile)(input.filename, { encoding: 'utf8' });
                     }
-                    let result = {
-                        name: '',
-                        added: [],
-                        updated: [],
-                        deleted: [],
-                    };
-                    let k;
-                    let msg = node_forge_1.pem.decode(input.pemString)[0];
-                    let encrypted = false;
-                    if (msg.type == 'ENCRYPTED PRIVATE KEY') {
-                        if (!input.password) {
-                            logger.warn(`Encrypted key requires password`);
-                            return reject(new CertError_1.CertError(400, 'Password is required for key ' + ((_a = input.filename) !== null && _a !== void 0 ? _a : 'no name')));
-                        }
-                        k = node_forge_1.pki.decryptRsaPrivateKey(input.pemString, input.password);
-                        encrypted = true;
-                    }
-                    else {
-                        k = node_forge_1.pki.privateKeyFromPem(input.pemString);
-                    }
-                    let kRow = { e: k.e, n: k.n, pairId: null, pairCN: null, name: null, type: CertTypes_1.CertTypes.key, encrypted: encrypted };
-                    let keys = this._privateKeys.find();
-                    let publicKey = node_forge_1.pki.setRsaPublicKey(k.n, k.e);
+                    let result = new OperationResult_1.OperationResult('unknown_key');
+                    let kRow = yield keyUtil_1.KeyUtil.CreateFromPem(input.pemString, input.password);
                     // See if we already have this key
-                    for (let i = 0; i < keys.length; i++) {
-                        if (WebServer._isIdenticalKey(node_forge_1.pki.setRsaPublicKey(keys[i].n, keys[i].e), publicKey)) {
-                            reject(new CertError_1.CertError(409, `Key already present: ${keys[i].name}`));
-                        }
-                    }
-                    // See if this is the key pair for a certificate
-                    let certs = this._certificates.find({ keyId: null });
-                    let newFile;
-                    let certIndex;
-                    for (certIndex = 0; certIndex < certs.length; certIndex++) {
-                        if (WebServer._isKeyPair(yield this._pkiCertFromRow(certs[certIndex]), k.n, k.e)) {
-                            kRow.pairId = certs[certIndex].$loki;
-                            kRow.pairCN = certs[certIndex].subject.CN;
-                            newFile = certs[certIndex].name + '_key';
-                            break;
-                        }
+                    let match;
+                    if ((match = keyStores_1.KeyStores.isIdentical(kRow))) {
+                        reject(new CertError_1.CertError(409, `Key already present: ${match.name}`));
+                        return;
                     }
                     // Generate a file name for a key without a certificate
                     if (kRow.pairId == null) {
-                        newFile = 'unknown_key';
-                        result.name = newFile;
+                        result.name = 'unknown_key';
                     }
                     else {
-                        result.name = kRow.pairCN + '_key';
+                        result.name = kRow.name;
                     }
-                    kRow.name = newFile;
-                    let newRecord = (this._privateKeys.insert(kRow));
-                    result.added.push({ type: CertTypes_1.CertTypes.key, id: newRecord.$loki });
-                    // Update certificate that key pair
-                    if (certIndex < certs.length) {
-                        certs[certIndex].keyId = newRecord.$loki;
-                        this._certificates.update(certs[certIndex]);
-                        result.updated.push({ type: certs[certIndex].type, id: certs[certIndex].$loki });
+                    let temp = kRow.insert();
+                    result.merge(temp);
+                    if (temp.pushUpdated.length > 0) {
+                        result.name = temp.name;
                     }
-                    let newName = WebServer._getKeyFilenameFromRow(newRecord);
-                    yield (0, promises_1.writeFile)(this._getKeysDir(newName), input.pemString, { encoding: 'utf8' });
-                    logger.info(`Written file ${newName}`);
+                    logger.info('Inserted key ' + kRow.name);
+                    yield kRow.writeFile();
+                    logger.info(`Written file ${kRow.name}`);
                     resolve(result);
                 }
                 catch (err) {
@@ -1206,14 +1136,14 @@ class WebServer {
      * @param r The key row from the database
      * @returns A summary of the database row
      */
-    _getKeyBrief(r) {
-        return {
-            id: r.$loki,
-            name: r.name,
-            certPair: (r.pairId == null) ? 'Not present' : r.name.substring(0, r.name.length - 4),
-            encrypted: r.encrypted,
-        };
-    }
+    // private _getKeyBrief(r: PrivateKeyRow & LokiObj): KeyBrief {
+    //     return { 
+    //         id: r.$loki,
+    //         name: r.name,
+    //         certPair: (r.pairId == null)? 'Not present' : r.name.substring(0, r.name.length -4),
+    //         encrypted: r.encrypted,
+    //     }
+    // }
     /**
      * Deletes a key's pem file and removes it from the database. If this key has a certificate pair that the certificate will be
      * updated to show that it no longer has its key pair in the system.
@@ -1224,27 +1154,21 @@ class WebServer {
     _tryDeleteKey(k) {
         return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
             try {
-                let result = { name: '', added: [], updated: [], deleted: [] };
-                let filename = this._getKeysDir(WebServer._getKeyFilenameFromRow(k));
-                if (yield (0, exists_1.exists)(filename)) {
-                    yield (0, promises_1.unlink)(filename);
-                }
-                else {
+                let result = new OperationResult_1.OperationResult('');
+                let filename = k.absoluteFilename;
+                if (!(yield k.deleteFile())) {
                     logger.error(`Could not find file ${filename}`);
                 }
                 if (k.pairId) {
-                    let cert = this._certificates.findOne({ $loki: k.pairId });
+                    let cert = certificateStores_1.CertificateStores.findOne({ $loki: k.pairId });
                     if (!cert) {
                         logger.warn(`Could not find certificate with id ${k.pairId}`);
                     }
                     else {
-                        cert.keyId = null;
-                        this._certificates.update(cert);
-                        result.updated.push({ type: cert.type, id: cert.$loki });
+                        result.pushUpdated(cert.updateKeyId(null));
                     }
                 }
-                result.deleted.push({ type: CertTypes_1.CertTypes.key, id: k.$loki });
-                this._privateKeys.remove(k);
+                result.pushDeleted(k.deleteRow());
                 resolve(result);
             }
             catch (err) {
@@ -1307,7 +1231,7 @@ class WebServer {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, _reject) => __awaiter(this, void 0, void 0, function* () {
                 let i;
-                let caList = this._certificates.find({ 'type': { '$in': [CertTypes_1.CertTypes.root, CertTypes_1.CertTypes.intermediate] } });
+                let caList = certificateStores_1.CertificateStores.find({ 'type': { '$in': [CertTypes_1.CertTypes.root, CertTypes_1.CertTypes.intermediate] } });
                 for (i = 0; i < caList.length; i++) {
                     try {
                         let c = yield this._pkiCertFromRow((caList[i]));
@@ -1337,53 +1261,54 @@ class WebServer {
      * @param id The row id from the database
      * @returns The results of the modifications to the certificate rows
      */
-    _findSigned(certificate, id) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
-                let signeeList = this._certificates.find({ $and: [
-                        { signedById: { $eq: null } },
-                        { $loki: { $ne: id } },
-                        { type: { $in: [CertTypes_1.CertTypes.leaf, CertTypes_1.CertTypes.intermediate] } }
-                    ] });
-                let retVal = [];
-                try {
-                    for (const s of signeeList) {
-                        let check = yield this._pkiCertFromRow(s);
-                        logger.debug(`Checking ${check.subject.getField('CN').value}`);
-                        try {
-                            if (certificate.verify(check)) {
-                                this._certificates.chain().find({ $loki: s.$loki }).update((u) => {
-                                    u.signedById = id;
-                                });
-                                logger.debug(`Marked ${s.name} as signed by ${certificate.subject.getField('CN').name}`);
-                                retVal.push({ type: s.type, id: s.$loki });
-                            }
-                            else {
-                                logger.debug(`Did not sign ${check.subject.getField('CN').value}`);
-                            }
-                        }
-                        catch (err) {
-                            if (err.message != 'The parent certificate did not issue the given child certificate; the child certificate\'s issuer does not match the parent\'s subject.') {
-                                logger.debug('Verify correct error: ' + err.message);
-                            }
-                            // verify should return false but apparently throws an exception - do nothing except when it is an unexpected error message
-                        }
-                    }
-                    resolve(retVal);
-                }
-                catch (err) {
-                    reject(err);
-                }
-            }));
-        });
-    }
+    // private async _findSigned(certificate: pki.Certificate, id: number): Promise<OperationResult2> {
+    //     return new Promise<OperationResult2>(async (resolve, reject) => {
+    //         let signeeList: CertificateUtil[] = CertificateStores.find({ $and: [
+    //             { signedById: { $eq: null } }, 
+    //             { $loki: { $ne: id } },
+    //             { type: {  $in: [ CertTypes.leaf, CertTypes.intermediate ] }}
+    //         ]});
+    //         let retVal: OperationResult2 = new OperationResult2('');
+    //         try {
+    //             for (const s of signeeList) {
+    //                 // let check = await s.getpkiCert();
+    //                 logger.debug(`Checking ${s.name}`);
+    //                 try {
+    //                     if (certificate.verify(await s.getpkiCert())) {
+    //                         s.updateSignedById(id);
+    //                         CertificateStores.bulkUpdate({ $loki: s.$loki }, (u) => {
+    //                             u.signedById = id;
+    //                         });
+    //                         // s.s
+    //                         logger.debug(`Marked ${s.name} as signed by ${certificate.subject.getField('CN').name}`);
+    //                         retVal.pushUpdated(new OperationResultItem2(s.type, s.$loki));
+    //                     }
+    //                     else {
+    //                         // logger.debug(`Did not sign ${check.subject.getField('CN').value }`);
+    //                         logger.debug(`That message`);
+    //                     }
+    //                 }
+    //                 catch (err) {
+    //                     if (err.message != 'The parent certificate did not issue the given child certificate; the child certificate\'s issuer does not match the parent\'s subject.') {
+    //                         logger.debug('Verify correct error: ' + err.message);
+    //                     }
+    //                     // verify should return false but apparently throws an exception - do nothing except when it is an unexpected error message
+    //                 }
+    //             }
+    //             resolve(retVal);
+    //         }
+    //         catch (err) {
+    //             reject(err);
+    //         }
+    //     });
+    // }
     /**
      * Broadcasts the updates to the certificates and keys to all of the web clients
      *
      * @param data the collection of operation results
      */
     _broadcast(data) {
-        let msg = JSON.stringify(data);
+        let msg = JSON.stringify(data.normalize());
         logger.debug('Updates: ' + msg);
         this._ws.clients.forEach((client) => {
             client.send(msg, (err) => {
@@ -1408,7 +1333,9 @@ class WebServer {
         if (!('name' in query) && !('id' in query))
             throw new CertError_1.CertError(400, 'Name or id must be specified');
         let selector = ('name' in query) ? { name: query.name } : { $loki: parseInt(query.id) };
-        c = this._certificates.find(selector);
+        if (selector.$loki && isNaN(selector.$loki))
+            throw new CertError_1.CertError(400, 'Specified id is not numeric');
+        c = certificateStores_1.CertificateStores.find(selector);
         if (c.length == 0) {
             throw new CertError_1.CertError(404, `No certificate for ${query.id ? 'id' : 'name'} ${Object.values(selector)[0]} found`);
         }
@@ -1437,10 +1364,9 @@ class WebServer {
         else if (c.count() > 1) {
             throw new CertError_1.CertError(400, `Multiple certificates match the name ${Object.values(selector)[0]} - use id instead`);
         }
-        let result = { name: null, added: [], updated: [], deleted: [] };
         let cd = c.data()[0];
-        result.name = cd.subject.CN;
-        result.updated.push({ type: cd.type, id: cd.$loki });
+        let result = new OperationResult_1.OperationResult(cd.subject.CN);
+        result.pushUpdated(new OperationResultItem_1.OperationResultItem(cd.type, cd.$loki));
         c.update(updater);
         return result;
     }
@@ -1466,7 +1392,7 @@ class WebServer {
                 throw new CertError_1.CertError(400, 'Specified id is not numeric');
             selector = { $loki: id };
         }
-        k = this._privateKeys.find(selector);
+        k = keyStores_1.KeyStores.find(selector);
         if (k.length == 0) {
             throw new CertError_1.CertError(404, `No key for ${JSON.stringify(query)} found`);
         }
@@ -1501,31 +1427,29 @@ class WebServer {
      * @param password Optional password if the key is encrypted
      * @returns A pki.PrivateKey constructed from the key's pem file
      */
-    _pkiKeyFromRow(k, password) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
-                try {
-                    let filename = this._getKeysDir(WebServer._getKeyFilenameFromRow(k));
-                    let p = yield (0, promises_1.readFile)(filename, { encoding: 'utf8' });
-                    let msg = node_forge_1.pem.decode(p)[0];
-                    if (msg.type.startsWith('ENCRYPTED')) {
-                        if (password) {
-                            resolve(node_forge_1.pki.decryptRsaPrivateKey(p, password));
-                        }
-                        else {
-                            throw new CertError_1.CertError(400, 'No password provided for encrypted key');
-                        }
-                    }
-                    else {
-                        resolve(node_forge_1.pki.privateKeyFromPem(p));
-                    }
-                }
-                catch (err) {
-                    reject(err);
-                }
-            }));
-        });
-    }
+    // private async _pkiKeyFromRow(k: PrivateKeyRow & LokiObj, password?: string): Promise<pki.PrivateKey> {
+    //     return new Promise<pki.PrivateKey>(async (resolve, reject) => {
+    //         try {
+    //             let filename = this._getKeysDir(WebServer._getKeyFilenameFromRow(k));
+    //             let p = await readFile(filename, { encoding: 'utf8' });
+    //             let msg = pem.decode(p)[0];
+    //             if(msg.type.startsWith('ENCRYPTED')) {
+    //                 if (password) {
+    //                     resolve(pki.decryptRsaPrivateKey(p, password));
+    //                 }
+    //                 else {
+    //                     throw new CertError(400, 'No password provided for encrypted key');
+    //                 }
+    //             }
+    //             else {
+    //                 resolve(pki.privateKeyFromPem(p));
+    //             }
+    //         }
+    //         catch (err) {
+    //             reject(err);
+    //         }
+    //     });
+    // }
     /**
      * This function is used to update the database when breaking changes are made.
      */
@@ -1657,11 +1581,11 @@ class WebServer {
      * @param keye Key e big integer
      * @returns true if this is the key paired with the certificate
      */
-    static _isKeyPair(cert, keyn, keye) {
-        let publicKey = node_forge_1.pki.setRsaPublicKey(keyn, keye);
-        let certPublicKey = cert.publicKey;
-        return this._isIdenticalKey(publicKey, certPublicKey);
-    }
+    // private static _isKeyPair(cert: pki.Certificate, keyn: jsbn.BigInteger, keye: jsbn.BigInteger): boolean {
+    //     let publicKey = pki.setRsaPublicKey(keyn, keye);
+    //     let certPublicKey: pki.rsa.PublicKey = cert.publicKey as pki.rsa.PublicKey;
+    //     return this._isIdenticalKey(publicKey, certPublicKey);
+    // }
     /**
      * Compares to keys for equality
      *
@@ -1669,16 +1593,15 @@ class WebServer {
      * @param rightKey Second key to compare
      * @returns true if the keys are identical
      */
-    static _isIdenticalKey(leftKey, rightKey) {
-        if (leftKey.n.data.length != rightKey.n.data.length) {
-            return false;
-        }
-        for (let i = 0; i < leftKey.n.data.length; i++) {
-            if (leftKey.n.data[i] != rightKey.n.data[i])
-                return false;
-        }
-        return true;
-    }
+    // private static _isIdenticalKey(leftKey: pki.rsa.PublicKey, rightKey: pki.rsa.PublicKey): boolean {
+    //     if (leftKey.n.data.length != rightKey.n.data.length) {
+    //         return false;
+    //     }
+    //     for (let i = 0; i < leftKey.n.data.length; i++) {
+    //         if (leftKey.n.data[i] != rightKey.n.data[i]) return false;
+    //     }
+    //     return true;
+    // }
     /**
      * Determines the filename of a certificate from the database record
      *
@@ -1713,9 +1636,9 @@ class WebServer {
      * @param name Input name
      * @returns Display name
      */
-    static _getDisplayName(name) {
-        return name.split('_').slice(0, -1).join('_');
-    }
+    // private static _getDisplayName(name: string): string {
+    //     return name.split('_').slice(0, -1).join('_');
+    // }
     /**
      * Parse the id from the end of the filename
      *
@@ -1731,29 +1654,29 @@ class WebServer {
      * @param name Input string
      * @returns Input with special characters replaced with underscores
      */
-    static _sanitizeName(name) {
-        return name.replace(/[^\w-_=+{}\[\]\(\)"'\]]/g, '_');
-    }
+    // private static _sanitizeName(name: string): string {
+    //     return name.replace(/[^\w-_=+{}\[\]\(\)"'\]]/g, '_');
+    // }
     /**
      * Extracts the issuer or subject values and returns them as a CertificateSubject
      *
      * @param s pki.Certificate field
      * @returns Extracted subject elements
      */
-    static _getSubject(s) {
-        let getValue = (v) => {
-            let work = s.getField(v);
-            return work ? work.value : null;
-        };
-        return {
-            C: getValue('C'),
-            ST: getValue('ST'),
-            L: getValue('L'),
-            O: getValue('O'),
-            OU: getValue('OU'),
-            CN: getValue('CN')
-        };
-    }
+    // private static _getSubject(s: pki.Certificate['issuer'] | pki.Certificate['subject']): CertificateSubject {
+    //     let getValue: (v: string) => string = (v: string): string => {
+    //         let work = s.getField(v);
+    //         return work? work.value : null;
+    //     }
+    //     return {
+    //         C: getValue('C'),
+    //         ST: getValue('ST'),
+    //         L: getValue('L'),
+    //         O: getValue('O'),
+    //         OU: getValue('OU'),
+    //         CN: getValue('CN')
+    //     }
+    // } 
     /**
      * Add subject values to pki.CertificateField
      *

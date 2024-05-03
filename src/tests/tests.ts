@@ -160,6 +160,7 @@ let tests: Test[] = [
     { description: 'Upload root certificate', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: uploadRootCertificate, result: TestResult.TestNotYetRun },
     { description: 'Delete intermediate key', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: deleteIntermediateKey, result: TestResult.TestNotYetRun },
     { description: 'Upload intermediate key', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: uploadIntermediateKey, result: TestResult.TestNotYetRun },
+    // { description: 'Upload multifile', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: uploadMultiFile, result: TestResult.TestNotYetRun },
     // bash script section
     { description: '[bash] Download and source bash helper script', runCondition: TestType.RunForBashTests, runOnFailure: false, testFunction: bashDownloadAndSource, result: TestResult.TestNotYetRun },
     { description: '[bash] Ensure urlencode works', runCondition: TestType.RunForBashTests, runOnFailure: false, testFunction: bashTestUrlEncode, result:TestResult.TestNotYetRun },
@@ -188,6 +189,8 @@ const wsQueue: string[] = [];       // Used to pass data from WebSocket on messa
 let msg: any;
 let rski: {};
 let iski: {};
+let nextCertId = 0;
+let nextKeyId = 0;
 
 async function setup():  Promise<boolean> {
     if (!fs.existsSync(testPath)) await mkdir(testPath);
@@ -229,7 +232,7 @@ async function connectWebSocket(): Promise<boolean> {
 async function checkForEmptyDatabase(): Promise<boolean> {
     
     for (let dir in types) {
-        res = await httpRequest('get', url + '/api/certList?type=' + types[dir]);
+        res = await httpRequest('get', `${url}/api/certList?type=${types[dir]}`);
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         assert.equal(res.body.files.length, 0, `Failed: Expected zero entries for ${types[dir]} request`);
         console.log(`Passed: zero entries returned for ${types[dir]}`);
@@ -238,51 +241,57 @@ async function checkForEmptyDatabase(): Promise<boolean> {
 }
 
 async function createCACertificate(): Promise<boolean> {
-    res = await httpRequest('post', url + '/api/createCACert', null, JSON.stringify(newCA));
+    nextCertId++;
+    nextKeyId++;
+    res = await httpRequest('post', `${url}/api/createCACert`, null, JSON.stringify(newCA));
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode} ${res.body.error}`);
     await ew.EventWait();
     ew.EventReset();
     msg = JSON.parse(wsQueue.shift() as string);
     checkPacket(msg, 'someName/someName_key', 2, 0, 0);
-    checkItems(msg.added, [{ type: 1, id: 1 }, { type: 4, id: 1 }]);
+    checkItems(msg.added, [OperationResultItem.makeResult({ type: 1, id: nextCertId }), OperationResultItem.makeResult({ type: 4, id: nextKeyId })]);
     return true;
 }
 
 async function createIntermediateCertificate(): Promise<boolean> {
-    res = await httpRequest('post', url + '/api/createIntermediateCert', null, JSON.stringify(newInt));
+    nextCertId++;
+    nextKeyId++;
+    res = await httpRequest('post', `${url}/api/createIntermediateCert`, null, JSON.stringify(newInt));
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body.error}`);
     await ew.EventWait();
     ew.EventReset();
     msg = JSON.parse(wsQueue.shift() as string);
     checkPacket(msg, 'intName/intName_key', 2, 0, 0);
-    checkItems(msg.added, [{ type: 2, id: 2 }, { type: 4, id: 2 }]);
+    checkItems(msg.added, [OperationResultItem.makeResult({ type: 2, id: nextCertId }), OperationResultItem.makeResult({ type: 4, id: nextKeyId })]);
     return true;
 }
 
 async function createLeafCertificate(): Promise<boolean> {
-    res = await httpRequest('post', url + '/api/createLeafCert', null, JSON.stringify(newLeaf));
+    nextCertId++;
+    nextKeyId++;
+    res = await httpRequest('post', `${url}/api/createLeafCert`, null, JSON.stringify(newLeaf));
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
     await ew.EventWait();
     ew.EventReset();
     msg = JSON.parse(wsQueue.shift() as string);
     checkPacket(msg, 'leafName/leafName_key', 2, 0, 0);
-    checkItems(msg.added, [{ type: 3, id: 3 }, { type: 4, id: 3 }]);
+    checkItems(msg.added, [OperationResultItem.makeResult({ type: 3, id: nextCertId }), OperationResultItem.makeResult({ type: 4, id: nextKeyId })]);
     return true;
 }
 
 async function addTagsToIntermediate(): Promise<boolean> {
-    res = await httpRequest('post', url + '/api/updateCertTag?id=2', null, JSON.stringify({ tags: [ 'tag1', 'tag2' ] }));
+    res = await httpRequest('post', `${url}/api/updateCertTag?id=2`, null, JSON.stringify({ tags: [ 'tag1', 'tag2' ] }));
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
     await ew.EventWait();
     ew.EventReset();
     msg = JSON.parse(wsQueue.shift() as string);
     checkPacket(msg, 'intName', 0, 1, 0);
-    checkItems(msg.updated, [{ type: 2, id: 2}]);
+    checkItems(msg.updated, [OperationResultItem.makeResult({ type: 2, id: nextCertId - 1 })]);
     return true;
 }
 
 async function getRootCertificateList(): Promise<boolean> {
-    res = await httpRequest('get', url + '/api/certList?type=root');
+    res = await httpRequest('get', `${url}/api/certList?type=root`);
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body}`);
     assert.notEqual(res.body.files, null, 'Did not receive the files element');
     assert.equal(res.body.files.length, 1, `Files element is expected to be length 1 but received ${res.body.files.length}`);
@@ -295,7 +304,7 @@ async function getRootCertificateList(): Promise<boolean> {
 }
 
 async function getIntermediateCertificateList(): Promise<boolean> {
-    res = await httpRequest('get', url + '/api/certList?type=intermediate');
+    res = await httpRequest('get', `${url}/api/certList?type=intermediate`);
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body}`);
     assert.notEqual(res.body.files, null, 'Did not receive the files element');
     assert.equal(res.body.files.length, 1, `Files element is expected to be length 1 but received ${res.body.files.length}`);
@@ -308,7 +317,7 @@ async function getIntermediateCertificateList(): Promise<boolean> {
 }
 
 async function getLeafCertificateList(): Promise<boolean> {
-    res = await httpRequest('get', url + '/api/certList?type=leaf');
+    res = await httpRequest('get', `${url}/api/certList?type=leaf`);
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body}`);
     assert.notEqual(res.body.files, null, 'Did not receive the files element');
     assert.equal(res.body.files.length, 1, `Files element is expected to be length 1 but received ${res.body.files.length}`);
@@ -320,7 +329,7 @@ async function getLeafCertificateList(): Promise<boolean> {
 }
 
 async function getCertificateDetailsByID(): Promise<boolean> {
-    res = await httpRequest('get', url + '/api/certDetails?id=2');
+    res = await httpRequest('get', `${url}/api/certDetails?id=${nextCertId - 1}`);
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
     assert.equal(res.body.certType, 'intermediate', `Wrong certificate type ${res.body.certType} returned`);
     assert.equal(res.body.id, 2, `Wrong id ${res.body.id} returned`);
@@ -331,7 +340,7 @@ async function getCertificateDetailsByID(): Promise<boolean> {
 }
     
 async function getKeyDetailsByID(): Promise<boolean> {
-    res = await httpRequest('get', url + '/keyDetails?id=3');
+    res = await httpRequest('get', url + `/keyDetails?id=${nextKeyId}`);
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
     return true;
 }
@@ -339,7 +348,7 @@ async function getKeyDetailsByID(): Promise<boolean> {
 async function checkDatabaseIsPopulated(): Promise<boolean> {
     for (let dir in types) {
         console.log(`get populated ${types[dir]} list`);
-        res = await httpRequest('get', url + '/certList?type=' + types[dir]);
+        res = await httpRequest('get', `${url}/certList?type=${types[dir]}`);
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         if (dir != '3') {
             assert.equal(res.body.files.length, 1, `Failed: Expected one entry for ${types[dir]} request`);
@@ -354,7 +363,7 @@ async function checkDatabaseIsPopulated(): Promise<boolean> {
 }
 
 async function getKeyList(): Promise<boolean> {
-    res = await httpRequest('get', url + '/api/keyList');
+    res = await httpRequest('get', `${url}/api/keyList`);
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body}`);
     assert.notEqual(res.body.files, null, 'Did not receive the files element');
     assert.equal(res.body.files.length, 3, `Files element is expected to be length 1 but received ${res.body.files.length}`);
@@ -368,18 +377,24 @@ async function getKeyList(): Promise<boolean> {
 }
         
 async function getRootCertificateFile(): Promise<boolean> {
-    res = await httpRequest('get', url + '/api/getCertificatePem?id=' + '1');
+    res = await httpRequest('get', `${url}/api/getCertificatePem?id=${nextCertId - 2}`);
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
-    await writeFile(path.join(testPath, 'someName.pem'), res.body);
+    let filename = res.headers['content-disposition'].split('=')[1];
+    filename = filename.slice(1, filename.length - 1);
+    assert.equal('someName.pem', filename);
+    await writeFile(path.join(testPath, filename), res.body);
     let rootCert = pki.certificateFromPem(res.body);
     rski = rootCert.getExtension('subjectKeyIdentifier');
     return true;
 }
 
 async function getIntermediateCertificateFile(): Promise<boolean> {
-    res = await httpRequest('get', url + '/api/getCertificatePem?id=' +'2');
+    res = await httpRequest('get', `${url}/api/getCertificatePem?id=${nextCertId - 1}`);
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
-    await writeFile(path.join(testPath, 'intName.pem'), res.body);
+    let filename = res.headers['content-disposition'].split('=')[1];
+    filename = filename.slice(1, filename.length - 1);
+    assert.equal('intName.pem', filename);
+    await writeFile(path.join(testPath, filename), res.body);
     let intermediateCert = pki.certificateFromPem(res.body);
     iski = intermediateCert.getExtension('subjectKeyIdentifier');
     let iaki = intermediateCert.getExtension('authorityKeyIdentifier');
@@ -388,9 +403,12 @@ async function getIntermediateCertificateFile(): Promise<boolean> {
 }
 
 async function getLeafCertificateFile(): Promise<boolean> {
-    res = await httpRequest('get', url + '/api/getCertificatePem?id=' + '3');
+    res = await httpRequest('get', `${url}/api/getCertificatePem?id=${nextCertId}`);
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
-    await writeFile(path.join(testPath, 'leafName.pem'), res.body);
+    let filename = res.headers['content-disposition'].split('=')[1];
+    filename = filename.slice(1, filename.length - 1);
+    assert.equal('leafName.pem', filename);
+    await writeFile(path.join(testPath, filename), res.body);
     let leafCert = pki.certificateFromPem(res.body);
     let laki = leafCert.getExtension('authorityKeyIdentifier');
     assert.equal((iski as any).value.slice(1), (laki as any).value.slice(3), 'Authority key identifier does not match parent\'s subject key identifier');
@@ -403,17 +421,19 @@ async function getLeafCertificateFile(): Promise<boolean> {
 
 async function getLeafChainFile(): Promise<boolean> {
     let certHeader = '-----BEGIN CERTIFICATE-----';
-    res = await httpRequest('get', url + '/api/chainDownload?id=' + '3');
+    res = await httpRequest('get', `${url}/api/chainDownload?id=${nextCertId}`);
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
     let filename = res.headers['content-disposition'].split('=')[1];
+    filename = filename.slice(1, filename.length - 1);
     assert.equal('leafName_chain.pem', filename, 'The content-disposition header was incorrect');
     assert.equal(res.body.split(certHeader).length, 4, `Incorrect number of certificates returned in chain: ${res.body.split(certHeader).length}`);
     return true;
 }
 
 async function getKeyFile(): Promise<boolean> {
-    res = await httpRequest('get', url + '/api/getKeyPem?id=2');
+    res = await httpRequest('get', `${url}/api/getKeyPem?id=${nextKeyId - 1}`);
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
+    // assert.equal
     await writeFile(path.join(testPath, 'intName_key.pem'), res.body);
     return true;
 }
@@ -425,8 +445,8 @@ async function deleteRootCertificate(): Promise<boolean> {
     ew.EventReset();
     msg = JSON.parse(wsQueue.shift() as string);
     checkPacket(msg, '', 0, 2, 1);
-    checkItems(msg.updated, [{ type: 4, id: 1 }, { type: 2, id: 2 }]);
-    checkItems(msg.deleted, [{ type: 1, id: 1 }]);
+    checkItems(msg.updated, [OperationResultItem.makeResult({ type: 4, id: nextKeyId - 2 }), OperationResultItem.makeResult({ type: 2, id: nextCertId - 1 })]);
+    checkItems(msg.deleted, [OperationResultItem.makeResult({ type: 1, id: nextCertId - 2 })]);
     res = await httpRequest('get', url + '/certDetails?id=2');
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
     assert.equal(res.body.signerId, null, 'Signed certificate still references nonexistent parent');
@@ -434,6 +454,7 @@ async function deleteRootCertificate(): Promise<boolean> {
 }
 
 async function uploadRootCertificate(): Promise<boolean> {
+    nextCertId++;
     let cert = await readFile(path.join(testPath, 'someName.pem'), { encoding: 'utf8' });
     res = await httpRequest('post', url + '/api/uploadCert', null, cert, 'text/plain');
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode} ${res.body.error}`);
@@ -441,8 +462,8 @@ async function uploadRootCertificate(): Promise<boolean> {
     ew.EventReset();
     msg = JSON.parse(wsQueue.shift() as string);
     checkPacket(msg, 'someName', 1, 2, 0);
-    checkItems(msg.added, [{ type: 1, id: 4 }]);
-    checkItems(msg.updated, [{ type: 2, id: 2 }, { type: 4, id: 1 }]);
+    checkItems(msg.added, [OperationResultItem.makeResult({ type: 1, id: nextCertId })]);
+    checkItems(msg.updated, [OperationResultItem.makeResult({ type: 4, id: nextKeyId - 2 }), OperationResultItem.makeResult({ type: 2, id: nextCertId - 2 })]);
     res = await httpRequest('get', url + '/certDetails?id=2');
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
     assert.equal(res.body.signerId, 4, 'Signed certificate does not reference uploaded parent');
@@ -457,21 +478,22 @@ async function deleteIntermediateKey(): Promise<boolean> {
     ew.EventReset();
     msg = JSON.parse(wsQueue.shift() as string);
     checkPacket(msg, '', 0, 1, 1);
-    checkItems(msg.updated, [{ type: 2, id: 2 }]);
-    checkItems(msg.deleted, [{ type: 4, id: 2 }]);
+    checkItems(msg.updated, [OperationResultItem.makeResult({ type: 2, id: nextCertId - 2 })]);
+    checkItems(msg.deleted, [OperationResultItem.makeResult({ type: 4, id: nextKeyId - 1 })]);
     return true;
 }
 
 async function uploadIntermediateKey(): Promise<boolean> {
+    nextKeyId++;
     let key = await readFile(path.join(testPath, 'intName_key.pem'), { encoding: 'utf8' });
-    res = await httpRequest('post', url + '/api/uploadKey', null, key, 'text/plain');
+    res = await httpRequest('post', `${url}/api/uploadKey`, null, key, 'text/plain');
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
     await ew.EventWait();
     ew.EventReset();
     msg = JSON.parse(wsQueue.shift() as string);
     checkPacket(msg, 'intName_key', 1, 1, 0);
-    checkItems(msg.added, [{ type: 4, id: 4 }]);
-    checkItems(msg.updated, [{ type: 2, id:2 }]);
+    checkItems(msg.added, [OperationResultItem.makeResult({ type: 4, id: nextKeyId })]);
+    checkItems(msg.updated, [OperationResultItem.makeResult({ type: 2, id: nextCertId - 2 })]);
     return true;
 }
 
@@ -496,7 +518,7 @@ async function getCertificateWithNonexistentId(): Promise<boolean> {
 async function bashDownloadAndSource(): Promise<boolean> {
     try {
         let scriptLoc = path.join(testPath, bashHelperScript);
-        res = await httpRequest('get', url + '/api/helper?os=linux');
+        res = await httpRequest('get', `${url}/api/helper?os=linux`);
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         await writeFile(scriptLoc, res.body);
         execSync(`${shells.bash.command} -c "source ${scriptLoc}"`);
@@ -568,7 +590,7 @@ async function bashContactHubWithBadConnectionString(): Promise<boolean> {
 
 async function bashGenDevice(): Promise<boolean> {
     try {
-        let response = await runShellCommands([`pushd ${testPath}`, `gendevice "${connectionString}" 4 serverTest`, 'popd'], shells.bash)
+        let response = await runShellCommands([`pushd ${testPath}`, `gendevice "${connectionString}" ${nextCertId - 3} serverTest`, 'popd'], shells.bash)
         assert.equal(response[2], 'Device serverTest created', `Device creation failed: ${response[1]}`);
         assert.equal(response[4], 'Certificate created', `Certificate creation failed: ${response[3]}`);
         assert.match(response[17], /‘serverTest_chain.pem’ saved/);
@@ -645,7 +667,7 @@ async function pwshGetIoTStats(): Promise<boolean> {
 
 async function pwshGenDevice(): Promise<boolean> {
     try {
-        let response = await runShellCommands([`Push-Location ${testPath}`, `New-Device "${connectionString}" 4 serverTest`, 'Pop-Location'], shells.powershell)
+        let response = await runShellCommands([`Push-Location ${testPath}`, `New-Device "${connectionString}" ${nextCertId - 3} serverTest`, 'Pop-Location'], shells.powershell)
         assert.equal(response[3], 'Device serverTest created', `Device creation failed: ${response[3]}`);
         assert.equal(response[4], 'Certificate created', `Certificate creation failed: ${response[4]}`);
         assert.match(response[7], /serverTest_chain.pem written/);
@@ -842,7 +864,7 @@ function checkItems(items: OperationResultItem[], test: OperationResultItem[]) {
     assert.equal(items.length, test.length, `Entry counts do not match - ${test.length}, received ${items.length}`);
 
     for (let i = 0; i < items.length; i++) {
-        assert.deepStrictEqual(items[i], test[i], `Item type ${i} does not match the test version`);
+        assert.equal(OperationResultItem.makeResult(items[i]).isEqual(test[i]), true);
     }
 }
 

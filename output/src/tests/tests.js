@@ -26,6 +26,7 @@ const node_process_1 = require("node:process");
 const ws_1 = __importDefault(require("ws"));
 // import * as wtfnode from 'wtfnode';
 const eventWaiter_1 = require("../utility/eventWaiter");
+const OperationResultItem_1 = require("../webservertypes/OperationResultItem");
 const generatesastoken_1 = require("../utility/generatesastoken");
 const testPath = path_1.default.join(__dirname, '../testdata');
 const testConfig = path_1.default.join(testPath, 'testconfig.yml');
@@ -131,6 +132,7 @@ let tests = [
     { description: 'Upload root certificate', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: uploadRootCertificate, result: TestResult.TestNotYetRun },
     { description: 'Delete intermediate key', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: deleteIntermediateKey, result: TestResult.TestNotYetRun },
     { description: 'Upload intermediate key', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: uploadIntermediateKey, result: TestResult.TestNotYetRun },
+    // { description: 'Upload multifile', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: uploadMultiFile, result: TestResult.TestNotYetRun },
     // bash script section
     { description: '[bash] Download and source bash helper script', runCondition: TestType.RunForBashTests, runOnFailure: false, testFunction: bashDownloadAndSource, result: TestResult.TestNotYetRun },
     { description: '[bash] Ensure urlencode works', runCondition: TestType.RunForBashTests, runOnFailure: false, testFunction: bashTestUrlEncode, result: TestResult.TestNotYetRun },
@@ -158,6 +160,8 @@ const wsQueue = []; // Used to pass data from WebSocket on message function to m
 let msg;
 let rski;
 let iski;
+let nextCertId = 0;
+let nextKeyId = 0;
 function setup() {
     return __awaiter(this, void 0, void 0, function* () {
         if (!fs_1.default.existsSync(testPath))
@@ -202,7 +206,7 @@ function connectWebSocket() {
 function checkForEmptyDatabase() {
     return __awaiter(this, void 0, void 0, function* () {
         for (let dir in types) {
-            res = yield httpRequest('get', url + '/api/certList?type=' + types[dir]);
+            res = yield httpRequest('get', `${url}/api/certList?type=${types[dir]}`);
             node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
             node_assert_1.default.equal(res.body.files.length, 0, `Failed: Expected zero entries for ${types[dir]} request`);
             console.log(`Passed: zero entries returned for ${types[dir]}`);
@@ -212,55 +216,61 @@ function checkForEmptyDatabase() {
 }
 function createCACertificate() {
     return __awaiter(this, void 0, void 0, function* () {
-        res = yield httpRequest('post', url + '/api/createCACert', null, JSON.stringify(newCA));
+        nextCertId++;
+        nextKeyId++;
+        res = yield httpRequest('post', `${url}/api/createCACert`, null, JSON.stringify(newCA));
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode} ${res.body.error}`);
         yield ew.EventWait();
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
         checkPacket(msg, 'someName/someName_key', 2, 0, 0);
-        checkItems(msg.added, [{ type: 1, id: 1 }, { type: 4, id: 1 }]);
+        checkItems(msg.added, [OperationResultItem_1.OperationResultItem.makeResult({ type: 1, id: nextCertId }), OperationResultItem_1.OperationResultItem.makeResult({ type: 4, id: nextKeyId })]);
         return true;
     });
 }
 function createIntermediateCertificate() {
     return __awaiter(this, void 0, void 0, function* () {
-        res = yield httpRequest('post', url + '/api/createIntermediateCert', null, JSON.stringify(newInt));
+        nextCertId++;
+        nextKeyId++;
+        res = yield httpRequest('post', `${url}/api/createIntermediateCert`, null, JSON.stringify(newInt));
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body.error}`);
         yield ew.EventWait();
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
         checkPacket(msg, 'intName/intName_key', 2, 0, 0);
-        checkItems(msg.added, [{ type: 2, id: 2 }, { type: 4, id: 2 }]);
+        checkItems(msg.added, [OperationResultItem_1.OperationResultItem.makeResult({ type: 2, id: nextCertId }), OperationResultItem_1.OperationResultItem.makeResult({ type: 4, id: nextKeyId })]);
         return true;
     });
 }
 function createLeafCertificate() {
     return __awaiter(this, void 0, void 0, function* () {
-        res = yield httpRequest('post', url + '/api/createLeafCert', null, JSON.stringify(newLeaf));
+        nextCertId++;
+        nextKeyId++;
+        res = yield httpRequest('post', `${url}/api/createLeafCert`, null, JSON.stringify(newLeaf));
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         yield ew.EventWait();
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
         checkPacket(msg, 'leafName/leafName_key', 2, 0, 0);
-        checkItems(msg.added, [{ type: 3, id: 3 }, { type: 4, id: 3 }]);
+        checkItems(msg.added, [OperationResultItem_1.OperationResultItem.makeResult({ type: 3, id: nextCertId }), OperationResultItem_1.OperationResultItem.makeResult({ type: 4, id: nextKeyId })]);
         return true;
     });
 }
 function addTagsToIntermediate() {
     return __awaiter(this, void 0, void 0, function* () {
-        res = yield httpRequest('post', url + '/api/updateCertTag?id=2', null, JSON.stringify({ tags: ['tag1', 'tag2'] }));
+        res = yield httpRequest('post', `${url}/api/updateCertTag?id=2`, null, JSON.stringify({ tags: ['tag1', 'tag2'] }));
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         yield ew.EventWait();
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
         checkPacket(msg, 'intName', 0, 1, 0);
-        checkItems(msg.updated, [{ type: 2, id: 2 }]);
+        checkItems(msg.updated, [OperationResultItem_1.OperationResultItem.makeResult({ type: 2, id: nextCertId - 1 })]);
         return true;
     });
 }
 function getRootCertificateList() {
     return __awaiter(this, void 0, void 0, function* () {
-        res = yield httpRequest('get', url + '/api/certList?type=root');
+        res = yield httpRequest('get', `${url}/api/certList?type=root`);
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body}`);
         node_assert_1.default.notEqual(res.body.files, null, 'Did not receive the files element');
         node_assert_1.default.equal(res.body.files.length, 1, `Files element is expected to be length 1 but received ${res.body.files.length}`);
@@ -274,7 +284,7 @@ function getRootCertificateList() {
 }
 function getIntermediateCertificateList() {
     return __awaiter(this, void 0, void 0, function* () {
-        res = yield httpRequest('get', url + '/api/certList?type=intermediate');
+        res = yield httpRequest('get', `${url}/api/certList?type=intermediate`);
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body}`);
         node_assert_1.default.notEqual(res.body.files, null, 'Did not receive the files element');
         node_assert_1.default.equal(res.body.files.length, 1, `Files element is expected to be length 1 but received ${res.body.files.length}`);
@@ -288,7 +298,7 @@ function getIntermediateCertificateList() {
 }
 function getLeafCertificateList() {
     return __awaiter(this, void 0, void 0, function* () {
-        res = yield httpRequest('get', url + '/api/certList?type=leaf');
+        res = yield httpRequest('get', `${url}/api/certList?type=leaf`);
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body}`);
         node_assert_1.default.notEqual(res.body.files, null, 'Did not receive the files element');
         node_assert_1.default.equal(res.body.files.length, 1, `Files element is expected to be length 1 but received ${res.body.files.length}`);
@@ -301,7 +311,7 @@ function getLeafCertificateList() {
 }
 function getCertificateDetailsByID() {
     return __awaiter(this, void 0, void 0, function* () {
-        res = yield httpRequest('get', url + '/api/certDetails?id=2');
+        res = yield httpRequest('get', `${url}/api/certDetails?id=${nextCertId - 1}`);
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         node_assert_1.default.equal(res.body.certType, 'intermediate', `Wrong certificate type ${res.body.certType} returned`);
         node_assert_1.default.equal(res.body.id, 2, `Wrong id ${res.body.id} returned`);
@@ -313,7 +323,7 @@ function getCertificateDetailsByID() {
 }
 function getKeyDetailsByID() {
     return __awaiter(this, void 0, void 0, function* () {
-        res = yield httpRequest('get', url + '/keyDetails?id=3');
+        res = yield httpRequest('get', url + `/keyDetails?id=${nextKeyId}`);
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         return true;
     });
@@ -322,7 +332,7 @@ function checkDatabaseIsPopulated() {
     return __awaiter(this, void 0, void 0, function* () {
         for (let dir in types) {
             console.log(`get populated ${types[dir]} list`);
-            res = yield httpRequest('get', url + '/certList?type=' + types[dir]);
+            res = yield httpRequest('get', `${url}/certList?type=${types[dir]}`);
             node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
             if (dir != '3') {
                 node_assert_1.default.equal(res.body.files.length, 1, `Failed: Expected one entry for ${types[dir]} request`);
@@ -338,7 +348,7 @@ function checkDatabaseIsPopulated() {
 }
 function getKeyList() {
     return __awaiter(this, void 0, void 0, function* () {
-        res = yield httpRequest('get', url + '/api/keyList');
+        res = yield httpRequest('get', `${url}/api/keyList`);
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}: ${res.body}`);
         node_assert_1.default.notEqual(res.body.files, null, 'Did not receive the files element');
         node_assert_1.default.equal(res.body.files.length, 3, `Files element is expected to be length 1 but received ${res.body.files.length}`);
@@ -353,9 +363,12 @@ function getKeyList() {
 }
 function getRootCertificateFile() {
     return __awaiter(this, void 0, void 0, function* () {
-        res = yield httpRequest('get', url + '/api/getCertificatePem?id=' + '1');
+        res = yield httpRequest('get', `${url}/api/getCertificatePem?id=${nextCertId - 2}`);
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
-        yield (0, promises_1.writeFile)(path_1.default.join(testPath, 'someName.pem'), res.body);
+        let filename = res.headers['content-disposition'].split('=')[1];
+        filename = filename.slice(1, filename.length - 1);
+        node_assert_1.default.equal('someName.pem', filename);
+        yield (0, promises_1.writeFile)(path_1.default.join(testPath, filename), res.body);
         let rootCert = node_forge_1.pki.certificateFromPem(res.body);
         rski = rootCert.getExtension('subjectKeyIdentifier');
         return true;
@@ -363,9 +376,12 @@ function getRootCertificateFile() {
 }
 function getIntermediateCertificateFile() {
     return __awaiter(this, void 0, void 0, function* () {
-        res = yield httpRequest('get', url + '/api/getCertificatePem?id=' + '2');
+        res = yield httpRequest('get', `${url}/api/getCertificatePem?id=${nextCertId - 1}`);
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
-        yield (0, promises_1.writeFile)(path_1.default.join(testPath, 'intName.pem'), res.body);
+        let filename = res.headers['content-disposition'].split('=')[1];
+        filename = filename.slice(1, filename.length - 1);
+        node_assert_1.default.equal('intName.pem', filename);
+        yield (0, promises_1.writeFile)(path_1.default.join(testPath, filename), res.body);
         let intermediateCert = node_forge_1.pki.certificateFromPem(res.body);
         iski = intermediateCert.getExtension('subjectKeyIdentifier');
         let iaki = intermediateCert.getExtension('authorityKeyIdentifier');
@@ -375,9 +391,12 @@ function getIntermediateCertificateFile() {
 }
 function getLeafCertificateFile() {
     return __awaiter(this, void 0, void 0, function* () {
-        res = yield httpRequest('get', url + '/api/getCertificatePem?id=' + '3');
+        res = yield httpRequest('get', `${url}/api/getCertificatePem?id=${nextCertId}`);
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
-        yield (0, promises_1.writeFile)(path_1.default.join(testPath, 'leafName.pem'), res.body);
+        let filename = res.headers['content-disposition'].split('=')[1];
+        filename = filename.slice(1, filename.length - 1);
+        node_assert_1.default.equal('leafName.pem', filename);
+        yield (0, promises_1.writeFile)(path_1.default.join(testPath, filename), res.body);
         let leafCert = node_forge_1.pki.certificateFromPem(res.body);
         let laki = leafCert.getExtension('authorityKeyIdentifier');
         node_assert_1.default.equal(iski.value.slice(1), laki.value.slice(3), 'Authority key identifier does not match parent\'s subject key identifier');
@@ -391,9 +410,10 @@ function getLeafCertificateFile() {
 function getLeafChainFile() {
     return __awaiter(this, void 0, void 0, function* () {
         let certHeader = '-----BEGIN CERTIFICATE-----';
-        res = yield httpRequest('get', url + '/api/chainDownload?id=' + '3');
+        res = yield httpRequest('get', `${url}/api/chainDownload?id=${nextCertId}`);
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         let filename = res.headers['content-disposition'].split('=')[1];
+        filename = filename.slice(1, filename.length - 1);
         node_assert_1.default.equal('leafName_chain.pem', filename, 'The content-disposition header was incorrect');
         node_assert_1.default.equal(res.body.split(certHeader).length, 4, `Incorrect number of certificates returned in chain: ${res.body.split(certHeader).length}`);
         return true;
@@ -401,8 +421,9 @@ function getLeafChainFile() {
 }
 function getKeyFile() {
     return __awaiter(this, void 0, void 0, function* () {
-        res = yield httpRequest('get', url + '/api/getKeyPem?id=2');
+        res = yield httpRequest('get', `${url}/api/getKeyPem?id=${nextKeyId - 1}`);
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
+        // assert.equal
         yield (0, promises_1.writeFile)(path_1.default.join(testPath, 'intName_key.pem'), res.body);
         return true;
     });
@@ -415,8 +436,8 @@ function deleteRootCertificate() {
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
         checkPacket(msg, '', 0, 2, 1);
-        checkItems(msg.updated, [{ type: 4, id: 1 }, { type: 2, id: 2 }]);
-        checkItems(msg.deleted, [{ type: 1, id: 1 }]);
+        checkItems(msg.updated, [OperationResultItem_1.OperationResultItem.makeResult({ type: 4, id: nextKeyId - 2 }), OperationResultItem_1.OperationResultItem.makeResult({ type: 2, id: nextCertId - 1 })]);
+        checkItems(msg.deleted, [OperationResultItem_1.OperationResultItem.makeResult({ type: 1, id: nextCertId - 2 })]);
         res = yield httpRequest('get', url + '/certDetails?id=2');
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         node_assert_1.default.equal(res.body.signerId, null, 'Signed certificate still references nonexistent parent');
@@ -425,6 +446,7 @@ function deleteRootCertificate() {
 }
 function uploadRootCertificate() {
     return __awaiter(this, void 0, void 0, function* () {
+        nextCertId++;
         let cert = yield (0, promises_1.readFile)(path_1.default.join(testPath, 'someName.pem'), { encoding: 'utf8' });
         res = yield httpRequest('post', url + '/api/uploadCert', null, cert, 'text/plain');
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode} ${res.body.error}`);
@@ -432,8 +454,8 @@ function uploadRootCertificate() {
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
         checkPacket(msg, 'someName', 1, 2, 0);
-        checkItems(msg.added, [{ type: 1, id: 4 }]);
-        checkItems(msg.updated, [{ type: 2, id: 2 }, { type: 4, id: 1 }]);
+        checkItems(msg.added, [OperationResultItem_1.OperationResultItem.makeResult({ type: 1, id: nextCertId })]);
+        checkItems(msg.updated, [OperationResultItem_1.OperationResultItem.makeResult({ type: 4, id: nextKeyId - 2 }), OperationResultItem_1.OperationResultItem.makeResult({ type: 2, id: nextCertId - 2 })]);
         res = yield httpRequest('get', url + '/certDetails?id=2');
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         node_assert_1.default.equal(res.body.signerId, 4, 'Signed certificate does not reference uploaded parent');
@@ -449,22 +471,23 @@ function deleteIntermediateKey() {
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
         checkPacket(msg, '', 0, 1, 1);
-        checkItems(msg.updated, [{ type: 2, id: 2 }]);
-        checkItems(msg.deleted, [{ type: 4, id: 2 }]);
+        checkItems(msg.updated, [OperationResultItem_1.OperationResultItem.makeResult({ type: 2, id: nextCertId - 2 })]);
+        checkItems(msg.deleted, [OperationResultItem_1.OperationResultItem.makeResult({ type: 4, id: nextKeyId - 1 })]);
         return true;
     });
 }
 function uploadIntermediateKey() {
     return __awaiter(this, void 0, void 0, function* () {
+        nextKeyId++;
         let key = yield (0, promises_1.readFile)(path_1.default.join(testPath, 'intName_key.pem'), { encoding: 'utf8' });
-        res = yield httpRequest('post', url + '/api/uploadKey', null, key, 'text/plain');
+        res = yield httpRequest('post', `${url}/api/uploadKey`, null, key, 'text/plain');
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         yield ew.EventWait();
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
         checkPacket(msg, 'intName_key', 1, 1, 0);
-        checkItems(msg.added, [{ type: 4, id: 4 }]);
-        checkItems(msg.updated, [{ type: 2, id: 2 }]);
+        checkItems(msg.added, [OperationResultItem_1.OperationResultItem.makeResult({ type: 4, id: nextKeyId })]);
+        checkItems(msg.updated, [OperationResultItem_1.OperationResultItem.makeResult({ type: 2, id: nextCertId - 2 })]);
         return true;
     });
 }
@@ -493,7 +516,7 @@ function bashDownloadAndSource() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             let scriptLoc = path_1.default.join(testPath, bashHelperScript);
-            res = yield httpRequest('get', url + '/api/helper?os=linux');
+            res = yield httpRequest('get', `${url}/api/helper?os=linux`);
             node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
             yield (0, promises_1.writeFile)(scriptLoc, res.body);
             (0, child_process_1.execSync)(`${shells.bash.command} -c "source ${scriptLoc}"`);
@@ -570,7 +593,7 @@ function bashContactHubWithBadConnectionString() {
 function bashGenDevice() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            let response = yield runShellCommands([`pushd ${testPath}`, `gendevice "${connectionString}" 4 serverTest`, 'popd'], shells.bash);
+            let response = yield runShellCommands([`pushd ${testPath}`, `gendevice "${connectionString}" ${nextCertId - 3} serverTest`, 'popd'], shells.bash);
             node_assert_1.default.equal(response[2], 'Device serverTest created', `Device creation failed: ${response[1]}`);
             node_assert_1.default.equal(response[4], 'Certificate created', `Certificate creation failed: ${response[3]}`);
             node_assert_1.default.match(response[17], /‘serverTest_chain.pem’ saved/);
@@ -652,7 +675,7 @@ function pwshGetIoTStats() {
 function pwshGenDevice() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            let response = yield runShellCommands([`Push-Location ${testPath}`, `New-Device "${connectionString}" 4 serverTest`, 'Pop-Location'], shells.powershell);
+            let response = yield runShellCommands([`Push-Location ${testPath}`, `New-Device "${connectionString}" ${nextCertId - 3} serverTest`, 'Pop-Location'], shells.powershell);
             node_assert_1.default.equal(response[3], 'Device serverTest created', `Device creation failed: ${response[3]}`);
             node_assert_1.default.equal(response[4], 'Certificate created', `Certificate creation failed: ${response[4]}`);
             node_assert_1.default.match(response[7], /serverTest_chain.pem written/);
@@ -844,7 +867,7 @@ function checkPacket(packet, name, added, updated, deleted) {
 function checkItems(items, test) {
     node_assert_1.default.equal(items.length, test.length, `Entry counts do not match - ${test.length}, received ${items.length}`);
     for (let i = 0; i < items.length; i++) {
-        node_assert_1.default.deepStrictEqual(items[i], test[i], `Item type ${i} does not match the test version`);
+        node_assert_1.default.equal(OperationResultItem_1.OperationResultItem.makeResult(items[i]).isEqual(test[i]), true);
     }
 }
 function httpRequest(method, url, headers = null, body = null, contentType = 'application/json') {
