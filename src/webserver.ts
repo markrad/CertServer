@@ -952,103 +952,10 @@ export class WebServer {
 
                 let result: OperationResult = new OperationResult('');
                 let cRow = await CertificateUtil.createFromPem(input.pemString);
-                // let c: pki.Certificate = pki.certificateFromPem(input.pemString);
                 logger.debug(`Adding certificate ${cRow.name}`);
-                // let signedById: number = null;
-
-                // See if we already have this certificate
-                // let fingerprint256 = new crypto.X509Certificate(input.pemString).fingerprint256;
-
-                // if (this._certificates.findOne({ fingerprint256: fingerprint256 }) != null) {
-                //     throw new CertError(409, `${c.subject.getField('CN').value} already exists (fingerprint256: ${fingerprint256}) - ignored`);
-                // }
-
-                // See if this is a root, intermediate, or leaf
-                // let type: CertTypes;
-                // if (c.isIssuer(c)) {
-                //     type = CertTypes.root;
-                //     signedById = -1;
-                // }
-                // else {
-                //     let bc: any = c.getExtension('basicConstraints');
-
-                //     if ((bc != null) && (bc.cA ?? false) == true && (bc.pathlenConstraint ?? 1) > 0) {
-                //         type = CertTypes.intermediate;
-                //     }
-                //     else {
-                //         type = CertTypes.leaf;
-                //     }
-
-                //     // See if any existing certificates signed this one
-                //     let signer = await this._findSigner(c);
-
-                //     if (signer != null) {
-                //         signedById = signer.$loki;
-                //     }
-                // }
-
-                // Generate a filename for the common name
-                // let name = WebServer._sanitizeName(c.subject.getField('CN').value);
                 result.name = cRow.name;
-
-                // let newC: CertificateUtil = await CertificateUtil.createFrompkiCertificate(c);
                 result.merge(await cRow.insert());
                 logger.info(`Certificate ${cRow.name} added`);
-                // This is declared as returning the wrong type hence cast below
-                // let newRecord: CertificateRow & LokiObj = (this._certificates.insert({ 
-                //     name: name, 
-                //     type: type,
-                //     serialNumber: c.serialNumber, 
-                //     publicKey: c.publicKey, 
-                //     // privateKey: null, 
-                //     signedById: signedById,
-                //     issuer: WebServer._getSubject(c.issuer),
-                //     subject: WebServer._getSubject(c.subject),
-                //     notBefore: c.validity.notBefore,
-                //     notAfter: c.validity.notAfter, 
-                //     // havePrivateKey: undefined,
-                //     fingerprint: new crypto.X509Certificate(input.pemString).fingerprint,
-                //     fingerprint256: fingerprint256,
-                //     tags: [], 
-                //     keyId: null
-                // })) as CertificateRow & LokiObj;    // Return value erroneously omits LokiObj
-
-                // result.pushAdded(new OperationResultItem2(type, newRecord.$loki));
-
-                // // If the certificate is self-signed update the id in the record
-                // if (signedById == -1) {
-                //     let c = CertificateStores.findOne({ $loki: newRecord.$loki });
-                //     if (c) {
-                //         c.updateSignedById(newRecord.$loki);
-                //     }
-                // }
-                
-                // // Update any certificates signed by this one
-                // if (type != CertTypes.leaf) {
-                //     // Update certificates that this one signed
-                //     result.merge(await this._findSigned(c, newRecord.$loki))
-                // }
-
-                // // See if we have a private key for this certificate
-                // let keys: (PrivateKeyRow & LokiObj)[] = this._privateKeys.chain().find({ pairId: null }).data();
-
-                // for (let i in keys) {
-                //     if (WebServer._isKeyPair(c, keys[i].n, keys[i].e)) {
-                //         logger.info('Found private key for ' + name);
-                //         await rename(this._getKeysDir(WebServer._getKeyFilenameFromRow(keys[i])), this._getKeysDir(WebServer._getKeyFilename(name + '_key', keys[i].$loki)));
-                //         keys[i].name = name + '_key';
-                //         keys[i].pairId = newRecord.$loki;
-                //         this._privateKeys.update(keys[i]);
-                //         result.pushUpdated(new OperationResultItem2(CertTypes.key, keys[i].$loki));
-                //         newRecord.keyId = keys[i].$loki;
-                //         this._certificates.update(newRecord);
-                //         break;
-                //     }
-                // }
-
-                // This guarantees a unique filename
-                // let newName = WebServer._getCertificateFilenameFromRow(newRecord);
-                // await writeFile(this._getCertificatesDir(newName), input.pemString, { encoding: 'utf8' });
                 cRow.writeFile();
                 logger.info(`Written file ${cRow.name}`)
                 resolve(result); 
@@ -1109,22 +1016,12 @@ export class WebServer {
                 if (!c.deleteFile()) {
                     logger.error(`Could not find file ${c.absoluteFilename}`);
                 }
-                
-                let result: OperationResult = new OperationResult('');
-                let key = KeyStores.findOne({ $loki: c.keyId });
-
-                if (key) {
-                    result.pushUpdated(await key.clearCertificateKeyPair());
+                else {
+                    logger.debug(`Deleted file ${c.absoluteFilename}`);
                 }
 
-                CertificateStores.bulkUpdate({ $and: [{ signedById: c.$loki }, { $loki: { $ne: c.$loki } }] }, (cert) => {
-                    cert.signedById = null;
-                    result.pushUpdated(new OperationResultItem(cert.type, cert.$loki));
-                });
-
-                result.pushDeleted(c.remove());
-
-                resolve(result);
+                resolve(await c.remove());
+                logger.debug(`Removed row ${c.name}`);
             }
             catch (err) {
                 reject(err);
@@ -1140,7 +1037,7 @@ export class WebServer {
      * @param filename - The path to the file containing the key's pem
      * @param password - Optional password for encrypted keys
      * 
-     * @returns OperationResultEx2 promise containing updated entries
+     * @returns OperationResult promise containing updated entries
      */
     private async _tryAddKey(input: { filename: string, pemString?: string, password?: string } | { filename?: string, pemString: string, password?: string }): Promise<OperationResult> {
         return new Promise<OperationResult>(async (resolve, reject) => {
@@ -1159,8 +1056,7 @@ export class WebServer {
                 // See if we already have this key
                 let match: KeyUtil;
                 if ((match = KeyStores.isIdentical(kRow))) {
-                    reject(new CertError(409, `Key already present: ${match.name}`));
-                    return;
+                    throw new CertError(409, `Key already present: ${match.name}`);
                 }
 
                 // Generate a file name for a key without a certificate
@@ -1193,21 +1089,6 @@ export class WebServer {
     }
 
     /**
-     * Returns enough information about a key to build the summary on the client browser.
-     * 
-     * @param r The key row from the database
-     * @returns A summary of the database row
-     */
-    // private _getKeyBrief(r: PrivateKeyRow & LokiObj): KeyBrief {
-    //     return { 
-    //         id: r.$loki,
-    //         name: r.name,
-    //         certPair: (r.pairId == null)? 'Not present' : r.name.substring(0, r.name.length -4),
-    //         encrypted: r.encrypted,
-    //     }
-    // }
-
-    /**
      * Deletes a key's pem file and removes it from the database. If this key has a certificate pair that the certificate will be
      * updated to show that it no longer has its key pair in the system.
      * 
@@ -1217,26 +1098,15 @@ export class WebServer {
     private _tryDeleteKey(k: KeyUtil): Promise<OperationResult> {
         return new Promise<OperationResult>(async (resolve, reject) => {
             try {
-                let result: OperationResult = new OperationResult('');
-                let filename = k.absoluteFilename;
-
                 if (!await k.deleteFile()) {
-                    logger.error(`Could not find file ${filename}`);
+                    logger.error(`Could not find file ${k.absoluteFilename}`);
+                }
+                else {
+                    logger.debug(`Deleted file ${k.absoluteFilename}`);
                 }
 
-                if (k.pairId) {
-                    let cert = CertificateStores.findOne({ $loki: k.pairId });
-                    if (!cert) {
-                        logger.warn(`Could not find certificate with id ${k.pairId}`);
-                    }
-                    else {
-                        result.pushUpdated(cert.updateKeyId(null));
-                    }
-                }
-
-                result.pushDeleted(k.deleteRow());
-
-                resolve(result);
+                resolve(k.remove());
+                logger.debug(`Deleted key ${k.name}`);
             }
             catch (err) {
                 reject(err);

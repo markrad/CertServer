@@ -241,10 +241,20 @@ class CertificateUtil {
         return this.getOperationalResultItem();
     }
     remove() {
-        let saveLoki = this.$loki;
-        certificateStores_1.CertificateStores.CertificateDb.remove(this.row);
-        // TODO: Remove id from key pair and update any certificates signed by this one
-        return new OperationResultItem_1.OperationResultItem(this.type, saveLoki);
+        return __awaiter(this, void 0, void 0, function* () {
+            let result = new OperationResult_1.OperationResult('');
+            result.pushDeleted(this.getOperationalResultItem());
+            let key = keyStores_1.KeyStores.findOne({ $loki: this.keyId });
+            if (key) {
+                result.pushUpdated(yield key.clearCertificateKeyPair());
+            }
+            certificateStores_1.CertificateStores.bulkUpdate({ $and: [{ signedById: this.$loki }, { $loki: { $ne: this.$loki } }] }, (cert) => {
+                cert.signedById = null;
+                result.pushUpdated(new OperationResultItem_1.OperationResultItem(cert.type, cert.$loki));
+            });
+            certificateStores_1.CertificateStores.CertificateDb.remove(this.row);
+            return result;
+        });
     }
     get absoluteFilename() {
         return path_1.default.join(certificateStores_1.CertificateStores.CertificatePath, CertificateUtil._getKeyFilename(this.name, this.$loki));

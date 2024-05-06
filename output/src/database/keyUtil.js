@@ -182,7 +182,7 @@ class KeyUtil {
             this._row.name = 'unknown_key';
             let newName = this.absoluteFilename;
             yield (0, promises_1.rename)(currentName, newName);
-            return this.updateRow();
+            return this.update();
         });
     }
     setCertificateKeyPair(pairId, pairCN) {
@@ -192,7 +192,7 @@ class KeyUtil {
             this._row.pairCN = pairCN;
             let newName = this.absoluteFilename;
             yield (0, promises_1.rename)(currentName, newName);
-            return this.updateRow();
+            return this.update();
         });
     }
     get absoluteFilename() {
@@ -214,14 +214,24 @@ class KeyUtil {
             }
         });
     }
-    updateRow() {
+    update() {
         keyStores_1.KeyStores.KeyDb.update(this.row);
         return new OperationResultItem_1.OperationResultItem(this.type, this.$loki);
     }
-    deleteRow() {
-        let saveLoki = this.$loki;
+    remove() {
+        let result = new OperationResult_1.OperationResult();
+        result.pushDeleted(this.getOperationalResultItem());
+        if (this.pairId) {
+            let cert = certificateStores_1.CertificateStores.findOne({ $loki: this.pairId });
+            if (!cert) {
+                logger.warn(`Could not find certificate with id ${this.pairId}`);
+            }
+            else {
+                result.pushUpdated(cert.updateKeyId(null));
+            }
+        }
         keyStores_1.KeyStores.remove(this.$loki);
-        return new OperationResultItem_1.OperationResultItem(CertTypes_1.CertTypes.key, saveLoki);
+        return result;
     }
     getpkiKey(password) {
         return __awaiter(this, void 0, void 0, function* () {

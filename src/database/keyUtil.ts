@@ -147,16 +147,6 @@ export class KeyUtil implements PrivateKeyRow, LokiObj {
 
     public isCertificateKeyPair(c: CertificateUtil): boolean {
         return this.isIdentical(c.publicKey);
-        // if (this.isIdentical(c.publicKey)) {
-        //     // this._row.pairId = c.$loki;
-        //     // this._row.pairCN = c.subject.CN;
-        //     // this._row.name = `${c.subject.CN}_key`;
-        //     return true;
-        // }
-        // else {
-        //     this._row.name = 'unknown';
-        //     return null;
-        // }
     }
 
     public async clearCertificateKeyPair(): Promise<OperationResultItem> {
@@ -166,7 +156,7 @@ export class KeyUtil implements PrivateKeyRow, LokiObj {
         this._row.name = 'unknown_key';
         let newName = this.absoluteFilename;
         await rename(currentName, newName);
-        return this.updateRow();
+        return this.update();
     }
 
     public async setCertificateKeyPair(pairId: number, pairCN: string): Promise<OperationResultItem> {
@@ -175,7 +165,7 @@ export class KeyUtil implements PrivateKeyRow, LokiObj {
         this._row.pairCN = pairCN;
         let newName = this.absoluteFilename;
         await rename(currentName, newName);
-        return this.updateRow();
+        return this.update();
     }
 
     public get absoluteFilename(): string {
@@ -196,15 +186,27 @@ export class KeyUtil implements PrivateKeyRow, LokiObj {
         }
     }
 
-    public updateRow(): OperationResultItem {
+    public update(): OperationResultItem {
         KeyStores.KeyDb.update(this.row);
         return new OperationResultItem(this.type, this.$loki);
     }
 
-    public deleteRow(): OperationResultItem {
-        let saveLoki = this.$loki;
+    public remove(): OperationResult {
+        let result = new OperationResult();
+        result.pushDeleted(this.getOperationalResultItem());
+
+        if (this.pairId) {
+            let cert = CertificateStores.findOne({ $loki: this.pairId });
+            if (!cert) {
+                logger.warn(`Could not find certificate with id ${this.pairId}`);
+            }
+            else {
+                result.pushUpdated(cert.updateKeyId(null));
+            }
+        }
+
         KeyStores.remove(this.$loki);
-        return new OperationResultItem(CertTypes.key, saveLoki);
+        return result;
     }
 
     public async getpkiKey(password?: string): Promise<pki.rsa.PrivateKey> {

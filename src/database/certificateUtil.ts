@@ -223,11 +223,24 @@ export class CertificateUtil implements CertificateRow, LokiObj {
         return this.getOperationalResultItem();
     }
 
-    public remove(): OperationResultItem {
-        let saveLoki = this.$loki;
+    public async remove(): Promise<OperationResult> {
+        let result: OperationResult = new OperationResult('');
+        result.pushDeleted(this.getOperationalResultItem())
+
+        let key = KeyStores.findOne({ $loki: this.keyId });
+
+        if (key) {
+            result.pushUpdated(await key.clearCertificateKeyPair());
+        }
+
+        CertificateStores.bulkUpdate({ $and: [{ signedById: this.$loki }, { $loki: { $ne: this.$loki } }] }, (cert) => {
+            cert.signedById = null;
+            result.pushUpdated(new OperationResultItem(cert.type, cert.$loki));
+        });
+
         CertificateStores.CertificateDb.remove(this.row);
-        // TODO: Remove id from key pair and update any certificates signed by this one
-        return new OperationResultItem(this.type, saveLoki);
+
+        return result;
     }
 
     public get absoluteFilename(): string {
