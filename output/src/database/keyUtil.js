@@ -163,16 +163,6 @@ class KeyUtil {
     }
     isCertificateKeyPair(c) {
         return this.isIdentical(c.publicKey);
-        // if (this.isIdentical(c.publicKey)) {
-        //     // this._row.pairId = c.$loki;
-        //     // this._row.pairCN = c.subject.CN;
-        //     // this._row.name = `${c.subject.CN}_key`;
-        //     return true;
-        // }
-        // else {
-        //     this._row.name = 'unknown';
-        //     return null;
-        // }
     }
     clearCertificateKeyPair() {
         return __awaiter(this, void 0, void 0, function* () {
