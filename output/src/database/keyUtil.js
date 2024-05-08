@@ -204,6 +204,9 @@ class KeyUtil {
             }
         });
     }
+    static getIdFromFileName(name) {
+        return parseInt(path_1.default.parse(name).name.split('_').slice(-1)[0].split('.')[0]);
+    }
     update() {
         keyStores_1.KeyStores.KeyDb.update(this.row);
         return new OperationResultItem_1.OperationResultItem(this.type, this.$loki);

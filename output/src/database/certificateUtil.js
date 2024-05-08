@@ -97,6 +97,7 @@ class CertificateUtil {
      * @returns Row ready to write to the database
      */
     static _createRow(c, pem) {
+        var _a, _b;
         return __awaiter(this, void 0, void 0, function* () {
             let r = {
                 name: CertificateUtil._sanitizeName(c.subject.getField('CN').value),
@@ -110,7 +111,7 @@ class CertificateUtil {
                 subject: CertificateUtil._getFields(c.subject),
                 notBefore: c.validity.notBefore,
                 notAfter: c.validity.notAfter,
-                signedById: yield (CertificateUtil._findSigner(c)),
+                signedById: ((_b = (_a = (yield CertificateUtil._findSigner(c))) === null || _a === void 0 ? void 0 : _a.$loki) !== null && _b !== void 0 ? _b : null),
                 keyId: null,
                 $loki: undefined,
                 meta: {
@@ -228,12 +229,33 @@ class CertificateUtil {
                 .pushUpdated(updates);
         });
     }
+    /**
+     * Updates the key ID of the certificate.
+     *
+     * @param id - The new key ID to be set.
+     * @returns An `OperationResultItem` representing the result of the update operation.
+     */
     updateKeyId(id) {
         this._row.keyId = id;
         return this.update();
     }
+    /**
+     * Updates the signedById property of the certificateUtil instance.
+     *
+     * @param id - The ID of the certificate that signed this certificate.
+     * @returns An OperationResultItem indicating the result of the update operation.
+     */
     updateSignedById(id) {
         this._row.signedById = id;
+        return this.update();
+    }
+    /**
+     * Updates the tags of the certificate.
+     * @param tags - An array of strings representing the new tags for the certificate.
+     * @returns An OperationResultItem object representing the result of the update operation.
+     */
+    updateTags(tags) {
+        this._row.tags = tags;
         return this.update();
     }
     update() {
@@ -256,6 +278,62 @@ class CertificateUtil {
             return result;
         });
     }
+    certificateBrief() {
+        var _a;
+        let c = null;
+        if (this.signedById != null) {
+            c = certificateStores_1.CertificateStores.findOne({ $loki: this.signedById });
+            if (c == null) {
+                logger.warn(`Signing certificate missing for ${c.name}`);
+            }
+        }
+        let s = certificateStores_1.CertificateStores.find({ signedById: this.$loki }).map((r) => r.$loki);
+        return {
+            id: this.$loki,
+            certType: CertTypes_1.CertTypes[this.type],
+            name: this.subject.CN,
+            issuer: this.issuer,
+            subject: this.subject,
+            validFrom: this.notBefore,
+            validTo: this.notAfter,
+            serialNumber: this.serialNumber == null ? '' : this.serialNumber.match(/.{1,2}/g).join(':'),
+            signer: c ? c.subject.CN : null,
+            signerId: c ? c.$loki : null,
+            keyId: this.keyId,
+            fingerprint: this.fingerprint,
+            fingerprint256: this.fingerprint256,
+            signed: s,
+            tags: (_a = this.tags) !== null && _a !== void 0 ? _a : [],
+        };
+    }
+    getCertificateChain() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    let file;
+                    file = yield (0, promises_2.readFile)(this.absoluteFilename, { encoding: 'utf8' });
+                    let s = this.signedById;
+                    while (s != null) {
+                        let c = certificateStores_1.CertificateStores.findOne({ $loki: s });
+                        if (c == null) {
+                            throw new CertError_1.CertError(500, `Expected certificate row with id ${s}`);
+                        }
+                        file += yield (0, promises_2.readFile)(c.absoluteFilename, { encoding: 'utf8' });
+                        s = c.signedById == c.$loki ? null : c.signedById;
+                    }
+                    resolve(file);
+                }
+                catch (err) {
+                    reject(err);
+                }
+            }));
+        });
+    }
+    /**
+     * Gets the absolute filename of the certificate.
+     * The absolute filename is determined by joining the certificate path with the key filename.
+     * @returns The absolute filename of the certificate.
+     */
     get absoluteFilename() {
         return path_1.default.join(certificateStores_1.CertificateStores.CertificatePath, CertificateUtil._getKeyFilename(this.name, this.$loki));
     }
@@ -277,6 +355,11 @@ class CertificateUtil {
             (0, promises_1.writeFile)(this.absoluteFilename, this._pem);
         });
     }
+    /**
+     * Deletes the file associated with this certificate.
+     *
+     * @returns A promise that resolves to `true` if the file is successfully deleted, or `false` if the file does not exist.
+     */
     deleteFile() {
         return __awaiter(this, void 0, void 0, function* () {
             if (yield (0, exists_1.exists)(this.absoluteFilename)) {
@@ -295,6 +378,9 @@ class CertificateUtil {
     }
     isKeyPair(key) {
         return key.isIdentical(this.publicKey);
+    }
+    static getIdFromFileName(name) {
+        return parseInt(path_1.default.parse(name).name.split('_').slice(-1)[0].split('.')[0]);
     }
     /**
      * Determines the filename for a key
@@ -349,6 +435,11 @@ class CertificateUtil {
             return type;
         });
     }
+    findSigner() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return CertificateUtil._findSigner(yield this.getpkiCert());
+        });
+    }
     static _findSigner(c) {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, _reject) => __awaiter(this, void 0, void 0, function* () {
@@ -358,7 +449,7 @@ class CertificateUtil {
                     try {
                         let r = yield rowList[i].getpkiCert();
                         if (r.verify(c)) {
-                            resolve(rowList[i].$loki);
+                            resolve(rowList[i]);
                             break;
                         }
                     }

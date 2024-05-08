@@ -186,6 +186,10 @@ export class KeyUtil implements PrivateKeyRow, LokiObj {
         }
     }
 
+    public static getIdFromFileName(name: string): number {
+        return parseInt(Path.parse(name).name.split('_').slice(-1)[0].split('.')[0]);
+    }
+
     public update(): OperationResultItem {
         KeyStores.KeyDb.update(this.row);
         return new OperationResultItem(this.type, this.$loki);

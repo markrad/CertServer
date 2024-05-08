@@ -46,7 +46,7 @@ import { KeyUtil } from './database/keyUtil';
 import { CertificateStores } from './database/certificateStores';
 import { CertificateUtil } from './database/certificateUtil';
 import { OperationResultItem } from './webservertypes/OperationResultItem';
-// import { CertificateUtil } from './database/certificateUtil';
+import { DbStores } from './database/dbStores';
 
 const logger = log4js.getLogger();
 logger.level = "debug";
@@ -75,9 +75,9 @@ export class WebServer {
     private _app: Express.Application = Express();
     private _ws = new WsServer.Server({ noServer: true });
     private _db: loki;
-    private _certificates: Collection<CertificateRow>;
-    private _privateKeys: Collection<PrivateKeyRow>;
-    private _dbVersion: Collection<DBVersionRow>;
+    // private _certificates: Collection<CertificateRow>;
+    // private _privateKeys: Collection<PrivateKeyRow>;
+    // private _dbVersion: Collection<DBVersionRow>;
     private _certificate: string = null;
     private _key: string = null;
     private _config: Config;
@@ -168,12 +168,13 @@ export class WebServer {
             });
             await ew.EventWait();
             this._db = db;
-            this._certificates = certificates;
-            this._privateKeys = privateKeys;
-            this._dbVersion = dbVersion;
+            // this._certificates = certificates;
+            // this._privateKeys = privateKeys;
+            // this._dbVersion = dbVersion;
 
             CertificateStores.Init(certificates, path.join(this._dataPath, 'certificates'));
             KeyStores.Init(privateKeys, path.join(this._dataPath, 'privatekeys'));
+            DbStores.Init(dbVersion);
 
             await this._dbInit();
         }
@@ -560,7 +561,7 @@ export class WebServer {
         this._app.get('/api/certDetails', async (request, response) => {
             try {
                 let c = this._resolveCertificateQuery(request.query as QueryType);
-                let retVal: CertificateBrief = this._getCertificateBrief(c);
+                let retVal: CertificateBrief = c.certificateBrief();
                 response.status(200).json(retVal);
             }
             catch (err) {
@@ -571,7 +572,7 @@ export class WebServer {
                     response.status(err.status ?? 500).json({ error: err.message });
                 }
             }
-        })
+        });
         this._app.get('/api/keyList', (request, _response, next) => {
             request.url = '/api/certList';
             request.query = { type: 'key' };
@@ -676,7 +677,7 @@ export class WebServer {
                     if (tag.match(/[;<>\(\)\{\}\/]/) !== null) throw new CertError(400, 'Tags cannot contain ; < > / { } ( )');
                 }
                 let result: OperationResult = this._resolveCertificateUpdate(request.query as QueryType, (c) => {
-                    c.tags = cleanedTags;
+                    c.updateTags(cleanedTags);
                 });
                 this._broadcast(result);
                 return response.status(200).json({ message: `Certificate tags updated` });
@@ -751,7 +752,7 @@ export class WebServer {
             // BUG - Breaks if there chain is not complete
             try {
                 let c = this._resolveCertificateQuery(request.query as QueryType);
-                let fileData = await this._getChain(c);
+                let fileData = await c.getCertificateChain();
                 response.type('application/text');
                 response.setHeader('Content-Disposition', `attachment; filename="${c.name}_chain.pem"`);
                 response.send(fileData);
@@ -818,14 +819,14 @@ export class WebServer {
     private async _dbInit(): Promise<void> {
         return new Promise<void>(async (resolve, reject) => {
             try {
-                let version = this._dbVersion.where((_v) => true);
+                let version: (DBVersionRow & LokiObj)[] = DbStores.find();
 
                 if (version.length > 1) {
                     logger.fatal('Version table is corrupt. Should only contain one row');
                     process.exit(4);
                 }
                 else if (version.length == 0) {
-                    this._dbVersion.insert({ version: this._currentVersion });
+                    DbStores.insert({ version: this._currentVersion });
                 }
                 else {
                     this._currentVersion = version[0].version;
@@ -844,7 +845,6 @@ export class WebServer {
                 certRows.forEach((row) => {
                     if (!fs.existsSync(row.absoluteFilename)) {
                         logger.warn(`Certificate ${row.name} not found - removed`);
-                        row.remove();
                         CertificateStores.bulkUpdate({ $loki: row.signedById }, (r) => {
                             r.signedById = null;
                             logger.warn(`Removed signedBy from ${r.name}`);
@@ -854,16 +854,16 @@ export class WebServer {
                             row.clearCertificateKeyPair();
                             logger.warn(`Removed relationship to private key from ${row.name}`);
                         });
+                        row.remove();
                     }
                 });
 
-                files = fs.readdirSync(this._certificatesPath);
+                files = fs.readdirSync(CertificateStores.CertificatePath);
 
                 let adding: Promise<OperationResult>[] = [];
 
                 files.forEach(async (file) => {
-                    // TODO: Move _getIdFromFileName to CertificateStores
-                    let cert: CertificateUtil = CertificateStores.findOne({ $loki: WebServer._getIdFromFileName(file) });
+                    let cert: CertificateUtil = CertificateStores.findOne({ $loki: CertificateUtil.getIdFromFileName(file) });
                     if (!cert) {
                         try {
                             adding.push(this._tryAddCertificate({ filename: cert.absoluteFilename }));
@@ -876,29 +876,33 @@ export class WebServer {
 
                 let nonRoot = CertificateStores.find( { '$and': [ { 'type': { '$ne': CertTypes.root }}, { signedById: null } ] });
 
-                for (let i: number = 0; i < nonRoot.length; i++) {
-                    let signer = await this._findSigner(pki.certificateFromPem(fs.readFileSync(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(nonRoot[i])), { encoding: 'utf8' })));
+                for (let r of nonRoot) {
+                    let signer = await r.findSigner();
+
                     if (signer != null) {
-                        logger.info(`${nonRoot[i].name} is signed by ${signer.name}`);
-                        nonRoot[i].updateSignedById(signer.$loki);
+                        logger.info(`${r.name} is signed by ${signer.name}`);
+                        r.updateSignedById(signer.$loki);
+                    }
+                    else {
+                        logger.warn(`${r.name} is not signed by any certificate`);
                     }
                 }
 
-                let keyRows: (PrivateKeyRow & LokiObj)[] = this._privateKeys.chain().simplesort('name').data();
+                let keyRows: KeyUtil[] = KeyStores.find().sort((l, r) => l.name.localeCompare(r.name));
 
-                keyRows.forEach((key) => {
-                    if (!existsSync(this._getKeysDir(WebServer._getKeyFilenameFromRow(key)))) {
-                        logger.warn(`Key ${key.name} not found - removed`);
-                        this._privateKeys.remove(key);
+                for (let k of keyRows) {
+                    if (!existsSync(k.absoluteFilename)) {
+                        logger.warn(`Key ${k.name} not found - removed`);
+                        k.remove();
                     }
-                });
+                };
 
                 files = fs.readdirSync(this._privatekeysPath);
-
                 adding = [];
+
                 files.forEach(async (file) => {
                     // logger.debug(path.basename(file));
-                    let key = this._privateKeys.findOne({ $loki: WebServer._getIdFromFileName(file) });
+                    let key: KeyUtil = KeyStores.findOne({ $loki: KeyUtil.getIdFromFileName(file) });
                     if (!key) {
                         try {
                             adding.push(this._tryAddKey({ filename: path.join(this._privatekeysPath, file) }));
@@ -970,40 +974,6 @@ export class WebServer {
         });
     }
 
-    /**
-     * Returns details of the certificate for display on the client browser.
-     * 
-     * @param c Certificate row of the certificate requested
-     * @returns The useful fields from the certificate row
-     */
-    private _getCertificateBrief(c: CertificateUtil): CertificateBrief {
-        let c2: CertificateUtil = null;
-        if (c.signedById != null) {
-            c2 = CertificateStores.findOne({ $loki: c.signedById });
-            if (c2 == null) {
-                logger.warn(`Signing certificate missing for ${c.name}`);
-            }
-        } 
-        let s: number[] = CertificateStores.find({ signedById: c.$loki }).map((r) => r.$loki);
-        return { 
-            id: c.$loki,
-            certType: CertTypes[c.type],
-            name: c.subject.CN,
-            issuer: c.issuer,
-            subject: c.subject,
-            validFrom: c.notBefore,
-            validTo: c.notAfter,
-            serialNumber: c.serialNumber == null? '' : c.serialNumber.match(/.{1,2}/g).join(':'),  // Hacky fix for dud entries in db
-            signer: c2? c2.subject.CN : null,
-            signerId: c2? c2.$loki : null,
-            keyId: c.keyId,
-            fingerprint: c.fingerprint,
-            fingerprint256: c.fingerprint256,
-            signed: s,
-            tags: c.tags?? [],
-         };
-    }
-
    /**
     * Tries to delete a certificate and breaks all the links it has with other certificates and keys if any.
     * 
@@ -1013,7 +983,7 @@ export class WebServer {
     private async _tryDeleteCert(c: CertificateUtil): Promise<OperationResult> {
         return new Promise<OperationResult>(async (resolve, reject) => {
             try {
-                if (!c.deleteFile()) {
+                if (!await c.deleteFile()) {
                     logger.error(`Could not find file ${c.absoluteFilename}`);
                 }
                 else {
@@ -1115,35 +1085,6 @@ export class WebServer {
     }
 
     /**
-     * Takes the certificate's pem string and concatenates the parent certificate's pem string 
-     * until it reaches the self signed certificate at the top of the chain 
-     * 
-     * @param c Certificate at the bottom of the certificate chain
-     * @returns Certificate chain
-     */
-    private async _getChain(c: CertificateRow & LokiObj): Promise<string> {
-        return new Promise(async (resolve, reject) => {
-            try {
-                let file: string = '';
-                file = await readFile(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(c)), { encoding: 'utf8' });
-
-                while (c.signedById != c.$loki) {
-                    if (c.signedById === null) {
-                        return reject(new CertError(404, 'Certificate chain is incomplete'));
-                    }
-                    c = this._certificates.findOne({ $loki: c.signedById });
-                    file += await readFile(this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(c)), { encoding: 'utf8'});
-                }
-
-                resolve(file);
-            }
-            catch (err) {
-                reject(new CertError(500, err.message));
-            }
-        });
-    }
-
-    /**
      * Takes a filename of a certificate and returns the fully qualified name
      * 
      * @param filename The filename of the certificate
@@ -1159,41 +1100,41 @@ export class WebServer {
      * @param filename The filename of the key 
      * @returns The fully qualifed name
      */
-    private _getKeysDir(filename: string): string {
-        return path.join(this._privatekeysPath, filename);
-    }
+    // private _getKeysDir(filename: string): string {
+    //     return path.join(this._privatekeysPath, filename);
+    // }
 
     /**
      * Search for a certificate that signed this certificate
      * @param certificate Certificate for which to search for a signer
      * @returns The certificate row of the certificate that signed the passed certificate
      */
-    private async _findSigner(certificate: pki.Certificate): Promise<CertificateRow & LokiObj> {
-        return new Promise<CertificateRow & LokiObj>(async(resolve, _reject) => {
-            let i;
-            let caList: CertificateUtil[] = CertificateStores.find({ 'type': { '$in': [ CertTypes.root, CertTypes.intermediate ] }});
-            for (i = 0; i < caList.length; i++) {
-                try {
-                    let c = await this._pkiCertFromRow((caList[i]));
-                    if (c.verify(certificate)) {
-                        resolve(caList[i]);
-                        break;
-                    }
-                }
-                catch (err) {
-                    // TODO Handle other errors than verify error
-                    if (!err.actualIssuer || !err.expectedIssuer) {
-                        logger.debug(`Possible error: ${err.message}`);
-                    }
-                    // verify should return false but apparently throws an exception - do nothing
-                }
-            }
+    // private async _findSigner(certificate: pki.Certificate): Promise<CertificateRow & LokiObj> {
+    //     return new Promise<CertificateRow & LokiObj>(async(resolve, _reject) => {
+    //         let i;
+    //         let caList: CertificateUtil[] = CertificateStores.find({ 'type': { '$in': [ CertTypes.root, CertTypes.intermediate ] }});
+    //         for (i = 0; i < caList.length; i++) {
+    //             try {
+    //                 let c = await this._pkiCertFromRow((caList[i]));
+    //                 if (c.verify(certificate)) {
+    //                     resolve(caList[i]);
+    //                     break;
+    //                 }
+    //             }
+    //             catch (err) {
+    //                 // TODO Handle other errors than verify error
+    //                 if (!err.actualIssuer || !err.expectedIssuer) {
+    //                     logger.debug(`Possible error: ${err.message}`);
+    //                 }
+    //                 // verify should return false but apparently throws an exception - do nothing
+    //             }
+    //         }
     
-            if (i == caList.length) {
-                resolve(null);
-            }
-        });
-    }
+    //         if (i == caList.length) {
+    //             resolve(null);
+    //         }
+    //     });
+    // }
 
     /**
      * Find and update any certificates that were signed by the passed certificate
@@ -1299,25 +1240,26 @@ export class WebServer {
      * @param updater A void function that accepts a certificate row and modifies the contents
      * @returns The results of the operation with the row id of the updated certificate
      */
-    private _resolveCertificateUpdate(query: QueryType, updater: (row: CertificateRow & LokiObj) => void): OperationResult {
+    private _resolveCertificateUpdate(query: QueryType, updater: (row: CertificateUtil) => void): OperationResult {
         if ('name' in query && 'id' in query) throw new CertError(422, 'Name and id are mutually exclusive');
         if (!('name' in query) && !('id' in query)) throw new CertError(400, 'Name or id must be specified');
         let selector = ('name' in query)? { name: query.name as string } : { $loki: parseInt(query.id as string)};
 
-        let c = this._certificates.chain().find(selector);
+        let c: CertificateUtil[] = CertificateStores.find(selector);
 
-        if (c.count() == 0) {
+        if (c.length == 0) {
             throw new CertError(404, `No certificate for ${query.id ? 'id' : 'name'} ${Object.values(selector)[0]} found`);
         }
-        else if (c.count() > 1) {
+        else if (c.length > 1) {
             throw new CertError(400, `Multiple certificates match the name ${Object.values(selector)[0]} - use id instead`);
         }
 
-        let cd = c.data()[0];
-        let result = new OperationResult(cd.subject.CN);
+        let result = new OperationResult(c[0].subject.CN);
 
-        result.pushUpdated(new OperationResultItem(cd.type, cd.$loki));
-        c.update(updater);
+        result.pushUpdated(new OperationResultItem(c[0].type, c[0].$loki));
+        updater(c[0]);
+        c[0].update();
+
         return result;
     }
 
@@ -1362,17 +1304,17 @@ export class WebServer {
      * @param c Certificate row
      * @returns A pki.Certificate constructed from the certificate's pem file
      */
-    private async _pkiCertFromRow(c: CertificateRow & LokiObj): Promise<pki.Certificate> {
-        return new Promise<pki.Certificate>(async (resolve, reject) => {
-            try {
-                let filename = this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(c));
-                resolve(pki.certificateFromPem(await readFile(filename, { encoding: 'utf8' })));
-            }
-            catch (err) {
-                reject(err);
-            }
-        });
-    }
+    // private async _pkiCertFromRow(c: CertificateRow & LokiObj): Promise<pki.Certificate> {
+    //     return new Promise<pki.Certificate>(async (resolve, reject) => {
+    //         try {
+    //             let filename = this._getCertificatesDir(WebServer._getCertificateFilenameFromRow(c));
+    //             resolve(pki.certificateFromPem(await readFile(filename, { encoding: 'utf8' })));
+    //         }
+    //         catch (err) {
+    //             reject(err);
+    //         }
+    //     });
+    // }
 
     /**
      * Returns the decoded pem file referenced by the key row
@@ -1415,8 +1357,8 @@ export class WebServer {
             console.error(`Database version ${this._currentVersion} is not supported by the release - try installing the previous minor version`);
             process.exit(4);
         }
-        this._certificates.find({ $and: [{ signedById: null }, { type: 1 }] }).forEach(r => logger.warn(`Bad signed (${r.$loki}): ${r.subject.CN} - fixing`));
-        this._certificates.chain().find({ $and: [ { signedById: null }, { type: 1 } ] }).update((r) => r.signedById = r.$loki);
+        // this._certificates.find({ $and: [{ signedById: null }, { type: 1 }] }).forEach(r => logger.warn(`Bad signed (${r.$loki}): ${r.subject.CN} - fixing`));
+        // this._certificates.chain().find({ $and: [ { signedById: null }, { type: 1 } ] }).update((r) => r.signedById = r.$loki);
 
         // Check that the database is an older version that needs to be modified
         logger.info('Database is a supported version for this release');
@@ -1565,9 +1507,9 @@ export class WebServer {
      * @param k key's database record
      * @returns Filename in the form of name_identity.pem
      */
-    private static _getKeyFilenameFromRow(k: PrivateKeyRow & LokiObj): string {
-        return WebServer._getKeyFilename(k.name, k.$loki);
-    }
+    // private static _getKeyFilenameFromRow(k: PrivateKeyRow & LokiObj): string {
+    //     return WebServer._getKeyFilename(k.name, k.$loki);
+    // }
 
     /**
      * Determines the filename for a key
@@ -1576,9 +1518,9 @@ export class WebServer {
      * @param $loki Identity in the key record
      * @returns Filename in the form of name_identity.pem
      */
-    private static _getKeyFilename(name: string, $loki: number): string {
-        return `${name}_${$loki}.pem`;
-    }
+    // private static _getKeyFilename(name: string, $loki: number): string {
+    //     return `${name}_${$loki}.pem`;
+    // }
 
     /**
      * Removes the id from the end of the input name
@@ -1596,9 +1538,9 @@ export class WebServer {
      * @param name Filename of key or certificate
      * @returns  Database id associated with this file
      */
-    private static _getIdFromFileName(name: string): number {
-        return parseInt(path.parse(name).name.split('_').slice(-1)[0].split('.')[0]);
-    }
+    // private static _getIdFromFileName(name: string): number {
+    //     return parseInt(path.parse(name).name.split('_').slice(-1)[0].split('.')[0]);
+    // }
 
     /**
      * Converts certain special characters to an underscore

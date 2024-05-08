@@ -16,6 +16,7 @@ import { OperationResult } from "../webservertypes/OperationResult";
 import { exists } from "../utility/exists";
 import { KeyStores } from "./keyStores";
 import { KeyUtil } from "./keyUtil";
+import { CertificateBrief } from "../webservertypes/CertificateBrief";
 // import { KeyValueStore } from "lokijs";
 // import { KeyStores } from "./keyStores";
 // import { PrivateKeyRow } from "../webservertypes/PrivateKeyRow";
@@ -82,7 +83,7 @@ export class CertificateUtil implements CertificateRow, LokiObj {
             subject: CertificateUtil._getFields(c.subject),
             notBefore: c.validity.notBefore,
             notAfter: c.validity.notAfter,
-            signedById: await (CertificateUtil._findSigner(c)),
+            signedById: ((await CertificateUtil._findSigner(c))?.$loki ?? null),
             keyId: null,
             $loki: undefined,
             meta: {
@@ -208,14 +209,36 @@ export class CertificateUtil implements CertificateRow, LokiObj {
             .pushUpdated(updates)
     }
 
+    /**
+     * Updates the key ID of the certificate.
+     * 
+     * @param id - The new key ID to be set.
+     * @returns An `OperationResultItem` representing the result of the update operation.
+     */
     public updateKeyId(id: number): OperationResultItem {
         this._row.keyId = id;
         return this.update();
     }
 
+    /**
+     * Updates the signedById property of the certificateUtil instance.
+     * 
+     * @param id - The ID of the certificate that signed this certificate.
+     * @returns An OperationResultItem indicating the result of the update operation.
+     */
     public updateSignedById(id: number): OperationResultItem {
         this._row.signedById = id;
         return this.update()
+    }
+
+    /**
+     * Updates the tags of the certificate.
+     * @param tags - An array of strings representing the new tags for the certificate.
+     * @returns An OperationResultItem object representing the result of the update operation.
+     */
+    public updateTags(tags: string[]): OperationResultItem {
+        this._row.tags = tags;
+        return this.update();
     }
 
     public update(): OperationResultItem {
@@ -243,6 +266,70 @@ export class CertificateUtil implements CertificateRow, LokiObj {
         return result;
     }
 
+    public certificateBrief(): CertificateBrief {
+        let c: CertificateUtil = null;
+
+        if (this.signedById != null) {
+            c = CertificateStores.findOne({ $loki: this.signedById });
+            if (c == null) {
+                logger.warn(`Signing certificate missing for ${c.name}`);
+            }
+        }
+
+        let s: number[] = CertificateStores.find({ signedById: this.$loki }).map((r) => r.$loki);
+
+        return {
+            id: this.$loki,
+            certType: CertTypes[this.type],
+            name: this.subject.CN,
+            issuer: this.issuer,
+            subject: this.subject,
+            validFrom: this.notBefore,
+            validTo: this.notAfter,
+            serialNumber: this.serialNumber == null ? '' : this.serialNumber.match(/.{1,2}/g).join(':'),  // Hacky fix for dud entries in db
+            signer: c ? c.subject.CN : null,
+            signerId: c ? c.$loki : null,
+            keyId: this.keyId,
+            fingerprint: this.fingerprint,
+            fingerprint256: this.fingerprint256,
+            signed: s,
+            tags: this.tags ?? [],
+        };
+    }
+
+    public async getCertificateChain(): Promise<string> {
+        return new Promise<string>(async (resolve, reject) => {
+            try {
+                let file: string;
+
+                file = await readFile(this.absoluteFilename, { encoding: 'utf8' });
+
+                let s = this.signedById;
+
+                while (s != null) {
+                    let c = CertificateStores.findOne({ $loki: s });
+
+                    if (c == null) {
+                        throw new CertError(500, `Expected certificate row with id ${s}`);
+                    }
+
+                    file += await readFile(c.absoluteFilename, { encoding: 'utf8' });
+                    s = c.signedById == c.$loki? null : c.signedById;
+                }
+
+                resolve(file);
+            }
+            catch (err) {
+                reject(err);
+            }
+        });
+    }
+
+    /**
+     * Gets the absolute filename of the certificate.
+     * The absolute filename is determined by joining the certificate path with the key filename.
+     * @returns The absolute filename of the certificate.
+     */
     public get absoluteFilename(): string {
         return Path.join(CertificateStores.CertificatePath, CertificateUtil._getKeyFilename(this.name, this.$loki));
     }
@@ -264,6 +351,11 @@ export class CertificateUtil implements CertificateRow, LokiObj {
         writeFile(this.absoluteFilename, this._pem)
     }
 
+    /**
+     * Deletes the file associated with this certificate.
+     * 
+     * @returns A promise that resolves to `true` if the file is successfully deleted, or `false` if the file does not exist.
+     */
     public async deleteFile(): Promise<boolean> {
         if (await exists(this.absoluteFilename)) {
             await unlink(this.absoluteFilename);
@@ -282,6 +374,10 @@ export class CertificateUtil implements CertificateRow, LokiObj {
         return key.isIdentical(this.publicKey as pki.rsa.PublicKey);
     }
 
+    public static getIdFromFileName(name: string): number {
+        return parseInt(Path.parse(name).name.split('_').slice(-1)[0].split('.')[0]);
+    }
+
     /**
      * Determines the filename for a key
      * 
@@ -289,7 +385,7 @@ export class CertificateUtil implements CertificateRow, LokiObj {
      * @param $loki Identity in the key record
      * @returns Filename in the form of name_identity.pem
      */
-    public static _getKeyFilename(name: string, $loki: number): string {
+    private static _getKeyFilename(name: string, $loki: number): string {
         return `${name}_${$loki}.pem`;
     }
 
@@ -341,15 +437,19 @@ export class CertificateUtil implements CertificateRow, LokiObj {
         return type;
     }
 
-    private static async _findSigner(c: pki.Certificate): Promise<number> {
-        return new Promise<number>(async (resolve, _reject) => {
+    public async findSigner(): Promise<CertificateUtil> {
+        return CertificateUtil._findSigner(await this.getpkiCert());
+    }
+
+    private static async _findSigner(c: pki.Certificate): Promise<CertificateUtil> {
+        return new Promise<CertificateUtil>(async (resolve, _reject) => {
             let i;
             let rowList: CertificateUtil[] = CertificateStores.find({ 'type': { '$in': [CertTypes.root, CertTypes.intermediate] } });
             for (i = 0; i < rowList.length; i++) {
                 try {
                     let r = await rowList[i].getpkiCert();
                     if (r.verify(c)) {
-                        resolve(rowList[i].$loki);
+                        resolve(rowList[i]);
                         break;
                     }
                 }
