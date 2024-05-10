@@ -14,7 +14,14 @@
 		"type": "bind",
 		"source": "/home/markrad/.ssh",
 		"target": "/home/node/.ssh"
-	}]
+	}],
+	"containerEnv": {
+		"LOG_SERVER_STDOUT": "1",
+		"RUN_API_TESTS": "1",
+		"RUN_BASH_HELPER_TESTS": "1",
+		"RUN_POWERSHELL_HELPER_TESTS": "1",
+		"RUN_IOTHUB_TESTS": "0"
+	}
 	// "runArgs": [ "--network=host" ],
 	// "forwardPorts": [ 4141 ]
 
