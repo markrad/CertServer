@@ -36,6 +36,17 @@
             "console": "integratedTerminal"
         },
         {
+            "name": "Database Cleanup",
+            "program": "${workspaceFolder}/output/src/tools/dbcleanup.js",
+            "request": "launch",
+            "outputCapture": "std",
+            "args": [ "data/db/certs.db", "--renumber", "--remove-orphan-keys", "--remove-orphan-certs", "--force" ],
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "type": "node",
+        },
+        {
             "type": "bashdb",
             "request": "launch",
             "name": "Launch build script",
