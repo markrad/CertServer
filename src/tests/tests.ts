@@ -461,7 +461,7 @@ async function uploadRootCertificate(): Promise<boolean> {
     await ew.EventWait();
     ew.EventReset();
     msg = JSON.parse(wsQueue.shift() as string);
-    checkPacket(msg, 'someName', 1, 2, 0);
+    checkPacket(msg, 'multiple', 1, 2, 0);
     checkItems(msg.added, [OperationResultItem.makeResult({ type: 1, id: nextCertId })]);
     checkItems(msg.updated, [OperationResultItem.makeResult({ type: 4, id: nextKeyId - 2 }), OperationResultItem.makeResult({ type: 2, id: nextCertId - 2 })]);
     res = await httpRequest('get', url + '/certDetails?id=2');
@@ -491,7 +491,7 @@ async function uploadIntermediateKey(): Promise<boolean> {
     await ew.EventWait();
     ew.EventReset();
     msg = JSON.parse(wsQueue.shift() as string);
-    checkPacket(msg, 'intName_key', 1, 1, 0);
+    checkPacket(msg, 'multiple', 1, 1, 0);
     checkItems(msg.added, [OperationResultItem.makeResult({ type: 4, id: nextKeyId })]);
     checkItems(msg.updated, [OperationResultItem.makeResult({ type: 2, id: nextCertId - 2 })]);
     return true;

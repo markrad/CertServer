@@ -23,7 +23,7 @@ import { ExtensionAuthorityKeyIdentifier } from './extensions/ExtensionAuthority
 import { ExtensionSubjectKeyIdentifier } from './extensions/ExtensionSubjectKeyIdentifier';
 import { ExtensionExtKeyUsage } from './extensions/ExtensionExtKeyUsage';
 import { ExtensionSubjectAltName, ExtensionSubjectAltNameOptions } from './extensions/ExtensionSubjectAltName';
-import { OperationResult } from './webservertypes/OperationResult';
+import { OperationResult, ResultType } from './webservertypes/OperationResult';
 import { CertTypes } from './webservertypes/CertTypes';
 import { Config } from './webservertypes/Config';
 import { CertificateSubject } from './webservertypes/CertificateSubject';
@@ -281,61 +281,6 @@ export class WebServer {
             request.query['id'] = request.body.toTag;
             next();
         });
-        /**
-         * Upload pem format files. These can be key, a certificate, or a file that
-         * contains keys or certificates.
-         */
-        this._app.post('/uploadPem', (async (request: any, response) => {
-            // FUTURE: Allow der and pfx files to be submitted
-            if (!request.files || Object.keys(request.files).length == 0) {
-                return response.status(400).json({ error: 'No file selected' });
-            }
-            try {
-                let files: any = request.files.certFile;
-                if (!Array.isArray(files)) {
-                    files = [ files ];
-                }
-
-                let result: OperationResult = new OperationResult('multiple');
-                type message = { level: number, message: string };
-                let messages: message[] = [];
-
-                for (let i in files) {
-                    let msg: pem.ObjectPEM[] = pem.decode(files[i].data);
-
-                    for (let j in msg) {
-                        logger.debug(`Received ${msg[j].type}`);
-                        try {
-                            let oneRes: OperationResult;
-                            if (msg[j].type.includes('CERTIFICATE')) {
-                                oneRes = await this._tryAddCertificate({ filename: files[i].name, pemString: pem.encode(msg[j], { maxline: 64 }) });
-                                messages.push({ level: 0, message: `Certificate ${files[i].name} uploaded` });
-                            }
-                            else if (msg[j].type.includes('KEY')) {
-                                oneRes = await this._tryAddKey({ filename: files[i].name, pemString: files[i].data.toString() });
-                                messages.push({ level: 0 , message: `Key ${files[i].name} uploaded` });
-                            }
-                            else {
-                                throw new CertError(409, `File ${files[i].name} is not a certificate or a key`);
-                            }
-                            result.merge(oneRes);
-                        }
-                        catch (err) {
-                            messages.push({ level: 1, message: err.message });
-                        }
-                    }
-                }
-
-                if (result.added.length + result.updated.length + result.deleted.length > 0) {
-                    this._broadcast(result);
-                }
-                return response.status(200).json(messages);
-            }
-            catch (err) {
-                logger.error(`Upload files failed: ${err.message}`);
-                return response.status(err.status?? 500).json({ error: err.message });
-            }
-        }));
         this._app.delete('/deleteCert', ((request: any, _response: any, next: NextFunction) => {
             request.url = '/api/deleteCert';
             next();
@@ -615,34 +560,9 @@ export class WebServer {
                 return response.status(err.status?? 500).json({ error: err.message });
             }
         });
-        this._app.post('/api/uploadCert', async (request: any, response) => {
-            // FUTURE Allow multiple concatenated pem files
-            // FUTURE Merge uploadCert and uploadKey into uploadFile
-            try {
-                if (request.headers['content-type'] != 'text/plain') {
-                    return response.status(400).json({ error: 'Content-Type must be text/plain' });
-                }
-                if (!(request.body as string).includes('\n')) {
-                    return response.status(400).json({ error: 'Certificate must be in standard 64 byte line length format - try --data-binary with curl' });
-                }
-                let msg: pem.ObjectPEM[] = pem.decode(request.body);
-
-                if (msg.length == 0) {
-                    return response.status(400).json({ error: 'Could not decode the file as a pem certificate'});
-                }
-                else if (msg.length > 1) {
-                    return response.status(400).json({ error: 'Multiple pems in a single file are not supported' });
-                }
-                else if (!msg[0].type.includes('CERTIFICATE')) {
-                    return response.status(400).json({ error: `Expecting CERTIFICATE - received ${msg[0].type}` });
-                }
-                let result: OperationResult = await this._tryAddCertificate({ pemString: request.body });
-                this._broadcast(result);
-                return response.status(200).json({ message: `Certificate ${result.name} of type ${CertTypes[result.added[0].type]} added`, ids: { certificateId: result.added[0].id } });
-            }
-            catch (err) {
-                response.status(err.status?? 500).json({ error: err.message });
-            }
+        this._app.post('/api/uploadCert', async (request, _response, next) => {
+            request.url = '/api/uploadPem';
+            next();
         });
         this._app.delete('/api/deleteCert', async (request, response) => {
             try {
@@ -683,32 +603,9 @@ export class WebServer {
                 response.status(err.status ?? 500).json({ error: err.message });
             }
         });
-        this._app.post('/api/uploadKey', async (request, response) => {
-            try {
-                if (request.headers['content-type'] != 'text/plain') {
-                        return response.status(400).send('Content type must be text/plain');
-                }
-                if (!(request.body as string).includes('\n')) {
-                    return response.status(400).send('Key must be in standard 64 byte line length format - try --data-binary with curl');
-                }
-                let msg: pem.ObjectPEM[] = pem.decode(request.body);
-
-                if (msg.length == 0) {
-                    return response.status(400).json({ error: 'Could not decode the file as a pem key' });
-                }
-                else if (msg.length > 1) {
-                    return response.status(400).json({ error: 'Multiple pems in a single file are not supported' });
-                }
-                else if (!msg[0].type.includes('KEY')) {
-                    return response.status(400).json({ error: `Expecting KEY - received ${msg[0].type}` });
-                }
-                let result: OperationResult = await this._tryAddKey({ pemString: request.body, password: request.query.password as string });
-                this._broadcast(result);
-                return response.status(200).json({ message: `Key ${result.name} added`, ids: { keyId: result.added[0].id } });
-            }
-            catch (err) {
-                response.status(500).json({ error: err.message });
-            }
+        this._app.post('/api/uploadKey', async (request, _response, next) => {
+            request.url = '/api/uploadPem';
+            next();
         });
         this._app.delete('/api/deleteKey', async (request, response) => {
             try {
@@ -734,6 +631,54 @@ export class WebServer {
             catch (err) {
                 logger.error('Key download failed: ', err.message);
                 return response.status(err.status?? 500).json({ error: err.message });
+            }
+        });
+        /**
+         * Upload pem format files. These can be key, a certificate, or a file that
+         * contains keys or certificates.
+         */
+        this._app.post('/uploadPem', (async (request: any, response) => {
+            // FUTURE: Allow der and pfx files to be submitted
+            if (!request.files || Object.keys(request.files).length == 0) {
+                return response.status(400).json({ error: 'No file selected' });
+            }
+            try {
+                let files: any = request.files.certFile;
+                if (!Array.isArray(files)) {
+                    files = [files];
+                }
+
+                let result: OperationResult = new OperationResult('multiple');
+
+                for (let f of files) {
+                    result.merge(await this._processMultiFile(f));
+                }
+
+                if (result.added.length + result.updated.length + result.deleted.length > 0) {
+                    this._broadcast(result);
+                }
+                return response.status(200).json(result.messages);
+            }
+            catch (err) {
+                logger.error(`Upload files failed: ${err.message}`);
+                return response.status(err.status ?? 500).json({ error: err.message });
+            }
+        }));
+        this._app.post('/api/uploadPem', async (request, response) => {
+            try {
+                if (request.headers['content-type'] != 'text/plain') {
+                    return response.status(400).send('Content type must be text/plain');
+                }
+                if (!(request.body as string).includes('\n')) {
+                    return response.status(400).send('Key must be in standard 64 byte line length format - try --data-binary with curl');
+                }
+
+                let result: OperationResult = await this._processMultiFile(request.body);
+                this._broadcast(result);
+                return response.status(200).json({ message: `${result.added.length} Files uploaded`, results: result.messages });
+            }
+            catch (err) {
+                return response.status(err.status ?? 500).json({ error: err.message });
             }
         });
         this._app.get('/api/ChainDownload', async (request, response) => {
@@ -915,6 +860,44 @@ export class WebServer {
         });
     }
 
+    private async _processMultiFile(pemString: string): Promise<OperationResult> {
+            return new Promise<OperationResult>(async (resolve, reject) => {
+            try {
+                let result: OperationResult = new OperationResult('multiple');
+                let msg: pem.ObjectPEM[] = pem.decode(pemString);
+
+                if (msg.length == 0) {
+                    throw new CertError(400, 'Could not decode the file as a pem certificate');
+                }
+
+                for (let m of msg) {
+                    logger.debug(`Processing ${m.type}`);
+                    let oneRes: OperationResult;
+                    try {
+                        if (m.type.includes('CERTIFICATE')) {
+                            oneRes = await this._tryAddCertificate({ pemString: pem.encode(m, { maxline: 64 }) });
+                        }
+                        else if (m.type.includes('KEY')) {
+                            oneRes = await this._tryAddKey({ pemString: pem.encode(m, { maxline: 64 }) });
+                        }
+                        else {
+                            throw new CertError(409, `Unsupported type ${m.type}`);
+                        }
+                        result.merge(oneRes);
+                    }
+                    catch (err) {
+                        logger.error(err.message);
+                        result.pushMessage(err.message, ResultType.Failed);
+                    }
+                }
+                resolve(result);
+            }
+            catch (err) {
+                reject(err);
+            }
+        });
+    }
+
     /**
      * Tries to add a new certificate to the system. During that process, it will also check to see if there is already a key pair in the system
      * and will link the two if there is. It will also look for a signing certificate and link that and any certificates that have been signed by
@@ -946,6 +929,7 @@ export class WebServer {
                 logger.debug(`Adding certificate ${cRow.name}`);
                 result.name = cRow.name;
                 result.merge(await cRow.insert());
+                result.pushMessage(`Certificate ${cRow.name} added`, ResultType.Success);
                 logger.info(`Certificate ${cRow.name} added`);
                 cRow.writeFile();
                 logger.info(`Written file ${cRow.name}`)
@@ -1025,6 +1009,7 @@ export class WebServer {
                 }
                 let temp: OperationResult = kRow.insert();
                 result.merge(temp);
+                result.pushMessage(`Key ${kRow.name} added`, ResultType.Success);
 
                 if (temp.pushUpdated.length > 0) {
                     result.name = temp.name;

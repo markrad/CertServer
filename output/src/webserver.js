@@ -274,57 +274,6 @@ class WebServer {
                 request.query['id'] = request.body.toTag;
                 next();
             }));
-            /**
-             * Upload pem format files. These can be key, a certificate, or a file that
-             * contains keys or certificates.
-             */
-            this._app.post('/uploadPem', ((request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _a;
-                // FUTURE: Allow der and pfx files to be submitted
-                if (!request.files || Object.keys(request.files).length == 0) {
-                    return response.status(400).json({ error: 'No file selected' });
-                }
-                try {
-                    let files = request.files.certFile;
-                    if (!Array.isArray(files)) {
-                        files = [files];
-                    }
-                    let result = new OperationResult_1.OperationResult('multiple');
-                    let messages = [];
-                    for (let i in files) {
-                        let msg = node_forge_1.pem.decode(files[i].data);
-                        for (let j in msg) {
-                            logger.debug(`Received ${msg[j].type}`);
-                            try {
-                                let oneRes;
-                                if (msg[j].type.includes('CERTIFICATE')) {
-                                    oneRes = yield this._tryAddCertificate({ filename: files[i].name, pemString: node_forge_1.pem.encode(msg[j], { maxline: 64 }) });
-                                    messages.push({ level: 0, message: `Certificate ${files[i].name} uploaded` });
-                                }
-                                else if (msg[j].type.includes('KEY')) {
-                                    oneRes = yield this._tryAddKey({ filename: files[i].name, pemString: files[i].data.toString() });
-                                    messages.push({ level: 0, message: `Key ${files[i].name} uploaded` });
-                                }
-                                else {
-                                    throw new CertError_1.CertError(409, `File ${files[i].name} is not a certificate or a key`);
-                                }
-                                result.merge(oneRes);
-                            }
-                            catch (err) {
-                                messages.push({ level: 1, message: err.message });
-                            }
-                        }
-                    }
-                    if (result.added.length + result.updated.length + result.deleted.length > 0) {
-                        this._broadcast(result);
-                    }
-                    return response.status(200).json(messages);
-                }
-                catch (err) {
-                    logger.error(`Upload files failed: ${err.message}`);
-                    return response.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).json({ error: err.message });
-                }
-            })));
             this._app.delete('/deleteCert', ((request, _response, next) => {
                 request.url = '/api/deleteCert';
                 next();
@@ -346,7 +295,7 @@ class WebServer {
                 next();
             });
             this._app.get('/keyDetails', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _b;
+                var _a;
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     if (k) {
@@ -358,11 +307,11 @@ class WebServer {
                     }
                 }
                 catch (err) {
-                    response.status((_b = err.status) !== null && _b !== void 0 ? _b : 500).json({ error: err.message });
+                    response.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).json({ error: err.message });
                 }
             }));
             this._app.post('/api/createCaCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _c;
+                var _b;
                 try {
                     logger.debug(request.body);
                     let certInput = WebServer._validateCertificateInput(CertTypes_1.CertTypes.root, request.body);
@@ -399,7 +348,7 @@ class WebServer {
                         .json({ message: `Certificate/Key ${certResult.name}/${keyResult.name} added`, ids: { certificateId: certId, keyId: keyId } });
                 }
                 catch (err) {
-                    return response.status((_c = err.status) !== null && _c !== void 0 ? _c : 500).json({ error: err.message });
+                    return response.status((_b = err.status) !== null && _b !== void 0 ? _b : 500).json({ error: err.message });
                 }
             }));
             this._app.post('/api/createIntermediateCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
@@ -509,17 +458,17 @@ class WebServer {
                 }
             }));
             this._app.get('/api/certName', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _d, _e;
+                var _c, _d;
                 try {
                     let c = this._resolveCertificateQuery(request.query);
-                    response.status(200).json({ name: c.subject.CN, id: c.$loki, tags: (_d = c.tags) !== null && _d !== void 0 ? _d : [] });
+                    response.status(200).json({ name: c.subject.CN, id: c.$loki, tags: (_c = c.tags) !== null && _c !== void 0 ? _c : [] });
                 }
                 catch (err) {
-                    response.status((_e = err.status) !== null && _e !== void 0 ? _e : 500).json({ error: err.message });
+                    response.status((_d = err.status) !== null && _d !== void 0 ? _d : 500).json({ error: err.message });
                 }
             }));
             this._app.get('/api/certDetails', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _f;
+                var _e;
                 try {
                     let c = this._resolveCertificateQuery(request.query);
                     let retVal = c.certificateBrief();
@@ -530,7 +479,7 @@ class WebServer {
                         response.status(err.status).json({ error: err.message, ids: err.certs });
                     }
                     else {
-                        response.status((_f = err.status) !== null && _f !== void 0 ? _f : 500).json({ error: err.message });
+                        response.status((_e = err.status) !== null && _e !== void 0 ? _e : 500).json({ error: err.message });
                     }
                 }
             }));
@@ -575,7 +524,7 @@ class WebServer {
                 next();
             }));
             this._app.get('/api/getCertificatePem', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _g;
+                var _f;
                 try {
                     let c = this._resolveCertificateQuery(request.query);
                     response.download(c.absoluteFilename, c.name + '.pem', (err) => {
@@ -586,40 +535,15 @@ class WebServer {
                 }
                 catch (err) {
                     logger.error('Certificate download failed: ', err.message);
-                    return response.status((_g = err.status) !== null && _g !== void 0 ? _g : 500).json({ error: err.message });
+                    return response.status((_f = err.status) !== null && _f !== void 0 ? _f : 500).json({ error: err.message });
                 }
             }));
-            this._app.post('/api/uploadCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _h;
-                // FUTURE Allow multiple concatenated pem files
-                // FUTURE Merge uploadCert and uploadKey into uploadFile
-                try {
-                    if (request.headers['content-type'] != 'text/plain') {
-                        return response.status(400).json({ error: 'Content-Type must be text/plain' });
-                    }
-                    if (!request.body.includes('\n')) {
-                        return response.status(400).json({ error: 'Certificate must be in standard 64 byte line length format - try --data-binary with curl' });
-                    }
-                    let msg = node_forge_1.pem.decode(request.body);
-                    if (msg.length == 0) {
-                        return response.status(400).json({ error: 'Could not decode the file as a pem certificate' });
-                    }
-                    else if (msg.length > 1) {
-                        return response.status(400).json({ error: 'Multiple pems in a single file are not supported' });
-                    }
-                    else if (!msg[0].type.includes('CERTIFICATE')) {
-                        return response.status(400).json({ error: `Expecting CERTIFICATE - received ${msg[0].type}` });
-                    }
-                    let result = yield this._tryAddCertificate({ pemString: request.body });
-                    this._broadcast(result);
-                    return response.status(200).json({ message: `Certificate ${result.name} of type ${CertTypes_1.CertTypes[result.added[0].type]} added`, ids: { certificateId: result.added[0].id } });
-                }
-                catch (err) {
-                    response.status((_h = err.status) !== null && _h !== void 0 ? _h : 500).json({ error: err.message });
-                }
+            this._app.post('/api/uploadCert', (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
+                request.url = '/api/uploadPem';
+                next();
             }));
             this._app.delete('/api/deleteCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _j;
+                var _g;
                 try {
                     let c = this._resolveCertificateQuery(request.query);
                     let result = yield this._tryDeleteCert(c);
@@ -627,11 +551,11 @@ class WebServer {
                     return response.status(200).json({ message: `Certificate ${result.name} deleted` });
                 }
                 catch (err) {
-                    return response.status((_j = err.status) !== null && _j !== void 0 ? _j : 500).json(JSON.stringify({ error: err.message }));
+                    return response.status((_g = err.status) !== null && _g !== void 0 ? _g : 500).json(JSON.stringify({ error: err.message }));
                 }
             }));
             this._app.post('/api/updateCertTag', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _k;
+                var _h;
                 try {
                     let tags = request.body;
                     if (tags.tags === undefined)
@@ -650,47 +574,25 @@ class WebServer {
                     return response.status(200).json({ message: `Certificate tags updated` });
                 }
                 catch (err) {
-                    return response.status((_k = err.status) !== null && _k !== void 0 ? _k : 500).json({ error: err.message });
+                    return response.status((_h = err.status) !== null && _h !== void 0 ? _h : 500).json({ error: err.message });
                 }
             }));
             this._app.get('/api/keyname', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _l;
+                var _j;
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     response.status(200).json({ name: k.name, id: k.$loki, tags: [] });
                 }
                 catch (err) {
-                    response.status((_l = err.status) !== null && _l !== void 0 ? _l : 500).json({ error: err.message });
+                    response.status((_j = err.status) !== null && _j !== void 0 ? _j : 500).json({ error: err.message });
                 }
             }));
-            this._app.post('/api/uploadKey', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                try {
-                    if (request.headers['content-type'] != 'text/plain') {
-                        return response.status(400).send('Content type must be text/plain');
-                    }
-                    if (!request.body.includes('\n')) {
-                        return response.status(400).send('Key must be in standard 64 byte line length format - try --data-binary with curl');
-                    }
-                    let msg = node_forge_1.pem.decode(request.body);
-                    if (msg.length == 0) {
-                        return response.status(400).json({ error: 'Could not decode the file as a pem key' });
-                    }
-                    else if (msg.length > 1) {
-                        return response.status(400).json({ error: 'Multiple pems in a single file are not supported' });
-                    }
-                    else if (!msg[0].type.includes('KEY')) {
-                        return response.status(400).json({ error: `Expecting KEY - received ${msg[0].type}` });
-                    }
-                    let result = yield this._tryAddKey({ pemString: request.body, password: request.query.password });
-                    this._broadcast(result);
-                    return response.status(200).json({ message: `Key ${result.name} added`, ids: { keyId: result.added[0].id } });
-                }
-                catch (err) {
-                    response.status(500).json({ error: err.message });
-                }
+            this._app.post('/api/uploadKey', (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
+                request.url = '/api/uploadPem';
+                next();
             }));
             this._app.delete('/api/deleteKey', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _m;
+                var _k;
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     let result = yield this._tryDeleteKey(k);
@@ -698,11 +600,11 @@ class WebServer {
                     return response.status(200).json({ message: `Key ${result.name} deleted` });
                 }
                 catch (err) {
-                    return response.status((_m = err.status) !== null && _m !== void 0 ? _m : 500).json({ error: err.message });
+                    return response.status((_k = err.status) !== null && _k !== void 0 ? _k : 500).json({ error: err.message });
                 }
             }));
             this._app.get('/api/getKeyPem', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _o;
+                var _l;
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     response.download(k.absoluteFilename, k.name + '.pem', (err) => {
@@ -713,6 +615,52 @@ class WebServer {
                 }
                 catch (err) {
                     logger.error('Key download failed: ', err.message);
+                    return response.status((_l = err.status) !== null && _l !== void 0 ? _l : 500).json({ error: err.message });
+                }
+            }));
+            /**
+             * Upload pem format files. These can be key, a certificate, or a file that
+             * contains keys or certificates.
+             */
+            this._app.post('/uploadPem', ((request, response) => __awaiter(this, void 0, void 0, function* () {
+                var _m;
+                // FUTURE: Allow der and pfx files to be submitted
+                if (!request.files || Object.keys(request.files).length == 0) {
+                    return response.status(400).json({ error: 'No file selected' });
+                }
+                try {
+                    let files = request.files.certFile;
+                    if (!Array.isArray(files)) {
+                        files = [files];
+                    }
+                    let result = new OperationResult_1.OperationResult('multiple');
+                    for (let f of files) {
+                        result.merge(yield this._processMultiFile(f));
+                    }
+                    if (result.added.length + result.updated.length + result.deleted.length > 0) {
+                        this._broadcast(result);
+                    }
+                    return response.status(200).json(result.messages);
+                }
+                catch (err) {
+                    logger.error(`Upload files failed: ${err.message}`);
+                    return response.status((_m = err.status) !== null && _m !== void 0 ? _m : 500).json({ error: err.message });
+                }
+            })));
+            this._app.post('/api/uploadPem', (request, response) => __awaiter(this, void 0, void 0, function* () {
+                var _o;
+                try {
+                    if (request.headers['content-type'] != 'text/plain') {
+                        return response.status(400).send('Content type must be text/plain');
+                    }
+                    if (!request.body.includes('\n')) {
+                        return response.status(400).send('Key must be in standard 64 byte line length format - try --data-binary with curl');
+                    }
+                    let result = yield this._processMultiFile(request.body);
+                    this._broadcast(result);
+                    return response.status(200).json({ message: `${result.added.length} Files uploaded`, results: result.messages });
+                }
+                catch (err) {
                     return response.status((_o = err.status) !== null && _o !== void 0 ? _o : 500).json({ error: err.message });
                 }
             }));
@@ -879,6 +827,43 @@ class WebServer {
             }));
         });
     }
+    _processMultiFile(pemString) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    let result = new OperationResult_1.OperationResult('multiple');
+                    let msg = node_forge_1.pem.decode(pemString);
+                    if (msg.length == 0) {
+                        throw new CertError_1.CertError(400, 'Could not decode the file as a pem certificate');
+                    }
+                    for (let m of msg) {
+                        logger.debug(`Processing ${m.type}`);
+                        let oneRes;
+                        try {
+                            if (m.type.includes('CERTIFICATE')) {
+                                oneRes = yield this._tryAddCertificate({ pemString: node_forge_1.pem.encode(m, { maxline: 64 }) });
+                            }
+                            else if (m.type.includes('KEY')) {
+                                oneRes = yield this._tryAddKey({ pemString: node_forge_1.pem.encode(m, { maxline: 64 }) });
+                            }
+                            else {
+                                throw new CertError_1.CertError(409, `Unsupported type ${m.type}`);
+                            }
+                            result.merge(oneRes);
+                        }
+                        catch (err) {
+                            logger.error(err.message);
+                            result.pushMessage(err.message, OperationResult_1.ResultType.Failed);
+                        }
+                    }
+                    resolve(result);
+                }
+                catch (err) {
+                    reject(err);
+                }
+            }));
+        });
+    }
     /**
      * Tries to add a new certificate to the system. During that process, it will also check to see if there is already a key pair in the system
      * and will link the two if there is. It will also look for a signing certificate and link that and any certificates that have been signed by
@@ -908,6 +893,7 @@ class WebServer {
                     logger.debug(`Adding certificate ${cRow.name}`);
                     result.name = cRow.name;
                     result.merge(yield cRow.insert());
+                    result.pushMessage(`Certificate ${cRow.name} added`, OperationResult_1.ResultType.Success);
                     logger.info(`Certificate ${cRow.name} added`);
                     cRow.writeFile();
                     logger.info(`Written file ${cRow.name}`);
@@ -986,6 +972,7 @@ class WebServer {
                     }
                     let temp = kRow.insert();
                     result.merge(temp);
+                    result.pushMessage(`Key ${kRow.name} added`, OperationResult_1.ResultType.Success);
                     if (temp.pushUpdated.length > 0) {
                         result.name = temp.name;
                     }

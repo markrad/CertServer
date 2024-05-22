@@ -453,7 +453,7 @@ function uploadRootCertificate() {
         yield ew.EventWait();
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
-        checkPacket(msg, 'someName', 1, 2, 0);
+        checkPacket(msg, 'multiple', 1, 2, 0);
         checkItems(msg.added, [OperationResultItem_1.OperationResultItem.makeResult({ type: 1, id: nextCertId })]);
         checkItems(msg.updated, [OperationResultItem_1.OperationResultItem.makeResult({ type: 4, id: nextKeyId - 2 }), OperationResultItem_1.OperationResultItem.makeResult({ type: 2, id: nextCertId - 2 })]);
         res = yield httpRequest('get', url + '/certDetails?id=2');
@@ -485,7 +485,7 @@ function uploadIntermediateKey() {
         yield ew.EventWait();
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
-        checkPacket(msg, 'intName_key', 1, 1, 0);
+        checkPacket(msg, 'multiple', 1, 1, 0);
         checkItems(msg.added, [OperationResultItem_1.OperationResultItem.makeResult({ type: 4, id: nextKeyId })]);
         checkItems(msg.updated, [OperationResultItem_1.OperationResultItem.makeResult({ type: 2, id: nextCertId - 2 })]);
         return true;

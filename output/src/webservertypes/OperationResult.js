@@ -1,7 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.OperationResult = void 0;
+exports.OperationResult = exports.ResultType = void 0;
 const OperationResultItem_1 = require("./OperationResultItem");
+var ResultType;
+(function (ResultType) {
+    ResultType[ResultType["Success"] = 0] = "Success";
+    ResultType[ResultType["Failed"] = 1] = "Failed";
+})(ResultType || (exports.ResultType = ResultType = {}));
+;
 /**
  * Represents the result of an operation.
  */
@@ -16,6 +22,7 @@ class OperationResult {
         this._added = [];
         this._updated = [];
         this._deleted = [];
+        this._messages = [];
         if (name)
             this._name = name;
     }
@@ -83,6 +90,10 @@ class OperationResult {
         }
         return this;
     }
+    pushMessage(message, type) {
+        this._messages.push({ type: type, message: message });
+        return this;
+    }
     /**
      * Merges the specified `OperationResult` into the current instance.
      * @param mergeIn The `OperationResult` to merge.
@@ -105,6 +116,7 @@ class OperationResult {
                 this.deleted.push(mergeIn.deleted[i]);
             }
         }
+        this._messages = this._messages.concat(mergeIn._messages);
     }
     /**
      * Normalizes the OperationResult by removing any duplicates from the updated array.
@@ -142,6 +154,11 @@ class OperationResult {
      * @returns An array of OperationResultItem objects representing the added items.
      */
     get deleted() { return this._deleted; }
+    /**
+     * Gets the messages associated with the operation result.
+     * @returns An array of ResultMessages objects.
+     */
+    get messages() { return this._messages; }
     /**
      * This will be called by JSON.stringify. If removes the leading underscores from the private variable names.
      * @returns The object with sensible names.

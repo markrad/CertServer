@@ -1,5 +1,11 @@
 import { OperationResultItem } from './OperationResultItem';
 
+export enum ResultType { Success, Failed };
+export type ResultMessages = {
+    type: ResultType;
+    message: string;
+}
+
 /**
  * Represents the result of an operation.
  */
@@ -8,6 +14,7 @@ export class OperationResult {
     private _added: OperationResultItem[] = [];
     private _updated: OperationResultItem[] = [];
     private _deleted: OperationResultItem[] = [];
+    private _messages: ResultMessages[] = [];
 
     /**
      * Creates an OperationResult.
@@ -93,6 +100,11 @@ export class OperationResult {
         return this;
     }
 
+    public pushMessage(message: string, type: ResultType): OperationResult {
+        this._messages.push({ type: type, message: message });
+        return this;
+    }
+
     /**
      * Merges the specified `OperationResult` into the current instance.
      * @param mergeIn The `OperationResult` to merge.
@@ -117,6 +129,8 @@ export class OperationResult {
                 this.deleted.push(mergeIn.deleted[i]);
             }
         }
+
+        this._messages = this._messages.concat(mergeIn._messages);
     }
 
     /**
@@ -156,6 +170,11 @@ export class OperationResult {
      * @returns An array of OperationResultItem objects representing the added items.
      */
     public get deleted(): OperationResultItem[] { return this._deleted; }
+    /**
+     * Gets the messages associated with the operation result.
+     * @returns An array of ResultMessages objects.
+     */
+    public get messages(): ResultMessages[] { return this._messages; }
 
     /**
      * This will be called by JSON.stringify. If removes the leading underscores from the private variable names.
