@@ -1,9 +1,20 @@
 import { OperationResultItem } from './OperationResultItem';
 
 export enum ResultType { Success, Failed };
-export type ResultMessages = {
+export type ResultMessage = {
     type: ResultType;
     message: string;
+}
+
+export type ResponseMessage = {
+    success: boolean;
+    title: string;
+    messages: ResultMessage[];    
+    ids?: number[];
+    newIds?: {
+        certificateId: number;
+        keyId: number;
+    }
 }
 
 /**
@@ -14,7 +25,8 @@ export class OperationResult {
     private _added: OperationResultItem[] = [];
     private _updated: OperationResultItem[] = [];
     private _deleted: OperationResultItem[] = [];
-    private _messages: ResultMessages[] = [];
+    private _messages: ResultMessage[] = [];
+    private _statusCode: number = 200;
 
     /**
      * Creates an OperationResult.
@@ -100,8 +112,26 @@ export class OperationResult {
         return this;
     }
 
+    /**
+     * Pushes a message to the operation result.
+     * 
+     * @param message - The message to be pushed.
+     * @param type - The type of the message.
+     * @returns The updated OperationResult instance.
+     */
     public pushMessage(message: string, type: ResultType): OperationResult {
         this._messages.push({ type: type, message: message });
+        return this;
+    }
+
+    /**
+     * Sets the status code for the operation result.
+     * 
+     * @param code - The status code to set.
+     * @returns The updated OperationResult instance.
+     */
+    public setStatusCode(code: number): OperationResult {
+        this._statusCode = code;
         return this;
     }
 
@@ -131,6 +161,7 @@ export class OperationResult {
         }
 
         this._messages = this._messages.concat(mergeIn._messages);
+        this._statusCode = mergeIn.statusCode;
     }
 
     /**
@@ -174,7 +205,48 @@ export class OperationResult {
      * Gets the messages associated with the operation result.
      * @returns An array of ResultMessages objects.
      */
-    public get messages(): ResultMessages[] { return this._messages; }
+    public get messages(): ResultMessage[] { return this._messages; }
+    public get statusCode(): number { return this._statusCode; }
+    /**
+     * Gets the number of error messages in the operation result.
+     * @returns The number of error messages.
+     */
+    public get errorCount(): number {
+        return this.messages.filter((m) => m.type === ResultType.Failed).length;
+    }
+    /**
+     * Gets a value indicating whether the operation result has any errors.
+     * @returns A boolean value indicating whether the operation result has any errors.
+     */
+    public get hasErrors(): boolean {
+        return this.messages.some((m) => m.type === ResultType.Failed);
+    }
+
+    /**
+     * Gets a summary message based on the number of errors in the operation result.
+     * @returns A string representing the summary message.
+     */
+    public getMessageSummary(): string {
+        let errorCount = this.messages.filter((m) => m.type === ResultType.Failed).length;
+
+        return errorCount == 0
+            ? "Success"
+            : errorCount == 1
+            ? "Error"
+            : `${errorCount} Errors`;
+    }
+
+    /**
+     * Retrieves the response message for the operation result.
+     * @returns The response message object.
+     */
+    public getResponse(): ResponseMessage {
+        return {
+            success: !this.hasErrors,
+            title: this.getMessageSummary(),
+            messages: this.messages
+        }
+    }
 
     /**
      * This will be called by JSON.stringify. If removes the leading underscores from the private variable names.

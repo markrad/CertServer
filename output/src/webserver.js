@@ -52,17 +52,19 @@ const stream_1 = require("stream");
 const log4js = __importStar(require("log4js"));
 const eventWaiter_1 = require("./utility/eventWaiter");
 const exists_1 = require("./utility/exists");
-const ExtensionBasicConstraints_1 = require("./extensions/ExtensionBasicConstraints");
-const ExtensionKeyUsage_1 = require("./extensions/ExtensionKeyUsage");
-const ExtensionAuthorityKeyIdentifier_1 = require("./extensions/ExtensionAuthorityKeyIdentifier");
-const ExtensionSubjectKeyIdentifier_1 = require("./extensions/ExtensionSubjectKeyIdentifier");
-const ExtensionExtKeyUsage_1 = require("./extensions/ExtensionExtKeyUsage");
-const ExtensionSubjectAltName_1 = require("./extensions/ExtensionSubjectAltName");
+// import { ExtensionParent } from './extensions/ExtensionParent';
+// import { ExtensionBasicConstraints } from './extensions/ExtensionBasicConstraints';
+// import { ExtensionKeyUsage } from './extensions/ExtensionKeyUsage';
+// import { ExtensionAuthorityKeyIdentifier } from './extensions/ExtensionAuthorityKeyIdentifier';
+// import { ExtensionSubjectKeyIdentifier } from './extensions/ExtensionSubjectKeyIdentifier';
+// import { ExtensionExtKeyUsage } from './extensions/ExtensionExtKeyUsage';
+// import { ExtensionSubjectAltName, ExtensionSubjectAltNameOptions } from './extensions/ExtensionSubjectAltName';
 const OperationResult_1 = require("./webservertypes/OperationResult");
 const CertTypes_1 = require("./webservertypes/CertTypes");
 const userAgentOS_1 = require("./webservertypes/userAgentOS");
 const CertError_1 = require("./webservertypes/CertError");
 const CertMultiError_1 = require("./webservertypes/CertMultiError");
+// import { CertificateInput } from './webservertypes/CertificateInput';
 const keyStores_1 = require("./database/keyStores");
 const keyUtil_1 = require("./database/keyUtil");
 const certificateStores_1 = require("./database/certificateStores");
@@ -185,7 +187,27 @@ class WebServer {
             this._app.use((0, express_fileupload_1.default)());
             this._app.use((request, response, next) => {
                 var _a;
+                const redirects = {
+                    '/api/uploadCert': '/api/uploadPem',
+                    '/api/helpers': '/api/helper',
+                    '/api/script': '/api/helper',
+                    '/createCACert': '/api/createCACert',
+                    '/createIntermediateCert': '/api/createIntermediateCert',
+                    '/createLeafCert': '/api/createLeafCert',
+                    '/deleteCert': '/api/deleteCert',
+                    '/certList': '/api/certList',
+                    '/certDetails': '/api/certDetails',
+                    '/deleteKey': '/api/deleteKey',
+                    '/keyList': '/certList',
+                    '/keyDetails': '/api/keyDetails',
+                    '//api/getCertPem': '/api/getCertificatePem',
+                    '/api/uploadKey': '/api/uploadPem',
+                };
                 try {
+                    if (request.path in redirects) {
+                        logger.debug(`Redirecting ${request.path} to ${redirects[request.path]}`);
+                        request.url = redirects[request.path];
+                    }
                     logger.debug(`${request.method} ${request.url}`);
                     next();
                 }
@@ -204,14 +226,14 @@ class WebServer {
                     version: this._version,
                 });
             });
-            this._app.get('/api/helpers', (request, _response, next) => {
-                request.url = '/api/helper';
-                next();
-            });
-            this._app.get('/api/script', (request, _response, next) => {
-                request.url = '/api/helper';
-                next();
-            });
+            // this._app.get('/api/helpers', (request, _response, next) => {
+            //     request.url = '/api/helper';
+            //     next();
+            // });
+            // this._app.get('/api/script', (request, _response, next) => {
+            //     request.url = '/api/helper';
+            //     next();
+            // });
             this._app.get('/api/helper', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     response.setHeader('content-type', 'application/text');
@@ -257,230 +279,228 @@ class WebServer {
                     logger.error(err);
                 }
             }));
-            this._app.post('/createCACert', (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
-                request.url = '/api/createCACert';
-                next();
-            }));
-            this._app.post('/createIntermediateCert', (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
-                request.url = '/api/createIntermediateCert';
-                next();
-            }));
-            this._app.post('/createLeafCert', (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
-                request.url = '/api/createLeafCert';
-                next();
-            }));
+            // this._app.post('/createCACert', async (request, _response, next) => {
+            //     request.url = '/api/createCACert'
+            //     next();
+            // });
+            // this._app.post('/createIntermediateCert', async (request, _response, next) => {
+            //     request.url = '/api/createIntermediateCert';
+            //     next();
+            // });
+            // this._app.post('/createLeafCert', async (request, _response, next) => {
+            //     request.url = '/api/createLeafCert';
+            //     next();
+            // });
             this._app.post('/updateCertTag', (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
                 request.url = '/api/updateCertTag';
                 request.query['id'] = request.body.toTag;
                 next();
             }));
-            this._app.delete('/deleteCert', ((request, _response, next) => {
-                request.url = '/api/deleteCert';
-                next();
+            // this._app.delete('/deleteCert', ((request: any, _response: any, next: NextFunction) => {
+            //     request.url = '/api/deleteCert';
+            //     next();
+            // }));
+            // this._app.get('/certList', (request: any, _response: any, next: NextFunction) => {
+            //     request.url = '/api/certList';
+            //     next();
+            // });
+            // this._app.get('/certDetails', async (request: any, _response: any, next: NextFunction) => {
+            //     request.url = '/api/certDetails';
+            //     next();
+            // });
+            // this._app.delete('/deleteKey', ((request, _response, next: NextFunction) => {
+            //     request.url = '/api/deleteKey';
+            //     next();
+            // }))
+            // this._app.get('/keyList', (request, _response, next: NextFunction) => {
+            //     request.url = '/certList';
+            //     next();
+            // });
+            // this._app.get('/keyDetails', async (request, _response, next) => {
+            //     request.url = '/api/keyDetails';
+            //     next();
+            // });
+            this._app.post(/\/api\/create.*Cert/i, (request, response) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    logger.debug(request.body);
+                    // let certInput: CertificateInput = WebServer._validateCertificateInput(CertTypes.root, request.body);
+                    // const { privateKey, publicKey } = pki.rsa.generateKeyPair(2048);
+                    // const attributes = WebServer._setAttributes(certInput.subject);
+                    // const extensions: ExtensionParent[] = [
+                    //     new ExtensionBasicConstraints({ cA: true, critical: true }),
+                    //     new ExtensionKeyUsage({ keyCertSign: true, cRLSign: true }),
+                    //     // new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, keyIdentifier: true }),
+                    //     new ExtensionSubjectKeyIdentifier({ }),
+                    // ]
+                    // // Create an empty Certificate
+                    // let cert = pki.createCertificate();
+                    // // Set the Certificate attributes for the new Root CA
+                    // cert.publicKey = publicKey;
+                    // // cert.privateKey = privateKey;
+                    // cert.serialNumber = WebServer._getRandomSerialNumber();
+                    // cert.validity.notBefore = certInput.validFrom;
+                    // cert.validity.notAfter = certInput.validTo;
+                    // cert.setSubject(attributes);
+                    // cert.setIssuer(attributes);
+                    // cert.setExtensions(extensions.map((extension) => extension.getObject()));
+                    // // Self-sign the Certificate
+                    // cert.sign(privateKey, md.sha512.create());
+                    // Convert to PEM format
+                    let type = request.url.includes('createCACert')
+                        ? CertTypes_1.CertTypes.root
+                        : request.url.includes('createIntermediateCert')
+                            ? CertTypes_1.CertTypes.intermediate
+                            : CertTypes_1.CertTypes.leaf;
+                    let { certificatePem, keyPem, result } = yield certificateUtil_1.CertificateUtil.generateCertificatePair(type, request.body);
+                    if (result.hasErrors) {
+                        return response.status(result.statusCode).json(result.getResponse());
+                    }
+                    let certResult = yield this._tryAddCertificate({ pemString: certificatePem });
+                    let keyResult = yield this._tryAddKey({ pemString: keyPem });
+                    certResult.merge(keyResult);
+                    certResult.name = `${certResult.name}/${keyResult.name}`;
+                    this._broadcast(certResult);
+                    let certId = certResult.added[0].id;
+                    let keyId = keyResult.added[0].id;
+                    return response.status(200)
+                        .json({
+                        success: true,
+                        title: 'Certificate/Key Added',
+                        messages: [`Certificate/Key ${certResult.name}/${keyResult.name} added`],
+                        newIds: { certificateId: certId, keyId: keyId }
+                    });
+                }
+                catch (err) {
+                    let e = CertMultiError_1.CertMultiError.getCertError(err);
+                    return response.status(e.status).json(e.getResponse());
+                }
             }));
-            this._app.get('/certList', (request, _response, next) => {
-                request.url = '/api/certList';
-                next();
-            });
-            this._app.get('/certDetails', (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
-                request.url = '/api/certDetails';
-                next();
-            }));
-            this._app.delete('/deleteKey', ((request, _response, next) => {
-                request.url = '/api/deleteKey';
-                next();
-            }));
-            this._app.get('/keyList', (request, _response, next) => {
-                request.url = '/certList';
-                next();
-            });
-            this._app.get('/keyDetails', (request, response) => __awaiter(this, void 0, void 0, function* () {
+            // this._app.post('/api/createIntermediateCert', async (request, response) => {
+            //     try {
+            //         logger.debug(request.body);
+            //         let certInput: CertificateInput = WebServer._validateCertificateInput(CertTypes.intermediate, request.body);
+            //         const cRow = CertificateStores.findOne({ $loki: parseInt(certInput.signer) });
+            //         const kRow = KeyStores.findOne({ $loki: cRow.keyId })
+            //         if (!cRow || !kRow) {
+            //             return response.status(404).json({ error: 'Signing certificate or key are either missing or invalid' });
+            //         }
+            //         const c: pki.Certificate = await cRow.getpkiCert();
+            //         const k: pki.PrivateKey = await kRow.getpkiKey(certInput.password);
+            //         const { privateKey, publicKey } = pki.rsa.generateKeyPair(2048);
+            //         const attributes = WebServer._setAttributes(certInput.subject);
+            //         const extensions: ExtensionParent[] = [
+            //             new ExtensionBasicConstraints({ cA: true, critical: true }),
+            //             new ExtensionKeyUsage({ keyCertSign: true, cRLSign: true }),
+            //             new ExtensionAuthorityKeyIdentifier({ keyIdentifier: c.generateSubjectKeyIdentifier().getBytes(), authorityCertSerialNumber: true }),
+            //             new ExtensionSubjectKeyIdentifier({ }),
+            //         ];
+            //         if (certInput.san.domains.length > 0 || certInput.san.IPs.length > 0) {
+            //             let sal: ExtensionSubjectAltNameOptions = {};
+            //             sal.domains = certInput.san.domains;
+            //             sal.IPs = certInput.san.IPs;
+            //             extensions.push(new ExtensionSubjectAltName(sal));
+            //         }
+            //         // Create an empty Certificate
+            //         let cert = pki.createCertificate();
+            //         // Set the Certificate attributes for the new Root CA
+            //         cert.publicKey = publicKey;
+            //         cert.serialNumber = WebServer._getRandomSerialNumber();
+            //         cert.validity.notBefore = certInput.validFrom;
+            //         cert.validity.notAfter = certInput.validTo;
+            //         cert.setSubject(attributes);
+            //         cert.setIssuer(c.subject.attributes);
+            //         cert.setExtensions(extensions.map((extension) => extension.getObject()));
+            //         // Sign with parent certificate's private key
+            //         cert.sign(k, md.sha512.create());
+            //         // Convert to PEM format
+            //         let certResult = await this._tryAddCertificate({ pemString: pki.certificateToPem(cert) });
+            //         let keyResult = await this._tryAddKey({ pemString: pki.privateKeyToPem(privateKey) });
+            //         certResult.merge(keyResult);
+            //         certResult.name = `${certResult.name}/${keyResult.name}`;
+            //         this._broadcast(certResult);
+            //         let certId = certResult.added[0].id;
+            //         let keyId = keyResult.added[0].id;
+            //         return response.status(200)
+            //             .json({ message: `Certificate/Key ${certResult.name} added`, ids: { certificateId: certId, keyId: keyId } });
+            //     }
+            //     catch (err) {
+            //         logger.error(`Failed to create intermediate certificate: ${err.message}`);
+            //         return response.status(500).json({ error: err.message });
+            //     }
+            // });
+            // this._app.post('/api/createLeafCert', async (request, response) => {
+            //     try {
+            //         logger.debug(request.body);
+            //         let certInput: CertificateInput = WebServer._validateCertificateInput(CertTypes.leaf, request.body);
+            //         const cRow = CertificateStores.findOne({ $loki: parseInt(certInput.signer) });
+            //         const kRow = KeyStores.findOne({ $loki: cRow.keyId })
+            //         if (!cRow || !kRow) {
+            //             return response.status(500).json({ error: 'Signing certificate or key are either missing or invalid'});
+            //         }
+            //         const c: pki.Certificate = await cRow.getpkiCert();
+            //         const k: pki.PrivateKey = await kRow.getpkiKey(certInput.password);
+            //         const { privateKey, publicKey } = pki.rsa.generateKeyPair(2048);
+            //         const attributes = WebServer._setAttributes(certInput.subject);
+            //         let sal:ExtensionSubjectAltNameOptions = { };
+            //         sal.domains = certInput.san.domains;
+            //         sal.IPs = certInput.san.IPs;
+            //         let extensions: ExtensionParent[] = [
+            //             new ExtensionBasicConstraints({ cA: false }),
+            //             new ExtensionSubjectKeyIdentifier({ }),
+            //             new ExtensionKeyUsage({ nonRepudiation: true, digitalSignature: true, keyEncipherment: true }),
+            //             new ExtensionAuthorityKeyIdentifier({ keyIdentifier: c.generateSubjectKeyIdentifier().getBytes(), authorityCertSerialNumber: true }),
+            //             new ExtensionExtKeyUsage({ serverAuth: true, clientAuth: true,  }),
+            //             new ExtensionSubjectAltName(sal),
+            //         ];
+            //         // Create an empty Certificate
+            //         let cert = pki.createCertificate();
+            //         // Set the Certificate attributes for the new Root CA
+            //         cert.publicKey = publicKey;
+            //         // cert.privateKey = privateKey;
+            //         cert.serialNumber = WebServer._getRandomSerialNumber();
+            //         cert.validity.notBefore = certInput.validFrom;
+            //         cert.validity.notAfter = certInput.validTo;
+            //         cert.setSubject(attributes);
+            //         cert.setIssuer(c.subject.attributes);
+            //         cert.setExtensions(extensions.map((extension) => extension.getObject()));
+            //         // Sign the certificate with the parent's key
+            //         cert.sign(k, md.sha512.create());
+            //         // Convert to PEM format
+            //         let certResult = await this._tryAddCertificate({ pemString: pki.certificateToPem(cert) });
+            //         let keyResult = await this._tryAddKey({ pemString: pki.privateKeyToPem(privateKey) });
+            //         certResult.merge(keyResult);
+            //         certResult.name = `${certResult.name}/${keyResult.name}`;
+            //         this._broadcast(certResult);
+            //         let certId = certResult.added[0].id;
+            //         let keyId = keyResult.added[0].id;
+            //         return response.status(200)
+            //             .json({ message: `Certificate/Key ${certResult.name} added`, ids: { certificateId: certId, keyId: keyId } });
+            //     }
+            //     catch (err) {
+            //         logger.error(`Error creating leaf certificate: ${err.message}`);
+            //         return response.status(500).json({ error: err.message })
+            //     }
+            // });
+            this._app.get('/api/certName', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 var _a;
                 try {
-                    let k = this._resolveKeyQuery(request.query);
-                    if (k) {
-                        let retVal = k.keyBrief;
-                        response.status(200).json(retVal);
-                    }
-                    else {
-                        response.status(404).json({ error: 'Key not found' });
-                    }
-                }
-                catch (err) {
-                    response.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).json({ error: err.message });
-                }
-            }));
-            this._app.post('/api/createCaCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _b;
-                try {
-                    logger.debug(request.body);
-                    let certInput = WebServer._validateCertificateInput(CertTypes_1.CertTypes.root, request.body);
-                    const { privateKey, publicKey } = node_forge_1.pki.rsa.generateKeyPair(2048);
-                    const attributes = WebServer._setAttributes(certInput.subject);
-                    const extensions = [
-                        new ExtensionBasicConstraints_1.ExtensionBasicConstraints({ cA: true, critical: true }),
-                        new ExtensionKeyUsage_1.ExtensionKeyUsage({ keyCertSign: true, cRLSign: true }),
-                        // new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, keyIdentifier: true }),
-                        new ExtensionSubjectKeyIdentifier_1.ExtensionSubjectKeyIdentifier({}),
-                    ];
-                    // Create an empty Certificate
-                    let cert = node_forge_1.pki.createCertificate();
-                    // Set the Certificate attributes for the new Root CA
-                    cert.publicKey = publicKey;
-                    // cert.privateKey = privateKey;
-                    cert.serialNumber = WebServer._getRandomSerialNumber();
-                    cert.validity.notBefore = certInput.validFrom;
-                    cert.validity.notAfter = certInput.validTo;
-                    cert.setSubject(attributes);
-                    cert.setIssuer(attributes);
-                    cert.setExtensions(extensions.map((extension) => extension.getObject()));
-                    // Self-sign the Certificate
-                    cert.sign(privateKey, node_forge_1.md.sha512.create());
-                    // Convert to PEM format
-                    let certResult = yield this._tryAddCertificate({ pemString: node_forge_1.pki.certificateToPem(cert) });
-                    let keyResult = yield this._tryAddKey({ pemString: node_forge_1.pki.privateKeyToPem(privateKey) });
-                    certResult.merge(keyResult);
-                    certResult.name = `${certResult.name}/${keyResult.name}`;
-                    this._broadcast(certResult);
-                    let certId = certResult.added[0].id;
-                    let keyId = keyResult.added[0].id;
-                    return response.status(200)
-                        .json({ message: `Certificate/Key ${certResult.name}/${keyResult.name} added`, ids: { certificateId: certId, keyId: keyId } });
-                }
-                catch (err) {
-                    return response.status((_b = err.status) !== null && _b !== void 0 ? _b : 500).json({ error: err.message });
-                }
-            }));
-            this._app.post('/api/createIntermediateCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                try {
-                    logger.debug(request.body);
-                    let certInput = WebServer._validateCertificateInput(CertTypes_1.CertTypes.intermediate, request.body);
-                    const cRow = certificateStores_1.CertificateStores.findOne({ $loki: parseInt(certInput.signer) });
-                    const kRow = keyStores_1.KeyStores.findOne({ $loki: cRow.keyId });
-                    if (!cRow || !kRow) {
-                        return response.status(404).json({ error: 'Signing certificate or key are either missing or invalid' });
-                    }
-                    const c = yield cRow.getpkiCert();
-                    const k = yield kRow.getpkiKey(certInput.password);
-                    const { privateKey, publicKey } = node_forge_1.pki.rsa.generateKeyPair(2048);
-                    const attributes = WebServer._setAttributes(certInput.subject);
-                    const extensions = [
-                        new ExtensionBasicConstraints_1.ExtensionBasicConstraints({ cA: true, critical: true }),
-                        new ExtensionKeyUsage_1.ExtensionKeyUsage({ keyCertSign: true, cRLSign: true }),
-                        new ExtensionAuthorityKeyIdentifier_1.ExtensionAuthorityKeyIdentifier({ keyIdentifier: c.generateSubjectKeyIdentifier().getBytes(), authorityCertSerialNumber: true }),
-                        new ExtensionSubjectKeyIdentifier_1.ExtensionSubjectKeyIdentifier({}),
-                    ];
-                    if (certInput.san.domains.length > 0 || certInput.san.IPs.length > 0) {
-                        let sal = {};
-                        sal.domains = certInput.san.domains;
-                        sal.IPs = certInput.san.IPs;
-                        extensions.push(new ExtensionSubjectAltName_1.ExtensionSubjectAltName(sal));
-                    }
-                    // Create an empty Certificate
-                    let cert = node_forge_1.pki.createCertificate();
-                    // Set the Certificate attributes for the new Root CA
-                    cert.publicKey = publicKey;
-                    cert.serialNumber = WebServer._getRandomSerialNumber();
-                    cert.validity.notBefore = certInput.validFrom;
-                    cert.validity.notAfter = certInput.validTo;
-                    cert.setSubject(attributes);
-                    cert.setIssuer(c.subject.attributes);
-                    cert.setExtensions(extensions.map((extension) => extension.getObject()));
-                    // Sign with parent certificate's private key
-                    cert.sign(k, node_forge_1.md.sha512.create());
-                    // Convert to PEM format
-                    let certResult = yield this._tryAddCertificate({ pemString: node_forge_1.pki.certificateToPem(cert) });
-                    let keyResult = yield this._tryAddKey({ pemString: node_forge_1.pki.privateKeyToPem(privateKey) });
-                    certResult.merge(keyResult);
-                    certResult.name = `${certResult.name}/${keyResult.name}`;
-                    this._broadcast(certResult);
-                    let certId = certResult.added[0].id;
-                    let keyId = keyResult.added[0].id;
-                    return response.status(200)
-                        .json({ message: `Certificate/Key ${certResult.name} added`, ids: { certificateId: certId, keyId: keyId } });
-                }
-                catch (err) {
-                    logger.error(`Failed to create intermediate certificate: ${err.message}`);
-                    return response.status(500).json({ error: err.message });
-                }
-            }));
-            this._app.post('/api/createLeafCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                try {
-                    logger.debug(request.body);
-                    let certInput = WebServer._validateCertificateInput(CertTypes_1.CertTypes.leaf, request.body);
-                    const cRow = certificateStores_1.CertificateStores.findOne({ $loki: parseInt(certInput.signer) });
-                    const kRow = keyStores_1.KeyStores.findOne({ $loki: cRow.keyId });
-                    if (!cRow || !kRow) {
-                        return response.status(500).json({ error: 'Signing certificate or key are either missing or invalid' });
-                    }
-                    const c = yield cRow.getpkiCert();
-                    const k = yield kRow.getpkiKey(certInput.password);
-                    const { privateKey, publicKey } = node_forge_1.pki.rsa.generateKeyPair(2048);
-                    const attributes = WebServer._setAttributes(certInput.subject);
-                    let sal = {};
-                    sal.domains = certInput.san.domains;
-                    sal.IPs = certInput.san.IPs;
-                    let extensions = [
-                        new ExtensionBasicConstraints_1.ExtensionBasicConstraints({ cA: false }),
-                        new ExtensionSubjectKeyIdentifier_1.ExtensionSubjectKeyIdentifier({}),
-                        new ExtensionKeyUsage_1.ExtensionKeyUsage({ nonRepudiation: true, digitalSignature: true, keyEncipherment: true }),
-                        new ExtensionAuthorityKeyIdentifier_1.ExtensionAuthorityKeyIdentifier({ keyIdentifier: c.generateSubjectKeyIdentifier().getBytes(), authorityCertSerialNumber: true }),
-                        new ExtensionExtKeyUsage_1.ExtensionExtKeyUsage({ serverAuth: true, clientAuth: true, }),
-                        new ExtensionSubjectAltName_1.ExtensionSubjectAltName(sal),
-                    ];
-                    // Create an empty Certificate
-                    let cert = node_forge_1.pki.createCertificate();
-                    // Set the Certificate attributes for the new Root CA
-                    cert.publicKey = publicKey;
-                    // cert.privateKey = privateKey;
-                    cert.serialNumber = WebServer._getRandomSerialNumber();
-                    cert.validity.notBefore = certInput.validFrom;
-                    cert.validity.notAfter = certInput.validTo;
-                    cert.setSubject(attributes);
-                    cert.setIssuer(c.subject.attributes);
-                    cert.setExtensions(extensions.map((extension) => extension.getObject()));
-                    // Sign the certificate with the parent's key
-                    cert.sign(k, node_forge_1.md.sha512.create());
-                    // Convert to PEM format
-                    let certResult = yield this._tryAddCertificate({ pemString: node_forge_1.pki.certificateToPem(cert) });
-                    let keyResult = yield this._tryAddKey({ pemString: node_forge_1.pki.privateKeyToPem(privateKey) });
-                    certResult.merge(keyResult);
-                    certResult.name = `${certResult.name}/${keyResult.name}`;
-                    this._broadcast(certResult);
-                    let certId = certResult.added[0].id;
-                    let keyId = keyResult.added[0].id;
-                    return response.status(200)
-                        .json({ message: `Certificate/Key ${certResult.name} added`, ids: { certificateId: certId, keyId: keyId } });
-                }
-                catch (err) {
-                    logger.error(`Error creating leaf certificate: ${err.message}`);
-                    return response.status(500).json({ error: err.message });
-                }
-            }));
-            this._app.get('/api/certName', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _c, _d;
-                try {
                     let c = this._resolveCertificateQuery(request.query);
-                    response.status(200).json({ name: c.subject.CN, id: c.$loki, tags: (_c = c.tags) !== null && _c !== void 0 ? _c : [] });
+                    return response.status(200).json({ name: c.subject.CN, id: c.$loki, tags: (_a = c.tags) !== null && _a !== void 0 ? _a : [] });
                 }
                 catch (err) {
-                    response.status((_d = err.status) !== null && _d !== void 0 ? _d : 500).json({ error: err.message });
+                    let e = CertMultiError_1.CertMultiError.getCertError(err);
+                    return response.status(e.status).json(e.getResponse());
                 }
             }));
             this._app.get('/api/certDetails', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _e;
                 try {
                     let c = this._resolveCertificateQuery(request.query);
                     let retVal = c.certificateBrief();
                     response.status(200).json(retVal);
                 }
                 catch (err) {
-                    if (err instanceof CertMultiError_1.CertMultiError) {
-                        response.status(err.status).json({ error: err.message, ids: err.certs });
-                    }
-                    else {
-                        response.status((_e = err.status) !== null && _e !== void 0 ? _e : 500).json({ error: err.message });
-                    }
+                    let e = CertMultiError_1.CertMultiError.getCertError(err);
+                    response.status(e.status).json(e.getResponse());
                 }
             }));
             this._app.get('/api/keyList', (request, _response, next) => {
@@ -488,74 +508,86 @@ class WebServer {
                 request.query = { type: 'key' };
                 next();
             });
-            this._app.get('/api/certList', (request, response) => {
-                let type = CertTypes_1.CertTypes[request.query.type];
-                if (type == undefined) {
-                    response.status(404).json({ error: `Directory ${request.query.type} not found` });
+            this._app.get('/api/keyDetails', (request, response) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    let k = this._resolveKeyQuery(request.query);
+                    let retVal = k.keyBrief;
+                    response.status(200).json(retVal);
                 }
-                else {
-                    let retVal = [];
-                    if (type != CertTypes_1.CertTypes.key) {
-                        retVal = certificateStores_1.CertificateStores.find({ type: type }).sort((l, r) => l.name.localeCompare(r.name)).map((entry) => {
-                            var _a;
-                            return {
-                                name: entry.subject.CN,
-                                type: CertTypes_1.CertTypes[type].toString(),
-                                id: entry.$loki,
-                                tags: (_a = entry.tags) !== null && _a !== void 0 ? _a : [],
-                                keyId: entry.keyId
-                            };
-                        });
+                catch (err) {
+                    let e = CertMultiError_1.CertMultiError.getCertError(err);
+                    response.status(e.status).json(e.getResponse());
+                }
+            }));
+            this._app.get('/api/certList', (request, response) => {
+                try {
+                    let type = CertTypes_1.CertTypes[request.query.type];
+                    if (type == undefined) {
+                        throw new CertError_1.CertError(404, `Directory ${request.query.type} not found`);
                     }
                     else {
-                        retVal = keyStores_1.KeyStores.find().sort((l, r) => l.name.localeCompare(r.name)).map((entry) => {
-                            return {
-                                name: entry.name,
-                                type: CertTypes_1.CertTypes[type].toString(),
-                                id: entry.$loki
-                            };
-                        });
+                        let retVal = [];
+                        if (type != CertTypes_1.CertTypes.key) {
+                            retVal = certificateStores_1.CertificateStores.find({ type: type }).sort((l, r) => l.name.localeCompare(r.name)).map((entry) => {
+                                var _a;
+                                return {
+                                    name: entry.subject.CN,
+                                    type: CertTypes_1.CertTypes[type].toString(),
+                                    id: entry.$loki,
+                                    tags: (_a = entry.tags) !== null && _a !== void 0 ? _a : [],
+                                    keyId: entry.keyId
+                                };
+                            });
+                        }
+                        else {
+                            retVal = keyStores_1.KeyStores.find().sort((l, r) => l.name.localeCompare(r.name)).map((entry) => {
+                                return {
+                                    name: entry.name,
+                                    type: CertTypes_1.CertTypes[type].toString(),
+                                    id: entry.$loki
+                                };
+                            });
+                        }
+                        return response.status(200).json({ files: retVal });
                     }
-                    response.status(200).json({ files: retVal });
+                }
+                catch (err) {
+                    let e = CertMultiError_1.CertMultiError.getCertError(err);
+                    return response.status(e.status).json(e.getResponse());
                 }
             });
-            this._app.get('/api/getCertPem', (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
-                request.url = '/api/getCertificatePem';
-                next();
-            }));
+            // this._app.get('/api/getCertPem', async (request, _response, next) => {
+            //     request.url = '/api/getCertificatePem';
+            //     next();
+            // });
             this._app.get('/api/getCertificatePem', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _f;
                 try {
                     let c = this._resolveCertificateQuery(request.query);
                     response.download(c.absoluteFilename, c.name + '.pem', (err) => {
                         if (err) {
-                            return response.status(500).json({ error: `Failed to file for ${request.query}: ${err.message}` });
+                            throw new CertError_1.CertError(500, `Failed to find file for ${request.query}: ${err.message}`);
                         }
                     });
                 }
                 catch (err) {
                     logger.error('Certificate download failed: ', err.message);
-                    return response.status((_f = err.status) !== null && _f !== void 0 ? _f : 500).json({ error: err.message });
+                    let e = CertMultiError_1.CertMultiError.getCertError(err);
+                    return response.status(e.status).json(e.getResponse());
                 }
             }));
-            this._app.post('/api/uploadCert', (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
-                request.url = '/api/uploadPem';
-                next();
-            }));
             this._app.delete('/api/deleteCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _g;
                 try {
                     let c = this._resolveCertificateQuery(request.query);
                     let result = yield this._tryDeleteCert(c);
                     this._broadcast(result);
-                    return response.status(200).json({ message: `Certificate ${result.name} deleted` });
+                    return response.status(200).json(result.getResponse());
                 }
                 catch (err) {
-                    return response.status((_g = err.status) !== null && _g !== void 0 ? _g : 500).json(JSON.stringify({ error: err.message }));
+                    let e = CertMultiError_1.CertMultiError.getCertError(err);
+                    return response.status(e.status).json(e.getResponse());
                 }
             }));
             this._app.post('/api/updateCertTag', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _h;
                 try {
                     let tags = request.body;
                     if (tags.tags === undefined)
@@ -570,52 +602,54 @@ class WebServer {
                     let result = this._resolveCertificateUpdate(request.query, (c) => {
                         c.updateTags(cleanedTags);
                     });
+                    result.pushMessage('Certificate tags updated', OperationResult_1.ResultType.Success);
                     this._broadcast(result);
-                    return response.status(200).json({ message: `Certificate tags updated` });
+                    return response.status(200).json(result.getResponse());
                 }
                 catch (err) {
-                    return response.status((_h = err.status) !== null && _h !== void 0 ? _h : 500).json({ error: err.message });
+                    let e = CertMultiError_1.CertMultiError.getCertError(err);
+                    return response.status(e.status).json(e.getResponse());
                 }
             }));
             this._app.get('/api/keyname', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _j;
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     response.status(200).json({ name: k.name, id: k.$loki, tags: [] });
                 }
                 catch (err) {
-                    response.status((_j = err.status) !== null && _j !== void 0 ? _j : 500).json({ error: err.message });
+                    let e = CertMultiError_1.CertMultiError.getCertError(err);
+                    return response.status(e.status).json(e.getResponse());
                 }
             }));
-            this._app.post('/api/uploadKey', (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
-                request.url = '/api/uploadPem';
-                next();
-            }));
+            // this._app.post('/api/uploadKey', async (request, _response, next) => {
+            //     request.url = '/api/uploadPem';
+            //     next();
+            // });
             this._app.delete('/api/deleteKey', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _k;
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     let result = yield this._tryDeleteKey(k);
                     this._broadcast(result);
-                    return response.status(200).json({ message: `Key ${result.name} deleted` });
+                    return response.status(200).json(result.getResponse());
                 }
                 catch (err) {
-                    return response.status((_k = err.status) !== null && _k !== void 0 ? _k : 500).json({ error: err.message });
+                    let e = CertMultiError_1.CertMultiError.getCertError(err);
+                    return response.status(e.status).json(e.getResponse());
                 }
             }));
             this._app.get('/api/getKeyPem', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _l;
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     response.download(k.absoluteFilename, k.name + '.pem', (err) => {
                         if (err) {
-                            return response.status(500).json({ error: `Failed to file for ${request.query.id}: ${err.message}` });
+                            throw new CertError_1.CertError(404, `Failed to file for ${request.query.id}: ${err.message}`);
                         }
                     });
                 }
                 catch (err) {
                     logger.error('Key download failed: ', err.message);
-                    return response.status((_l = err.status) !== null && _l !== void 0 ? _l : 500).json({ error: err.message });
+                    let e = CertMultiError_1.CertMultiError.getCertError(err);
+                    return response.status(e.status).json(e.getResponse());
                 }
             }));
             /**
@@ -623,7 +657,6 @@ class WebServer {
              * contains keys or certificates.
              */
             this._app.post('/uploadPem', ((request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _m;
                 // FUTURE: Allow der and pfx files to be submitted
                 if (!request.files || Object.keys(request.files).length == 0) {
                     return response.status(400).json({ error: 'No file selected' });
@@ -640,32 +673,32 @@ class WebServer {
                     if (result.added.length + result.updated.length + result.deleted.length > 0) {
                         this._broadcast(result);
                     }
-                    return response.status(200).json(result.messages);
+                    return response.status(200).json(result.getResponse());
                 }
                 catch (err) {
                     logger.error(`Upload files failed: ${err.message}`);
-                    return response.status((_m = err.status) !== null && _m !== void 0 ? _m : 500).json({ error: err.message });
+                    let e = CertMultiError_1.CertMultiError.getCertError(err);
+                    return response.status(e.status).json(e.getResponse());
                 }
             })));
             this._app.post('/api/uploadPem', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _o;
                 try {
                     if (request.headers['content-type'] != 'text/plain') {
-                        return response.status(400).send('Content type must be text/plain');
+                        return response.status(400).json(new OperationResult_1.OperationResult('').pushMessage('Content type must be text/plain', OperationResult_1.ResultType.Failed).getResponse());
                     }
                     if (!request.body.includes('\n')) {
-                        return response.status(400).send('Key must be in standard 64 byte line length format - try --data-binary with curl');
+                        return response.status(400).json(new OperationResult_1.OperationResult('').pushMessage('Key must be in standard 64 byte line length format - try --data-binary with curl', OperationResult_1.ResultType.Failed).getResponse());
                     }
                     let result = yield this._processMultiFile(request.body);
                     this._broadcast(result);
-                    return response.status(200).json({ message: `${result.added.length} Files uploaded`, results: result.messages });
+                    return response.status(200).json(result.getResponse());
                 }
                 catch (err) {
-                    return response.status((_o = err.status) !== null && _o !== void 0 ? _o : 500).json({ error: err.message });
+                    let e = CertMultiError_1.CertMultiError.getCertError(err);
+                    return response.status(e.status).json(e.getResponse());
                 }
             }));
             this._app.get('/api/ChainDownload', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                var _p;
                 // BUG - Breaks if there chain is not complete
                 try {
                     let c = this._resolveCertificateQuery(request.query);
@@ -676,17 +709,37 @@ class WebServer {
                 }
                 catch (err) {
                     logger.error('Chain download failed: ' + err.message);
-                    return response.status((_p = err.status) !== null && _p !== void 0 ? _p : 500).json({ error: err.message });
+                    let e = CertMultiError_1.CertMultiError.getCertError(err);
+                    return response.status(e.status).json(e.getResponse());
                 }
             }));
             this._app.use((request, response, _next) => {
                 var _a;
                 try {
                     logger.warn(`No paths match ${request.path}`);
-                    response.status(404).json({ error: `No paths match ${request.path}` });
+                    response.status(404).json({
+                        success: false,
+                        title: 'Error',
+                        messages: [
+                            {
+                                message: `No paths match ${request.path}`,
+                                type: OperationResult_1.ResultType.Failed
+                            }
+                        ]
+                    });
                 }
                 catch (err) {
-                    response.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).json({ error: err.message });
+                    response.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).json({
+                        success: false,
+                        title: 'Error',
+                        messages: [
+                            {
+                                message: err.message,
+                                type: OperationResult_1.ResultType.Failed
+                            }
+                        ]
+                    });
+                    // response.status(err.status ?? 500).json({ error: err.message });
                 }
             });
             let server;
@@ -832,6 +885,7 @@ class WebServer {
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     let result = new OperationResult_1.OperationResult('multiple');
+                    // TODO: Put this in CertificateUtil
                     let msg = node_forge_1.pem.decode(pemString);
                     if (msg.length == 0) {
                         throw new CertError_1.CertError(400, 'Could not decode the file as a pem certificate');
@@ -841,9 +895,11 @@ class WebServer {
                         let oneRes;
                         try {
                             if (m.type.includes('CERTIFICATE')) {
+                                // TODO: Put this in CertificateUtil
                                 oneRes = yield this._tryAddCertificate({ pemString: node_forge_1.pem.encode(m, { maxline: 64 }) });
                             }
                             else if (m.type.includes('KEY')) {
+                                // TODO: Put this in CertificateUtil
                                 oneRes = yield this._tryAddKey({ pemString: node_forge_1.pem.encode(m, { maxline: 64 }) });
                             }
                             else {
@@ -883,6 +939,7 @@ class WebServer {
                         }
                         input.pemString = yield (0, promises_1.readFile)(input.filename, { encoding: 'utf8' });
                     }
+                    // TODO: Put this in CertificateUtil
                     let msg = node_forge_1.pem.decode(input.pemString)[0];
                     logger.debug(`Received ${msg.type}`);
                     if (msg.type != 'CERTIFICATE') {
@@ -1110,7 +1167,7 @@ class WebServer {
             throw new CertError_1.CertError(404, `No key for ${JSON.stringify(query)} found`);
         }
         else if (k.length > 1) {
-            throw new CertError_1.CertError(400, `Multiple keys match the CN ${JSON.stringify(query)} - use id instead`);
+            throw new CertMultiError_1.CertMultiError(400, `Multiple keys match the CN ${JSON.stringify(query)} - use id instead`, k.map((l) => l.$loki));
         }
         return k[0];
     }
@@ -1130,69 +1187,59 @@ class WebServer {
             logger.info('Database is a supported version for this release');
         });
     }
-    static _validateCertificateInput(type, bodyIn) {
-        var _a, _b;
-        // FUTURE Needs a mechanism to force parts of the RDA sequence to be omitted
-        try {
-            if (typeof bodyIn !== 'object') {
-                throw new CertError_1.CertError(400, 'Bad POST data format - use Content-type: application/json');
-            }
-            let body = bodyIn;
-            let result = {
-                validFrom: body.validFrom ? new Date(body.validFrom) : new Date(),
-                validTo: new Date(body.validTo),
-                signer: (_a = body.signer) !== null && _a !== void 0 ? _a : null,
-                password: (_b = body.password) !== null && _b !== void 0 ? _b : null,
-                subject: {
-                    C: body.country ? body.country : null,
-                    ST: body.state ? body.state : null,
-                    L: body.location ? body.location : null,
-                    O: body.organization ? body.organization : null,
-                    OU: body.unit ? body.unit : null,
-                    CN: body.commonName ? body.commonName : null
-                },
-                san: {
-                    domains: [],
-                    IPs: [],
-                }
-            };
-            let errString = [];
-            if (!result.subject.CN)
-                errString.push('Common name is required');
-            if (!result.validTo)
-                errString.push('Valid to is required');
-            if (type != CertTypes_1.CertTypes.root && !body.signer)
-                errString.push('Signing certificate is required');
-            if (isNaN(result.validTo.valueOf()))
-                errString.push('Valid to is invalid');
-            if (body.validFrom && isNaN(result.validFrom.valueOf()))
-                errString.push('Valid from is invalid');
-            if (result.subject.C != null && result.subject.C.length != 2)
-                errString.push('Country code must be omitted or have two characters');
-            let rc = WebServer._isValidRNASequence([result.subject.C, result.subject.ST, result.subject.L, result.subject.O, result.subject.OU, result.subject.CN]);
-            if (!rc.valid)
-                errString.push(rc.message);
-            if (errString.length > 0) {
-                throw new CertError_1.CertError(500, errString.join(';'));
-            }
-            if (type == CertTypes_1.CertTypes.leaf) {
-                result.san.domains.push(body.commonName);
-            }
-            if (type != CertTypes_1.CertTypes.root && body.SANArray) {
-                let SANArray = Array.isArray(body.SANArray) ? body.SANArray : [body.SANArray];
-                let domains = SANArray.filter((entry) => entry.startsWith('DNS:')).map((entry) => entry.split(' ')[1]);
-                let ips = SANArray.filter((entry) => entry.startsWith('IP:')).map((entry) => entry.split(' ')[1]);
-                if (domains.length > 0)
-                    result.san.domains = result.san.domains.concat(domains);
-                if (ips.length > 0)
-                    result.san.IPs = ips;
-            }
-            return result;
-        }
-        catch (err) {
-            throw new CertError_1.CertError(500, err.message);
-        }
-    }
+    // private static _validateCertificateInput(type: CertTypes, bodyIn: any): CertificateInput {
+    //     // FUTURE Needs a mechanism to force parts of the RDA sequence to be omitted
+    //     try {
+    //         if (typeof bodyIn !== 'object') {
+    //             throw new CertError(400, 'Bad POST data format - use Content-type: application/json');
+    //         }
+    //         let body: GenerateCertRequest = bodyIn;
+    //         let result: CertificateInput = {
+    //             validFrom: body.validFrom ? new Date(body.validFrom) : new Date(),
+    //             validTo: new Date(body.validTo),
+    //             signer: body.signer?? null,
+    //             password: body.password?? null,
+    //             subject: {
+    //                 C: body.country? body.country : null,
+    //                 ST: body.state? body.state : null,
+    //                 L: body.location? body.location : null,
+    //                 O: body.organization? body.organization : null,
+    //                 OU: body.unit? body.unit : null,
+    //                 CN: body.commonName? body.commonName : null
+    //             },
+    //             san: {
+    //                 domains: [],
+    //                 IPs: [],
+    //             }
+    //         };
+    //         let errString: string[] = [];
+    //         if (!result.subject.CN) errString.push('Common name is required');
+    //         if (!result.validTo) errString.push('Valid to is required');
+    //         if (type != CertTypes.root && !body.signer) errString.push('Signing certificate is required')
+    //         if (isNaN(result.validTo.valueOf())) errString.push('Valid to is invalid');
+    //         if (body.validFrom && isNaN(result.validFrom.valueOf())) errString.push('Valid from is invalid');
+    //         if (result.subject.C != null && result.subject.C.length != 2) errString.push('Country code must be omitted or have two characters');
+    //         let rc: { valid: boolean, message?: string } = WebServer._isValidRNASequence([result.subject.C, result.subject.ST, result.subject.L, result.subject.O, result.subject.OU, result.subject.CN]);
+    //         if (!rc.valid) errString.push(rc.message);
+    //         if (errString.length > 0) {
+    //             throw new CertError(500, errString.join(';'));
+    //         }
+    //         if (type == CertTypes.leaf) {
+    //             result.san.domains.push(body.commonName);
+    //         }
+    //         if (type != CertTypes.root && body.SANArray) {
+    //             let SANArray = Array.isArray(body.SANArray) ? body.SANArray : [body.SANArray];
+    //             let domains = SANArray.filter((entry: string) => entry.startsWith('DNS:')).map((entry: string) => entry.split(' ')[1]);
+    //             let ips = SANArray.filter((entry: string) => entry.startsWith('IP:')).map((entry: string) => entry.split(' ')[1]);
+    //             if (domains.length > 0) result.san.domains = result.san.domains.concat(domains);
+    //             if (ips.length > 0) result.san.IPs = ips;
+    //         }
+    //         return result;
+    //     }
+    //     catch (err) {
+    //         throw new CertError(500, err.message);
+    //     }
+    // }
     /**
      * Attempts to guess the client OS from the user agent string
      *
@@ -1223,64 +1270,8 @@ class WebServer {
             return userAgentOS_1.userAgentOS.ANDROID;
         return userAgentOS_1.userAgentOS.UNKNOWN;
     }
-    /**
-     * Validates RNA strings to ensure they consist only of characters allowed in those strings. The node-forge package does not enforce this.
-     *
-     * @param rnas Array of RNA values for validation
-     * @returns {{valid: boolean, message?: string}} valid: true if all are valid otherwise valid: false, message: error message
-     */
-    static _isValidRNASequence(rnas) {
-        for (let r in rnas) {
-            if (!/^[a-z A-Z 0-9'\=\(\)\+\,\-\.\/\:\?]*$/.test(rnas[r])) {
-                return { valid: false, message: 'Subject contains an invalid character' };
-            }
-        }
-        return { valid: true };
-    }
-    /**
-     * Add subject values to pki.CertificateField
-     *
-     * @param subject Subject fields for the certificate
-     * @returns pki.CertificateField with the provided fields
-     */
-    static _setAttributes(subject) {
-        let attributes = [];
-        if (subject.C)
-            attributes.push({ shortName: 'C', value: subject.C });
-        if (subject.ST)
-            attributes.push({ shortName: 'ST', value: subject.ST });
-        if (subject.L)
-            attributes.push({ shortName: 'L', value: subject.L });
-        if (subject.O)
-            attributes.push({ shortName: 'O', value: subject.O });
-        if (subject.OU)
-            attributes.push({ shortName: 'OU', value: subject.OU });
-        attributes.push({ shortName: 'CN', value: subject.CN });
-        return attributes;
-    }
-    /**
-     * Generates a certificate serial number
-     *
-     * @returns A random number to use as a certificate serial number
-     */
-    static _getRandomSerialNumber() {
-        return WebServer._makeNumberPositive(node_forge_1.util.bytesToHex(node_forge_1.random.getBytesSync(20)));
-    }
 }
 exports.WebServer = WebServer;
 WebServer.instance = null;
 WebServer._lowestDBVersion = 0;
-/**
- * If the passed number is negative it is made positive
- *
- * @param hexString String containing a hexadecimal number
- * @returns Positive version of the input
- */
-WebServer._makeNumberPositive = (hexString) => {
-    let mostSignificativeHexDigitAsInt = parseInt(hexString[0], 16);
-    if (mostSignificativeHexDigitAsInt < 8)
-        return hexString;
-    mostSignificativeHexDigitAsInt -= 8;
-    return mostSignificativeHexDigitAsInt.toString() + hexString.substring(1);
-};
 //# sourceMappingURL=webserver.js.map

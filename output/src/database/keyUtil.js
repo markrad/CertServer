@@ -224,6 +224,7 @@ class KeyUtil {
             }
         }
         keyStores_1.KeyStores.remove(this.$loki);
+        result.pushMessage(`Key ${this.name} removed`, OperationResult_1.ResultType.Success);
         return result;
     }
     getpkiKey(password) {

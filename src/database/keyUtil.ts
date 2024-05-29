@@ -11,7 +11,7 @@ import { unlink, writeFile, rename, readFile } from "fs/promises";
 import { KeyBrief } from "../webservertypes/KeyBrief";
 import { exists } from "../utility/exists";
 import { OperationResultItem } from "../webservertypes/OperationResultItem";
-import { OperationResult } from "../webservertypes/OperationResult";
+import { OperationResult, ResultType } from "../webservertypes/OperationResult";
 import { CertificateUtil } from "./certificateUtil";
 import { CertificateStores } from "./certificateStores";
 
@@ -210,6 +210,7 @@ export class KeyUtil implements PrivateKeyRow, LokiObj {
         }
 
         KeyStores.remove(this.$loki);
+        result.pushMessage(`Key ${this.name} removed`, ResultType.Success);
         return result;
     }
 

@@ -114,7 +114,7 @@ async function keyShow(details, arrow) {
         details.slideDown(500);
     }
     catch (err) {
-        showError(err.error, err.message);
+        showMessage(err);
     };
 }
 
@@ -165,7 +165,7 @@ async function keyDelete(name, id) {
         }
     }
     catch (err) {
-        showError(err);
+        showMessage(err);
     }
 }
 
@@ -423,8 +423,8 @@ async function certShow(details, arrow) {
         $(`#c${result.signerId}`).find('.cert-line-info').addClass('cert-value-signer');
         result.signed.forEach((s) => $(`#c${s}`).find('.cert-line-info').addClass('cert-value-signed'));
     }
-    catch ({ error, message }) {
-        showError(error, message);
+    catch (err) {
+        showMessage(err);
     }
 }
 
@@ -459,7 +459,7 @@ async function certDelete(name, id) {
         }
     }
     catch (err) {
-        showError(err);
+        showMessage(err);
     }
 }
 
@@ -482,7 +482,7 @@ async function uploadPem() {
         }
         catch (err) {
             document.getElementById('uploadCertForm').reset();
-            showError(err);
+            showMessage(err);
         }
     }
 }
@@ -641,18 +641,34 @@ function tagChooserSubmit() {
  * 
  * @param {string} msg message to display
  */
-function showMessage(msg) {
+function showMessage(result) {
     let timerHandle = null;
-    $('#messageDialogMessage').text(msg);
+    let msg = $('#messageDialogMessage');
+    let msgLine = '';
+    let first = true;
+    for (let m of result.messages) {
+        if (m.type == 0) {
+            msg.append(`<p class="msg-good-color ${msgLine}">${m.message}</p>`);
+        }
+        else {
+            msg.append(`<p class="msg-error-color ${msgLine}">${m.message}</p>`);
+        }
+
+        if (first) {
+            msgLine = 'msg-line';
+            first = false;
+        }
+    }
+    // $('#messageDialogMessage').text(msg);
     $('#messageDialog').dialog({
-        title: 'Informational',
+        title: result.title,
         resizable: false,
         maxheight: 260,
-        modal: false,
+        modal: !result.success,
         show: ('fade', 700),
         hide: ('fade', 700),
         classes: {
-            'ui-dialog': 'ui-state-default'
+            'ui-dialog': result.success? 'ui-state-default' : 'ui-state-error'
         },
         buttons: {
             "Ok": function() {
@@ -665,10 +681,12 @@ function showMessage(msg) {
             }
         }
     });
-    timerHandle = setTimeout(() => {
-        $('#messageDialogMessage').text('');
-        $('#messageDialog').dialog('close');
-    }, 3000);
+    if (result.success) {
+        timerHandle = setTimeout(() => {
+            $('#messageDialog').dialog('close');
+            $('#messageDialogMessage').text('');
+        }, 3000);
+    }
 }
 
 /**
@@ -711,23 +729,23 @@ function showMultiMessage(messages) {
  * @param {string} error error dialog title
  * @param {string} message message to display 
  */ 
-function showError(error, message) {
-    $('#messageDialogMessage').text(`${error}: ${message}`);
-    $('#messageDialog').dialog({
-        title: 'Error',
-        resizable: false,
-        maxheight: 260,
-        modal: true,
-        classes: {
-            'ui-dialog': 'ui-state-error'
-        },
-        buttons: {
-            "Ok": function() {
-                $(this).dialog('close');
-            }
-        }
-    });
-}
+// function showError(error, message) {
+//     $('#messageDialogMessage').text(`${error}: ${message}`);
+//     $('#messageDialog').dialog({
+//         title: 'Error',
+//         resizable: false,
+//         maxheight: 260,
+//         modal: true,
+//         classes: {
+//             'ui-dialog': 'ui-state-error'
+//         },
+//         buttons: {
+//             "Ok": function() {
+//                 $(this).dialog('close');
+//             }
+//         }
+//     });
+// }
 
 /**
  * Called when a new CA is successfully created.
@@ -835,7 +853,7 @@ function removeSAN(spanId) {
  */
 function updateTagsDisplay(result) {
     $('tagsCancelButton').trigger('click');
-    showMessage(result.message);
+    showMessage(result);
     $('#tagsEdit').dialog('close');
 }
 
@@ -989,7 +1007,7 @@ $(async function() {
         dataType: 'json',
         success: createCACertResponse,
         error: (xhr, _msg, err) => {
-            showError(err, JSON.parse(xhr.responseText).error);
+            showMessage(JSON.parse(xhr.responseText));
         } 
     });
 
@@ -997,7 +1015,7 @@ $(async function() {
         dataType: 'json',
         success: createIntermediateCertResponse,
         error: (xhr, _msg, err) => {
-            showError(err, JSON.parse(xhr.responseText).error);
+            showMessage(JSON.parse(xhr.responseText));
         } 
     });
 
@@ -1005,7 +1023,7 @@ $(async function() {
         dataType: 'json',
         success: createLeafCertResponse,
         error: (xhr, _msg, err) => {
-            showError(err, JSON.parse(xhr.responseText).error);
+            showMessage(JSON.parse(xhr.responseText));
         } 
     });
 
@@ -1013,7 +1031,7 @@ $(async function() {
         datType: 'json',
         success: updateTagsDisplay,
         error: (xhr, _msg, err) => {
-            showError(err, JSON.parse(xhr.responseText).error);
+            showMessage(xhr.responseText);
         } 
     });
 

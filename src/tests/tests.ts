@@ -787,7 +787,7 @@ async function runTests() {
             }, TestResult.TestSucceeded);
             // Don't run if there has been a failure and this test is not set to run on failure
             if (succeeded == TestResult.TestSucceeded || tests[test].runOnFailure == true) {
-                console.log(`Test ${test}: ${tests[test].description}`);
+                console.log(`Test ${test}: ${fgGreen(tests[test].description)}`);
                 try {
                     tests[test].result = (await tests[test].testFunction())? TestResult.TestSucceeded : TestResult.TestFailed;
                     if (tests[test].result != TestResult.TestSucceeded) {

@@ -1,8 +1,7 @@
-import { pki, pem, /*jsbn*/ } from "node-forge";
+import { pki, pem, util, random, md, /*jsbn*/ } from "node-forge";
 import { CertTypes } from "../webservertypes/CertTypes";
 import { CertificateRow } from "../webservertypes/CertificateRow";
 import { CertificateSubject } from "../webservertypes/CertificateSubject";
-// import { WebServer } from "../webserver";
 import { CertificateStores } from "./certificateStores";
 import { CertError } from "../webservertypes/CertError";
 
@@ -12,17 +11,20 @@ import * as log4js from "log4js";
 import { readFile, /*writeFile, unlink, rename*/ } from 'fs/promises'
 import crypto from 'crypto';
 import { OperationResultItem } from "../webservertypes/OperationResultItem";
-import { OperationResult } from "../webservertypes/OperationResult";
+import { OperationResult, ResultMessage, ResultType } from "../webservertypes/OperationResult";
 import { exists } from "../utility/exists";
 import { KeyStores } from "./keyStores";
 import { KeyUtil } from "./keyUtil";
 import { CertificateBrief } from "../webservertypes/CertificateBrief";
-// import { KeyValueStore } from "lokijs";
-// import { KeyStores } from "./keyStores";
-// import { PrivateKeyRow } from "../webservertypes/PrivateKeyRow";
-// import { KeyStores } from "./keyStores";
-// import { KeyUtil } from "./keyUtil";
-// import { jsbn, pki, pem, util, random, md } from 'node-forge'; 
+import { GenerateCertRequest } from "../webservertypes/GenerateCertRequest";
+import { CertificateInput } from "../webservertypes/CertificateInput";
+import { ExtensionParent } from "../extensions/ExtensionParent";
+import { ExtensionBasicConstraints } from "../extensions/ExtensionBasicConstraints";
+import { ExtensionKeyUsage } from "../extensions/ExtensionKeyUsage";
+import { ExtensionSubjectKeyIdentifier } from "../extensions/ExtensionSubjectKeyIdentifier";
+import { ExtensionAuthorityKeyIdentifier } from "../extensions/ExtensionAuthorityKeyIdentifier";
+import { ExtensionExtKeyUsage } from "../extensions/ExtensionExtKeyUsage";
+import { ExtensionSubjectAltName /*, ExtensionSubjectAltNameOptions */} from "../extensions/ExtensionSubjectAltName";
 
 const logger = log4js.getLogger();
 
@@ -241,11 +243,20 @@ export class CertificateUtil implements CertificateRow, LokiObj {
         return this.update();
     }
 
+    /**
+     * Updates the certificate in the certificate database.
+     * 
+     * @returns {OperationResultItem} The operation result item.
+     */
     public update(): OperationResultItem {
         CertificateStores.CertificateDb.update(this.row);
         return this.getOperationalResultItem();
     }
 
+    /**
+     * Removes the certificate from the database.
+     * @returns A Promise that resolves to an OperationResult indicating the success of the removal operation.
+     */
     public async remove(): Promise<OperationResult> {
         let result: OperationResult = new OperationResult('');
         result.pushDeleted(this.getOperationalResultItem())
@@ -262,10 +273,15 @@ export class CertificateUtil implements CertificateRow, LokiObj {
         });
 
         CertificateStores.CertificateDb.remove(this.row);
+        result.pushMessage(`Certificate ${this.name} removed`, ResultType.Success);
 
         return result;
     }
 
+    /**
+     * Returns a brief representation of the certificate required for display on the web interface.
+     * @returns {CertificateBrief} The brief representation of the certificate.
+     */
     public certificateBrief(): CertificateBrief {
         let c: CertificateUtil = null;
 
@@ -297,6 +313,14 @@ export class CertificateUtil implements CertificateRow, LokiObj {
         };
     }
 
+    /**
+     * Retrieves the certificate chain by reading the contents of each certificate file.
+     * The chain is constructed by starting from the current certificate and following the `signedById` property.
+     * Each certificate file is read using the `readFile` function with 'utf8' encoding.
+     * 
+     * @returns A Promise that resolves to a string representing the concatenated contents of all the certificate files in the chain.
+     * @throws {CertError} If a certificate row with the specified `signedById` is not found in the database.
+     */
     public async getCertificateChain(): Promise<string> {
         return new Promise<string>(async (resolve, reject) => {
             try {
@@ -334,6 +358,10 @@ export class CertificateUtil implements CertificateRow, LokiObj {
         return Path.join(CertificateStores.CertificatePath, CertificateUtil._getKeyFilename(this.name, this.$loki));
     }
 
+    /**
+     * Writes the PEM content to a file.
+     * @returns A Promise that resolves when the file is successfully written, or rejects with an error if there was a problem.
+     */
     public async writeFile(): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             try {
@@ -366,14 +394,110 @@ export class CertificateUtil implements CertificateRow, LokiObj {
         }
     }
 
+    /**
+     * Retrieves the PKI certificate.
+     * If the certificate is already available in memory, it returns it.
+     * Otherwise, it reads the certificate from the file system and returns it.
+     * @returns A Promise that resolves to the PKI certificate.
+     */
     public async getpkiCert(): Promise<pki.Certificate> {
         return pki.certificateFromPem(this._pem? this._pem : await readFile(this.absoluteFilename, { encoding: 'utf8'}));
     }
 
+    /**
+     * Finds the signer of the certificate.
+     * @returns A Promise that resolves to a CertificateUtil instance representing the signer.
+     */
+    public async findSigner(): Promise<CertificateUtil> {
+        return CertificateUtil._findSigner(await this.getpkiCert());
+    }
+
+    /**
+     * Checks if the given key is a key pair.
+     * @param key - The key to check.
+     * @returns True if the key is a key pair, false otherwise.
+     */
     public isKeyPair(key: KeyUtil) {
         return key.isIdentical(this.publicKey as pki.rsa.PublicKey);
     }
 
+    /**
+     * Generates a certificate pair consisting of a certificate and a private key.
+     * 
+     * @param type - The type of certificate to generate.
+     * @param body - The input data for generating the certificate.
+     * @returns A promise that resolves to an object containing the generated certificate PEM, key PEM, and the result of the operation.
+     * @throws {CertError} If an error occurs during the generation process.
+     */
+    public static async generateCertificatePair(type: CertTypes, body: any): Promise<{ certificatePem: string, keyPem: string, result: OperationResult }> {
+        return new Promise<{ certificatePem: string, keyPem: string, result: OperationResult }>(async (resolve, reject) => {
+            try {
+                let result: OperationResult = new OperationResult('');
+                let { certificateInput, messages } = CertificateUtil._validateCertificateInput(type, body);
+                if (messages.hasErrors) {
+                    resolve({ certificatePem: null, keyPem: null, result: messages });
+                    return;
+                }
+
+                const cRow: CertificateUtil = type == CertTypes.root ? null : CertificateStores.findOne({ $loki: parseInt(certificateInput.signer) });
+                const kRow: KeyUtil = type == CertTypes.root ? null : KeyStores.findOne({ $loki: cRow.keyId });
+
+                if (type != CertTypes.root && (!cRow || !kRow)) {
+                    resolve({ certificatePem: null, keyPem: null, result: result.pushMessage('Signing certificate or key are either missing or invalid', ResultType.Failed) });
+                    return;
+                }
+
+                const c: pki.Certificate = type == CertTypes.root ? null : await cRow.getpkiCert();
+                const k: pki.PrivateKey = type == CertTypes.root ? null : await kRow.getpkiKey(certificateInput.password);
+                const { privateKey, publicKey } = pki.rsa.generateKeyPair(2048);
+                const attributes = CertificateUtil._setAttributes(certificateInput.subject);
+                const extensions: ExtensionParent[] = [];
+
+                if (type != CertTypes.leaf) {
+                    extensions.push(new ExtensionBasicConstraints({ cA: true, critical: true }));
+                    extensions.push(new ExtensionKeyUsage({ keyCertSign: true, cRLSign: true }));
+                }
+
+                if (type != CertTypes.root) {
+                    extensions.push(new ExtensionAuthorityKeyIdentifier({ keyIdentifier: c.generateSubjectKeyIdentifier().getBytes(), authorityCertSerialNumber: true }));
+                }
+
+                if (type == CertTypes.leaf) {
+                    extensions.push(new ExtensionBasicConstraints({ cA: false }));
+                    extensions.push(new ExtensionKeyUsage({ nonRepudiation: true, digitalSignature: true, keyEncipherment: true }));
+                    extensions.push(new ExtensionExtKeyUsage({ serverAuth: true, clientAuth: true, }));
+                    extensions.push(new ExtensionSubjectAltName(certificateInput.san));
+                }
+
+                extensions.push(new ExtensionSubjectKeyIdentifier({}));
+
+                // Create an empty Certificate
+                let cert = pki.createCertificate();
+                cert.publicKey = publicKey;
+                // cert.privateKey = privateKey;
+                cert.serialNumber = CertificateUtil._getRandomSerialNumber();
+                cert.validity.notBefore = certificateInput.validFrom;
+                cert.validity.notAfter = certificateInput.validTo;
+                cert.setSubject(attributes);
+                cert.setIssuer(type == CertTypes.root ? attributes : c.subject.attributes);
+                cert.setExtensions(extensions.map((extension) => extension.getObject()));
+
+                // Self-sign root but use the signer's key for the others
+                cert.sign(type == CertTypes.root ? privateKey : k, md.sha512.create());
+                resolve({ certificatePem: pki.certificateToPem(cert), keyPem: pki.privateKeyToPem(privateKey), result: result });
+            }
+            catch (err) {
+                reject(new CertError(500, err.message));
+            }
+        });
+    }
+
+    /**
+     * Extracts the ID from a given file name.
+     * 
+     * @param name - The file name from which to extract the ID.
+     * @returns The extracted ID as a number.
+     */
     public static getIdFromFileName(name: string): number {
         return parseInt(Path.parse(name).name.split('_').slice(-1)[0].split('.')[0]);
     }
@@ -389,10 +513,22 @@ export class CertificateUtil implements CertificateRow, LokiObj {
         return `${name}_${$loki}.pem`;
     }
 
+    /**
+     * Sanitizes the given name by replacing any characters that are not alphanumeric, underscore, hyphen, equal sign, plus sign, curly braces, square brackets, parentheses, double quotes, or single quotes with an underscore.
+     * 
+     * @param name - The name to be sanitized.
+     * @returns The sanitized name.
+     */
     private static _sanitizeName(name: string) {
         return name.replace(/[^\w-_=+{}\[\]\(\)"'\]]/g, '_');
     }
 
+    /**
+     * Retrieves the fields from the issuer or subject of a certificate.
+     * 
+     * @param s - The issuer or subject of a certificate.
+     * @returns An object containing the values of the fields.
+     */
     private static _getFields(s: pki.Certificate['issuer'] | pki.Certificate['subject']): CertificateSubject {
         let getValue: (v: string) => string = (v: string): string => {
             let work = s.getField(v);
@@ -408,15 +544,27 @@ export class CertificateUtil implements CertificateRow, LokiObj {
         }
     }
 
+    /**
+     * Calculates the type of the certificate.
+     * @param c - The certificate to calculate the type for.
+     * @returns A promise that resolves to the type of the certificate.
+     */
     private static async _calcCertType(c: pki.Certificate): Promise<CertTypes> {
-        let type: CertTypes;
+        let type: CertTypes = null;
         // let signedById: number;
 
-        if (c.isIssuer(c)) {
+        try {
+            c.verify(c);
             type = CertTypes.root;
-            // signedById = -1;
         }
-        else {
+        catch (_err) {
+            // Don't care - verify throws an error rather than returning a boolean
+        }
+        // if (c.verify(c)) { 
+        //     type = CertTypes.root;
+        //     // signedById = -1;
+        // }
+        if (type == null) {
             let bc: any = c.getExtension('basicConstraints');
 
             if ((bc != null) && (bc.cA ?? false) == true && (bc.pathlenConstraint ?? 1) > 0) {
@@ -437,10 +585,11 @@ export class CertificateUtil implements CertificateRow, LokiObj {
         return type;
     }
 
-    public async findSigner(): Promise<CertificateUtil> {
-        return CertificateUtil._findSigner(await this.getpkiCert());
-    }
-
+    /**
+     * Finds the signer certificate for the given certificate.
+     * @param c - The certificate for which to find the signer.
+     * @returns A Promise that resolves with the signer certificate, or null if not found.
+     */
     private static async _findSigner(c: pki.Certificate): Promise<CertificateUtil> {
         return new Promise<CertificateUtil>(async (resolve, _reject) => {
             let i;
@@ -468,56 +617,128 @@ export class CertificateUtil implements CertificateRow, LokiObj {
         });
     }
 
-    // private static async _pkiCertFromRow(c: CertificateUtil): Promise<pki.Certificate> {
-    //     return new Promise<pki.Certificate>(async (resolve, reject) => {
-    //         try {
-    //             resolve(pki.certificateFromPem(await readFile(c.absoluteFilename, { encoding: 'utf8' })));
-    //         }
-    //         catch (err) {
-    //             reject(err);
-    //         }
-    //     });
-    // }
+    /**
+     * Validates the certificate input and returns the certificate input object and operation result.
+     * @param type - The type of certificate.
+     * @param bodyIn - The input body containing certificate details.
+     * @returns An object containing the certificate input and operation result.
+     * @throws {CertError} If there is an error in the certificate input.
+     */
+    private static _validateCertificateInput(type: CertTypes, bodyIn: any): { certificateInput: CertificateInput, messages: OperationResult } {
+        // FUTURE Needs a mechanism to force parts of the RDA sequence to be omitted
+        try {
+            if (typeof bodyIn !== 'object') {
+                throw new CertError(400, 'Bad POST data format - use Content-type: application/json');
+            }
+            let body: GenerateCertRequest = bodyIn;
+            let result: CertificateInput = {
+                validFrom: body.validFrom ? new Date(body.validFrom) : new Date(),
+                validTo: new Date(body.validTo),
+                signer: body.signer ?? null,
+                password: body.password ?? null,
+                subject: {
+                    C: body.country ? body.country : null,
+                    ST: body.state ? body.state : null,
+                    L: body.location ? body.location : null,
+                    O: body.organization ? body.organization : null,
+                    OU: body.unit ? body.unit : null,
+                    CN: body.commonName ? body.commonName : null
+                },
+                san: {
+                    domains: [],
+                    IPs: [],
+                }
+            };
+            let opResults: OperationResult = new OperationResult('Generate Certificate');
+            if (!result.subject.CN) opResults.pushMessage('Common name is required' , ResultType.Failed);
+            if (!result.validTo) opResults.pushMessage('Valid to is required', ResultType.Failed);
+            if (type != CertTypes.root && !body.signer) opResults.pushMessage('Signing certificate is required', ResultType.Failed);
+            if (isNaN(result.validTo.valueOf())) opResults.pushMessage('Valid to is invalid', ResultType.Failed);
+            if (body.validFrom && isNaN(result.validFrom.valueOf())) opResults.pushMessage('Valid from is invalid', ResultType.Failed);
+            if (result.subject.C != null && result.subject.C.length != 2) opResults.pushMessage('Country code must be omitted or have two characters', ResultType.Failed);
+            let rc: ResultMessage = CertificateUtil._isValidRNASequence([result.subject.C, result.subject.ST, result.subject.L, result.subject.O, result.subject.OU, result.subject.CN]);
+            if (rc) opResults.pushMessage(rc.message, rc.type);
+            if (opResults.hasErrors) {
+                opResults.setStatusCode(400);
+                return { certificateInput: null, messages: opResults };
+            }
+            if (type == CertTypes.leaf) {
+                result.san.domains.push(body.commonName);
+            }
+            if (type != CertTypes.root && body.SANArray) {
+                let SANArray = Array.isArray(body.SANArray) ? body.SANArray : [body.SANArray];
+                let domains = SANArray.filter((entry: string) => entry.startsWith('DNS:')).map((entry: string) => entry.split(' ')[1]);
+                let ips = SANArray.filter((entry: string) => entry.startsWith('IP:')).map((entry: string) => entry.split(' ')[1]);
+                if (domains.length > 0) result.san.domains = result.san.domains.concat(domains);
+                if (ips.length > 0) result.san.IPs = ips;
+            }
+            return { certificateInput: result, messages: opResults };
+        }
+        catch (err) {
+            throw new CertError(500, err.message);
+        }
+    }
 
-    // private static _getCertificateDir(filename: string): string {
-    //     return Path.join(CertificateStores.CertificatePath, filename);
-    // }
+    /**
+     * Validates RNA strings to ensure they consist only of characters allowed in those strings. The node-forge package does not enforce this.
+     * 
+     * @param rnas Array of RNA values for validation
+     * @returns {{valid: boolean, message?: string}} valid: true if all are valid otherwise valid: false, message: error message
+     */
+    private static _isValidRNASequence(rnas: string[]): ResultMessage {
+        for (let r in rnas) {
+            if (!/^[a-z A-Z 0-9'\=\(\)\+\,\-\.\/\:\?]*$/.test(rnas[r])) {
+                return { message: 'Subject contains an invalid character', type: ResultType.Failed };
+            }
+        }
+        return null;
+    }
 
-    // private static _getCertificateFilenameFromRow(c: CertificateUtil): string {
-    //     return `${c.name}_${c.$loki}.pem`;
-    // }
+    /**
+     * Generates a certificate serial number
+     * 
+     * @returns A random number to use as a certificate serial number
+     */
+    private static _getRandomSerialNumber(): string {
+        return CertificateUtil._makeNumberPositive(util.bytesToHex(random.getBytesSync(20)));
+    }
 
-    // /**
-    //  * Tests a certificate and key to determine if they are a pair
-    //  * 
-    //  * @param cert Certificate in node-forge pki format
-    //  * @param keyn Key n big integer
-    //  * @param keye Key e big integer
-    //  * @returns true if this is the key paired with the certificate
-    //  */
-    // private static _isKeyPair(cert: pki.Certificate, keyn: jsbn.BigInteger, keye: jsbn.BigInteger): boolean {
-    //     let publicKey = pki.setRsaPublicKey(keyn, keye);
-    //     let certPublicKey: pki.rsa.PublicKey = cert.publicKey as pki.rsa.PublicKey;
+    /**
+     * If the passed number is negative it is made positive
+     * 
+     * @param hexString String containing a hexadecimal number
+     * @returns Positive version of the input
+     */
+    private static _makeNumberPositive = (hexString: string): string => {
+        let mostSignificativeHexDigitAsInt = parseInt(hexString[0], 16);
 
-    //     return this._isIdenticalKey(publicKey, certPublicKey);
-    // }
+        if (mostSignificativeHexDigitAsInt < 8)
+            return hexString;
 
-    // /**
-    //  * Compares to keys for equality
-    //  * 
-    //  * @param leftKey First key to compare
-    //  * @param rightKey Second key to compare
-    //  * @returns true if the keys are identical
-    //  */
-    // private static _isIdenticalKey(leftKey: pki.rsa.PublicKey, rightKey: pki.rsa.PublicKey): boolean {
-    //     if (leftKey.n.data.length != rightKey.n.data.length) {
-    //         return false;
-    //     }
+        mostSignificativeHexDigitAsInt -= 8;
+        return mostSignificativeHexDigitAsInt.toString() + hexString.substring(1);
+    };
 
-    //     for (let i = 0; i < leftKey.n.data.length; i++) {
-    //         if (leftKey.n.data[i] != rightKey.n.data[i]) return false;
-    //     }
+    /**
+     * Add subject values to pki.CertificateField
+     * 
+     * @param subject Subject fields for the certificate
+     * @returns pki.CertificateField with the provided fields
+     */
+    private static _setAttributes(subject: CertificateSubject): pki.CertificateField[] {
+        let attributes: pki.CertificateField[] = [];
+        if (subject.C)
+            attributes.push({ shortName: 'C', value: subject.C });
+        if (subject.ST)
+            attributes.push({ shortName: 'ST', value: subject.ST });
+        if (subject.L)
+            attributes.push({ shortName: 'L', value: subject.L });
+        if (subject.O)
+            attributes.push({ shortName: 'O', value: subject.O });
+        if (subject.OU)
+            attributes.push({ shortName: 'OU', value: subject.OU });
+        attributes.push({ shortName: 'CN', value: subject.CN });
 
-    //     return true;
-    // }
+        return attributes;
+    }
 }

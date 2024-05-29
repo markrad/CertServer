@@ -287,7 +287,7 @@ class LineCache {
      * @param {string} data post data
      * @returns {Promise<{ message: string }>} server response
      */
-    async postToServer(url, data) {
+    async _postToServer(url, data) {
         return this._ajaxCall('POST', url, data);
         // return new Promise((resolve, reject) => {
         //     $.ajax({
@@ -323,7 +323,7 @@ class LineCache {
                 contentType: false,
                 data: data,
                 error: (xhr, _msg, err) => {
-                    reject(new Error(`${err}: ${xhr.responseJSON.error}`));
+                    reject(xhr.responseJSON);
                 },
                 success: async (result, _status) => {
                     resolve(result);

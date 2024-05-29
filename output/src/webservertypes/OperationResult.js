@@ -23,6 +23,7 @@ class OperationResult {
         this._updated = [];
         this._deleted = [];
         this._messages = [];
+        this._statusCode = 200;
         if (name)
             this._name = name;
     }
@@ -90,8 +91,25 @@ class OperationResult {
         }
         return this;
     }
+    /**
+     * Pushes a message to the operation result.
+     *
+     * @param message - The message to be pushed.
+     * @param type - The type of the message.
+     * @returns The updated OperationResult instance.
+     */
     pushMessage(message, type) {
         this._messages.push({ type: type, message: message });
+        return this;
+    }
+    /**
+     * Sets the status code for the operation result.
+     *
+     * @param code - The status code to set.
+     * @returns The updated OperationResult instance.
+     */
+    setStatusCode(code) {
+        this._statusCode = code;
         return this;
     }
     /**
@@ -117,6 +135,7 @@ class OperationResult {
             }
         }
         this._messages = this._messages.concat(mergeIn._messages);
+        this._statusCode = mergeIn.statusCode;
     }
     /**
      * Normalizes the OperationResult by removing any duplicates from the updated array.
@@ -159,6 +178,44 @@ class OperationResult {
      * @returns An array of ResultMessages objects.
      */
     get messages() { return this._messages; }
+    get statusCode() { return this._statusCode; }
+    /**
+     * Gets the number of error messages in the operation result.
+     * @returns The number of error messages.
+     */
+    get errorCount() {
+        return this.messages.filter((m) => m.type === ResultType.Failed).length;
+    }
+    /**
+     * Gets a value indicating whether the operation result has any errors.
+     * @returns A boolean value indicating whether the operation result has any errors.
+     */
+    get hasErrors() {
+        return this.messages.some((m) => m.type === ResultType.Failed);
+    }
+    /**
+     * Gets a summary message based on the number of errors in the operation result.
+     * @returns A string representing the summary message.
+     */
+    getMessageSummary() {
+        let errorCount = this.messages.filter((m) => m.type === ResultType.Failed).length;
+        return errorCount == 0
+            ? "Success"
+            : errorCount == 1
+                ? "Error"
+                : `${errorCount} Errors`;
+    }
+    /**
+     * Retrieves the response message for the operation result.
+     * @returns The response message object.
+     */
+    getResponse() {
+        return {
+            success: !this.hasErrors,
+            title: this.getMessageSummary(),
+            messages: this.messages
+        };
+    }
     /**
      * This will be called by JSON.stringify. If removes the leading underscores from the private variable names.
      * @returns The object with sensible names.
