@@ -21,7 +21,7 @@
 		"RUN_BASH_HELPER_TESTS": "1",
 		"RUN_POWERSHELL_HELPER_TESTS": "1",
 		"RUN_IOTHUB_TESTS": "0"
-	}
+	},
 	// "runArgs": [ "--network=host" ],
 	// "forwardPorts": [ 4141 ]
 
@@ -33,7 +33,7 @@
 	// "forwardPorts": [],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	// "postCreateCommand": "yarn install",
+	"postCreateCommand": "tsc --watch"
 
 	// Configure tool-specific properties.
 	// "customizations": {},
