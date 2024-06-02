@@ -887,7 +887,7 @@ class WebServer {
      */
     _processMultiFile(pemString) {
         return __awaiter(this, void 0, void 0, function* () {
-            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            return new Promise((resolve, _reject) => __awaiter(this, void 0, void 0, function* () {
                 let result = new OperationResult_1.OperationResult('multiple');
                 try {
                     // TODO: Put this in CertificateUtil

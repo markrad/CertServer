@@ -933,7 +933,7 @@ export class WebServer {
      * @returns A promise that resolves to an OperationResult indicating the result of the operation.
      */
     private async _processMultiFile(pemString: string): Promise<OperationResult> {
-        return new Promise<OperationResult>(async (resolve, reject) => {
+        return new Promise<OperationResult>(async (resolve, _reject) => {
             let result: OperationResult = new OperationResult('multiple');
             try {
                 // TODO: Put this in CertificateUtil
