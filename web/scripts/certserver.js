@@ -463,11 +463,25 @@ async function certDelete(name, id) {
     }
 }
 
+async function dropHandler(event) {
+    event.preventDefault();
+    var files = event.dataTransfer.files;
+    var data = new FormData();
+    for (let file of files) {
+        data.append('certFile', file);
+    }
+    let result = await lineCache.postToServer('/uploadPem', data);
+    showMessage(result);
+}
+
+function dragOverHandler(event) {
+    event.preventDefault();
+}
 /**
  * Upload a new pem file to the server. This can be a certificate, a key, or a file containing multiple pem files.
  * 
  */
-async function uploadPem() {
+async function uploadPem(x) {
     var data = new FormData();
     var files = $('#certUpload');
     if (files[0].files.length == 0) {
@@ -478,7 +492,8 @@ async function uploadPem() {
             data.append('certFile', files[0].files[i]);
         }
         try {
-            await lineCache.postToServer('/uploadPem', data);
+            let result = await lineCache.postToServer('/uploadPem', data);
+            showMessage(result);
         }
         catch (err) {
             document.getElementById('uploadCertForm').reset();

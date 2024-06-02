@@ -287,7 +287,7 @@ class LineCache {
      * @param {string} data post data
      * @returns {Promise<{ message: string }>} server response
      */
-    async _postToServer(url, data) {
+    async postToServer(url, data) {
         return this._ajaxCall('POST', url, data);
         // return new Promise((resolve, reject) => {
         //     $.ajax({

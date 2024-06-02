@@ -696,7 +696,7 @@ export class WebServer {
                 let result: OperationResult = new OperationResult('multiple');
 
                 for (let f of files) {
-                    result.merge(await this._processMultiFile(f));
+                    result.merge(await this._processMultiFile(f.data.toString()));
                 }
 
                 if (result.added.length + result.updated.length + result.deleted.length > 0) {
@@ -927,10 +927,15 @@ export class WebServer {
         });
     }
 
+    /**
+     * Processes a multi-file PEM string and adds the certificates or keys to the server.
+     * @param pemString The multi-file PEM string to process.
+     * @returns A promise that resolves to an OperationResult indicating the result of the operation.
+     */
     private async _processMultiFile(pemString: string): Promise<OperationResult> {
-            return new Promise<OperationResult>(async (resolve, reject) => {
+        return new Promise<OperationResult>(async (resolve, reject) => {
+            let result: OperationResult = new OperationResult('multiple');
             try {
-                let result: OperationResult = new OperationResult('multiple');
                 // TODO: Put this in CertificateUtil
                 let msg: pem.ObjectPEM[] = pem.decode(pemString);
 
@@ -956,14 +961,15 @@ export class WebServer {
                         result.merge(oneRes);
                     }
                     catch (err) {
-                        logger.error(err.message);
+                        // logger.error(err.message);
                         result.pushMessage(err.message, ResultType.Failed);
                     }
                 }
                 resolve(result);
             }
             catch (err) {
-                reject(err);
+                result.pushMessage(err.message, ResultType.Failed);
+                resolve(result);
             }
         });
     }

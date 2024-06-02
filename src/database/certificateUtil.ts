@@ -157,58 +157,66 @@ export class CertificateUtil implements CertificateRow, LokiObj {
     }
 
     public async insert(): Promise<OperationResult> {
-        if (CertificateStores.findOne({ fingerprint256: this.fingerprint256}) != null) {
-            throw new CertError(409, `${this.name} already exists (fingerprint256: ${this.fingerprint256}) - ignored`);
-        }
-        let inserted = CertificateStores.CertificateDb.insertOne(this._row);
+        return new Promise<OperationResult>(async (resolve, reject) => {
+            try {
+                if (CertificateStores.findOne({ fingerprint256: this.fingerprint256}) != null) {
+                    reject(new CertError(409, `${this.name} already exists (fingerprint256: ${this.fingerprint256}) - ignored`));
+                    return;
+                }
+                let inserted = CertificateStores.CertificateDb.insertOne(this._row);
 
-        let updates: OperationResultItem[] = [];
+                let updates: OperationResultItem[] = [];
 
-        if (this.type == CertTypes.root) {
-            updates.push(this.updateSignedById(this.$loki));
-        }
+                if (this.type == CertTypes.root) {
+                    updates.push(this.updateSignedById(this.$loki));
+                }
 
-        // Look for a private key
-        let kRows: KeyUtil[] = KeyStores.find({ pairId: null });
+                // Look for a private key
+                let kRows: KeyUtil[] = KeyStores.find({ pairId: null });
 
-        for (let k of kRows) {
-            if (k.isCertificateKeyPair(this)) {
-                updates.push(await k.setCertificateKeyPair(this.$loki, this.subject.CN));
-                break;
-            }
-        }
-
-        // Look for certificates signed by this one
-        if (this.type != CertTypes.leaf) {
-            let cRows = CertificateStores.find({
-                $and: [
-                    { signedById: { $eq: null } },
-                    { $loki: { $ne: this.$loki } },
-                    { type: { $in: [CertTypes.leaf, CertTypes.intermediate] } }
-                ]
-            });
-
-            let cpki = await this.getpkiCert();
-
-            for (let c of cRows) {
-                logger.debug(`Checking ${c.name}`);
-                try {
-                    if (cpki.verify(await c.getpkiCert())) {
-                        updates.push(c.updateSignedById(this.$loki));
-                        logger.debug(`Marked ${c.name} as signed by ${this.name}`);
+                for (let k of kRows) {
+                    if (k.isCertificateKeyPair(this)) {
+                        updates.push(await k.setCertificateKeyPair(this.$loki, this.subject.CN));
+                        break;
                     }
                 }
-                catch (err) {
-                    if (err.message != 'The parent certificate did not issue the given child certificate; the child certificate\'s issuer does not match the parent\'s subject.') {
-                        logger.debug('Verify correct error: ' + err.message);
+
+                // Look for certificates signed by this one
+                if (this.type != CertTypes.leaf) {
+                    let cRows = CertificateStores.find({
+                        $and: [
+                            { signedById: { $eq: null } },
+                            { $loki: { $ne: this.$loki } },
+                            { type: { $in: [CertTypes.leaf, CertTypes.intermediate] } }
+                        ]
+                    });
+
+                    let cpki = await this.getpkiCert();
+
+                    for (let c of cRows) {
+                        logger.debug(`Checking ${c.name}`);
+                        try {
+                            if (cpki.verify(await c.getpkiCert())) {
+                                updates.push(c.updateSignedById(this.$loki));
+                                logger.debug(`Marked ${c.name} as signed by ${this.name}`);
+                            }
+                        }
+                        catch (err) {
+                            if (err.message != 'The parent certificate did not issue the given child certificate; the child certificate\'s issuer does not match the parent\'s subject.') {
+                                logger.debug('Verify correct error: ' + err.message);
+                            }
+                        }
                     }
                 }
+                
+                resolve(new OperationResult(inserted.name)
+                    .pushAdded(new OperationResultItem(inserted.type, inserted.$loki))
+                    .pushUpdated(updates));
             }
-        }
-        
-        return new OperationResult(inserted.name)
-            .pushAdded(new OperationResultItem(inserted.type, inserted.$loki))
-            .pushUpdated(updates)
+            catch (err) {
+                reject(err);
+            }
+        });
     }
 
     /**

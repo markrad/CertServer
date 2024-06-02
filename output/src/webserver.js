@@ -668,7 +668,7 @@ class WebServer {
                     }
                     let result = new OperationResult_1.OperationResult('multiple');
                     for (let f of files) {
-                        result.merge(yield this._processMultiFile(f));
+                        result.merge(yield this._processMultiFile(f.data.toString()));
                     }
                     if (result.added.length + result.updated.length + result.deleted.length > 0) {
                         this._broadcast(result);
@@ -880,11 +880,16 @@ class WebServer {
             }));
         });
     }
+    /**
+     * Processes a multi-file PEM string and adds the certificates or keys to the server.
+     * @param pemString The multi-file PEM string to process.
+     * @returns A promise that resolves to an OperationResult indicating the result of the operation.
+     */
     _processMultiFile(pemString) {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+                let result = new OperationResult_1.OperationResult('multiple');
                 try {
-                    let result = new OperationResult_1.OperationResult('multiple');
                     // TODO: Put this in CertificateUtil
                     let msg = node_forge_1.pem.decode(pemString);
                     if (msg.length == 0) {
@@ -908,14 +913,15 @@ class WebServer {
                             result.merge(oneRes);
                         }
                         catch (err) {
-                            logger.error(err.message);
+                            // logger.error(err.message);
                             result.pushMessage(err.message, OperationResult_1.ResultType.Failed);
                         }
                     }
                     resolve(result);
                 }
                 catch (err) {
-                    reject(err);
+                    result.pushMessage(err.message, OperationResult_1.ResultType.Failed);
+                    resolve(result);
                 }
             }));
         });

@@ -99,7 +99,7 @@ block layout-content
         | Upload certificates and keys:
         span.UploadInput
           input#certUpload(type="file", multiple, name="certFile", accept=".pem,.crt", title="Upload file")
-        div#UploadDrop Or drop files here
+        div#UploadDrop(ondragover="dragOverHandler(event);" ondrop="dropHandler(event)") Or drop files here
         div.form-buttons
           input#fileCertReset(type="reset")
           button#uploadCertButton.form-submit-button(type="button", onClick="uploadPem()" title="submit", value="Upload") Upload
