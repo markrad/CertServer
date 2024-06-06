@@ -9,6 +9,36 @@ if [ $? -ne 0 ]; then
     echo *** ERROR *** Command curl is required!
     return 4
 fi
+if [ $AUTH_REQUIRED == "1" ]; then
+    echo "Authentication is required"
+    authenticate
+fi
+function isAuthRequired() {
+    auth=$(curl -s --fail-with-body $CERTSERVER_HOST/api/AuthRequired)
+    echo $auth
+}
+function authenticate() {
+    echo "Please enter your username and password"
+    echo "Username:"
+    read -r USERNAME
+    echo "Password:"
+    read -r -s PASSWORD
+    echo
+    echo "Authenticating..."
+    token=$(curl -s -X POST -H "Content-Type: application/json" -d "{\"userId\":\"${USERNAME}\",\"password\":\"$PASSWORD\"}" $CERTSERVER_HOST/login)
+    if [ $? -ne 0 ]; then
+        echo "Authentication failed"
+        return 4
+    fi
+    if [[ $token == *"Error"* ]]; then
+        echo "Authentication failed"
+        echo $token
+        return 4
+    fi
+    token=$(echo $token | tr -d '{' | tr -d '}' | cut -d ':' -f3 | tr -d '"')
+    export CERTSERVER_TOKEN="Authorization: Bearer $token"
+    echo "Authenticated - header exported as $CERTSERVER_TOKEN"
+}
 function _get_device() {
     # * internal
     # $1: SAS token generated from connection string
@@ -149,19 +179,19 @@ function getcertserver() {
     echo $CERTSERVER_HOST;
 }
 function getcert() { 
-    wget --content-disposition $CERTSERVER_HOST/api/getCertificatePem?id=$@ 2>&1; 
+    wget --content-disposition --header="$CERTSERVER_TOKEN" $CERTSERVER_HOST/api/getCertificatePem?id=$@ 2>&1; 
 }
 function getkey() { 
-    wget --content-disposition $CERTSERVER_HOST/api/getKeyPem?id=$@ 2>&1; 
+    wget --content-disposition --header="$CERTSERVER_TOKEN" $CERTSERVER_HOST/api/getKeyPem?id=$@ 2>&1; 
 }
 function getchain() { 
-    wget --content-disposition $CERTSERVER_HOST/api/chainDownload?id=$@ 2>&1; 
+    wget --content-disposition --header="$CERTSERVER_TOKEN" $CERTSERVER_HOST/api/chainDownload?id=$@ 2>&1; 
 }
 function pushcert() { 
-    curl -X POST -H "Content-Type: text/plain" --data-binary @$@ $CERTSERVER_HOST/api/uploadCert; 
+    curl -X POST -H "$CERTSERVER_TOKEN" -H "Content-Type: text/plain" --data-binary @$@ $CERTSERVER_HOST/api/uploadCert; 
 }
 function pushkey() { 
-    curl -X POST -H "Content-Type: text/plain" --data-binary @$@ $CERTSERVER_HOST/api/uploadKey; 
+    curl -X POST -H "$CERTSERVER_TOKEN" -H "Content-Type: text/plain" --data-binary @$@ $CERTSERVER_HOST/api/uploadKey; 
 }
 function extractkey() {
     # $1: Output from /api/certdetails
@@ -213,7 +243,7 @@ function extractetag() {
 function getcertandkey() {
     # Gets the certificate for the certificate id and the associated key
     # $1: Certificate id 
-    curlout=$(curl -s "$CERTSERVER_HOST/api/certdetails?id=$1")
+    curlout=$(curl -s -H "$CERTSERVER_TOKEN" "$CERTSERVER_HOST/api/certdetails?id=$1")
     if [ ${#curlout} -eq 0 ]; then
         echo Requested certificate was not found or server error
         return 4
@@ -232,7 +262,7 @@ function getcertandkey() {
 function getchainandkey() {
     # Gets the certificate chain for the certificate id and the associated key
     # $1: Certificate id of lowest level certficate
-    curlout=$(curl -s --fail-with-body "$CERTSERVER_HOST/api/certdetails?id=$1")
+    curlout=$(curl -s --fail-with-body -H "$CERTSERVER_TOKEN" "$CERTSERVER_HOST/api/certdetails?id=$1")
     res=$?
     if [ $res -ne 0 ]; then
         echo Requested certificate was not found or server error: $curlout
@@ -263,7 +293,7 @@ function getcertdetailsbyname() {
         echo "Usage getcertdetailsbyname <device identity>"
         return 4
     fi
-    curlout=$(curl -s --fail-with-body -w "%{http_code}" "$CERTSERVER_HOST/api/certdetails?name=$1")
+    curlout=$(curl -s --fail-with-body -H "$CERTSERVER_TOKEN" -w "%{http_code}" "$CERTSERVER_HOST/api/certdetails?name=$1")
     res=$?
     curloutlen=${#curlout}
     curlresp=${curlout:0:$curloutlen-3}

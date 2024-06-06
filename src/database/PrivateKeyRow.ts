@@ -1,5 +1,5 @@
 import { jsbn } from 'node-forge';
-import { CertTypes } from './CertTypes';
+import { CertTypes } from '../webservertypes/CertTypes';
 
 /**
  * Data structure for the keys in the database

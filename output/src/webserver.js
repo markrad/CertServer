@@ -47,31 +47,45 @@ const lokijs_1 = __importStar(require("lokijs"));
 const express_1 = __importDefault(require("express"));
 const express_fileupload_1 = __importDefault(require("express-fileupload"));
 const serve_favicon_1 = __importDefault(require("serve-favicon"));
+const express_session_1 = __importDefault(require("express-session"));
+// declare global {
+//     namespace Express {
+//         interface Session {
+//             userId: string;
+//             password: string;
+//         }
+//     }
+// }
+// export interface Request extends Express.Request {
+//     session: Express.Session;
+// }
+// interface Session {
+//     userId: string;
+//     password: string;
+// }
+// interface Request {
+//     session: Session;
+// }
 const ws_1 = __importDefault(require("ws"));
 const stream_1 = require("stream");
 const log4js = __importStar(require("log4js"));
+const jsonwebtoken_1 = __importStar(require("jsonwebtoken"));
 const eventWaiter_1 = require("./utility/eventWaiter");
 const exists_1 = require("./utility/exists");
-// import { ExtensionParent } from './extensions/ExtensionParent';
-// import { ExtensionBasicConstraints } from './extensions/ExtensionBasicConstraints';
-// import { ExtensionKeyUsage } from './extensions/ExtensionKeyUsage';
-// import { ExtensionAuthorityKeyIdentifier } from './extensions/ExtensionAuthorityKeyIdentifier';
-// import { ExtensionSubjectKeyIdentifier } from './extensions/ExtensionSubjectKeyIdentifier';
-// import { ExtensionExtKeyUsage } from './extensions/ExtensionExtKeyUsage';
-// import { ExtensionSubjectAltName, ExtensionSubjectAltNameOptions } from './extensions/ExtensionSubjectAltName';
 const OperationResult_1 = require("./webservertypes/OperationResult");
 const CertTypes_1 = require("./webservertypes/CertTypes");
 const userAgentOS_1 = require("./webservertypes/userAgentOS");
 const CertError_1 = require("./webservertypes/CertError");
 const CertMultiError_1 = require("./webservertypes/CertMultiError");
-// import { CertificateInput } from './webservertypes/CertificateInput';
 const keyStores_1 = require("./database/keyStores");
 const keyUtil_1 = require("./database/keyUtil");
 const certificateStores_1 = require("./database/certificateStores");
 const certificateUtil_1 = require("./database/certificateUtil");
 const OperationResultItem_1 = require("./webservertypes/OperationResultItem");
 const dbStores_1 = require("./database/dbStores");
-const logger = log4js.getLogger();
+const dbName_1 = require("./database/dbName");
+const userStore_1 = require("./database/userStore");
+const logger = log4js.getLogger('CertServer');
 logger.level = "debug";
 /**
  * @classdesc Web server to help maintain test certificates and keys in the file system and a database.
@@ -93,11 +107,11 @@ class WebServer {
      * @param config Configuration information such as port, etc.
      */
     constructor(config) {
-        this.DB_NAME = 'certs.db';
         this._app = (0, express_1.default)();
         this._ws = new ws_1.default.Server({ noServer: true });
         this._certificate = null;
         this._key = null;
+        this._hashSecret = null;
         this._version = 'v' + require('../../package.json').version;
         this._currentVersion = 4;
         this._config = config;
@@ -109,6 +123,12 @@ class WebServer {
             }
             this._certificate = fs_1.default.readFileSync(config.certServer.certificate, { encoding: 'utf8' });
             this._key = fs_1.default.readFileSync(config.certServer.key, { encoding: 'utf8' });
+        }
+        if (config.certServer.hashSecret) {
+            if (!config.certServer.certificate) {
+                throw new Error('Hash secret requires TLS encryption to be enabled');
+            }
+            this._hashSecret = config.certServer.hashSecret;
         }
         if (config.certServer.subject.C && config.certServer.subject.C.length != 2) {
             throw new Error(`Invalid country code ${config.certServer.subject.C} - must be two characters`);
@@ -136,7 +156,7 @@ class WebServer {
         return __awaiter(this, void 0, void 0, function* () {
             const csHost = ({ protocol, hostname, port }) => `${protocol}://${hostname}:${port}`;
             logger.info(`CertServer starting - ${this._version}`);
-            let getCollections = () => {
+            let getCollections = function () {
                 if (null == (certificates = db.getCollection('certificates'))) {
                     certificates = db.addCollection('certificates', {});
                 }
@@ -146,6 +166,9 @@ class WebServer {
                 if (null == (dbVersion = db.getCollection('dbversion'))) {
                     dbVersion = db.addCollection('dbversion', {});
                 }
+                if (null == (userStore = db.getCollection('users'))) {
+                    userStore = db.addCollection('users', {});
+                }
                 ew.EventSet();
             };
             try {
@@ -153,7 +176,8 @@ class WebServer {
                 var certificates = null;
                 var privateKeys = null;
                 var dbVersion = null;
-                var db = new lokijs_1.default(path_1.default.join(this._dbPath.toString(), this.DB_NAME), {
+                var userStore = null;
+                var db = new lokijs_1.default(path_1.default.join(this._dbPath.toString(), dbName_1.DB_NAME), {
                     autosave: true,
                     autosaveInterval: 2000,
                     adapter: new lokijs_1.LokiFsAdapter(),
@@ -164,15 +188,87 @@ class WebServer {
                 });
                 yield ew.EventWait();
                 this._db = db;
-                certificateStores_1.CertificateStores.Init(certificates, path_1.default.join(this._dataPath, 'certificates'));
-                keyStores_1.KeyStores.Init(privateKeys, path_1.default.join(this._dataPath, 'privatekeys'));
-                dbStores_1.DbStores.Init(dbVersion);
+                certificateStores_1.CertificateStores.init(certificates, path_1.default.join(this._dataPath, 'certificates'));
+                keyStores_1.KeyStores.init(privateKeys, path_1.default.join(this._dataPath, 'privatekeys'));
+                dbStores_1.DbStores.init(dbVersion);
+                userStore_1.UserStore.init(userStore);
                 yield this._dbInit();
             }
             catch (err) {
                 logger.fatal('Failed to initialize the database: ' + err.message);
                 process.exit(4);
             }
+            /**
+             * Middleware function to check authentication before processing the request.
+             * If the user is not authenticated, it redirects to the signin page.
+             * If the user is authenticated, it verifies the session token and checks if the user exists.
+             * If authentication fails, it logs a warning and redirects to the signin page.
+             *
+             * @param request - The HTTP request object.
+             * @param response - The HTTP response object.
+             * @param next - The next function to be called in the middleware chain.
+             */
+            let checkAuth = (request, response, next) => {
+                try {
+                    if (this._hashSecret) {
+                        if (request.session.userId == '' || !request.session.token) {
+                            return response.redirect('/signin');
+                        }
+                        let decoded = jsonwebtoken_1.default.verify(request.session.token, this._hashSecret);
+                        logger.debug(decoded);
+                        if (!userStore_1.UserStore.getUser(decoded.userId)) {
+                            throw new CertError_1.CertError(401, `User ${decoded.userId} not found`);
+                        }
+                    }
+                    next();
+                }
+                catch (err) {
+                    // TODO - Pass error message to sign in page
+                    logger.warn(`Failed to authenticate: ${err.message}`);
+                    // let e: (CertError | CertMultiError) = CertMultiError.getCertError(err);
+                    // return response.status(e.status).json(e.getResponse());
+                    return response.redirect('/signin');
+                }
+            };
+            /**
+             * Middleware function for authentication.
+             * Verifies the token provided in the request headers and checks if the user exists.
+             * If the token is expired, it redirects to the sign-in page.
+             * If there is an error during authentication, it returns the appropriate error response.
+             * @param request - The HTTP request object.
+             * @param response - The HTTP response object.
+             * @param next - The next function to be called in the middleware chain.
+             */
+            let auth = (request, response, next) => {
+                try {
+                    if (this._hashSecret) {
+                        if (!request.headers.authorization) {
+                            throw new CertError_1.CertError(401, 'No token provided');
+                        }
+                        let token = request.headers.authorization.split(' ')[1];
+                        if (!token) {
+                            throw new CertError_1.CertError(401, 'No token provided');
+                        }
+                        let decoded = jsonwebtoken_1.default.verify(token, this._hashSecret);
+                        logger.debug(decoded);
+                        if (!userStore_1.UserStore.getUser(decoded.userId)) {
+                            throw new CertError_1.CertError(401, `User ${decoded.userId} not found`);
+                        }
+                    }
+                    next();
+                }
+                catch (err) {
+                    logger.warn(err.message);
+                    let e;
+                    if (err instanceof jsonwebtoken_1.JsonWebTokenError) {
+                        e = new CertError_1.CertError(401, err.message);
+                    }
+                    else {
+                        e = CertMultiError_1.CertMultiError.getCertError(err);
+                    }
+                    return response.status(e.status).json(e.getResponse());
+                }
+            };
             this._app.use(express_1.default.urlencoded({ extended: true }));
             this._app.use((0, serve_favicon_1.default)(path_1.default.join(__dirname, "../../web/icons/doc_lock.ico"), { maxAge: 2592000000 }));
             this._app.use(express_1.default.json({ type: '*/json' }));
@@ -185,8 +281,20 @@ class WebServer {
             this._app.use('/files', express_1.default.static(path_1.default.join(__dirname, '../../web/files')));
             this._app.use('/images', express_1.default.static(path_1.default.join(__dirname, '../../web/images')));
             this._app.use((0, express_fileupload_1.default)());
+            this._app.use((0, express_session_1.default)({
+                secret: 'mysecret',
+                name: 'certserver',
+                resave: false,
+                saveUninitialized: false
+            }));
             this._app.use((request, response, next) => {
                 var _a;
+                if (!request.session.userId) {
+                    request.session.userId = '';
+                    request.session.lastSignedIn = null;
+                    request.session.tokenExpiration = null;
+                    request.session.token = null;
+                }
                 const redirects = {
                     '/api/uploadCert': '/api/uploadPem',
                     '/api/helpers': '/api/helper',
@@ -202,6 +310,7 @@ class WebServer {
                     '/keyDetails': '/api/keyDetails',
                     '//api/getCertPem': '/api/getCertificatePem',
                     '/api/uploadKey': '/api/uploadPem',
+                    '/login': '/api/login'
                 };
                 try {
                     if (request.path in redirects) {
@@ -215,7 +324,7 @@ class WebServer {
                     response.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).json({ error: err.message });
                 }
             });
-            this._app.get('/', (_request, response) => {
+            this._app.get('/', checkAuth, (_request, response) => {
                 response.render('index', {
                     title: 'Certificates Management Home',
                     C: this._config.certServer.subject.C,
@@ -226,14 +335,34 @@ class WebServer {
                     version: this._version,
                 });
             });
-            // this._app.get('/api/helpers', (request, _response, next) => {
-            //     request.url = '/api/helper';
-            //     next();
-            // });
-            // this._app.get('/api/script', (request, _response, next) => {
-            //     request.url = '/api/helper';
-            //     next();
-            // });
+            this._app.get('/signin', (_request, response) => {
+                response.render('signin', { title: 'Sign In' });
+            });
+            // FUTURE: Add a signout route?
+            this._app.post('/api/login', (request, response) => {
+                try {
+                    const { userId, password } = request.body;
+                    logger.debug(`Login request - User: ${userId}`);
+                    if (userStore_1.UserStore.authenticate(userId, password)) {
+                        let token = jsonwebtoken_1.default.sign({ userId: userId }, this._hashSecret, { expiresIn: '1h' });
+                        // TODO - Does not handle multiple signins
+                        request.session.userId = userId;
+                        request.session.token = token;
+                        request.session.lastSignedIn = new Date();
+                        request.session.tokenExpiration = new Date(Date.now() + 3600000);
+                        logger.debug('Login successful');
+                        return response.status(200).json({ success: true, token: token });
+                    }
+                    else {
+                        throw new CertError_1.CertError(401, 'Invalid credentials');
+                    }
+                }
+                catch (err) {
+                    logger.error(err.message);
+                    let e = CertMultiError_1.CertMultiError.getCertError(err);
+                    return response.status(e.status).json(e.getResponse());
+                }
+            });
             this._app.get('/api/helper', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     response.setHeader('content-type', 'application/text');
@@ -260,6 +389,7 @@ class WebServer {
                         readable = stream_1.Readable.from([
                             `export CERTSERVER_HOST=${hostname}\n`,
                             `export REQUEST_PATH=${request.path}\n`,
+                            `export AUTH_REQUIRED=${Number(this._hashSecret != null).toString()}\n`,
                         ].concat(((yield (0, promises_1.readFile)('src/files/linuxhelperscript.sh', { encoding: 'utf8' })).split('\n').map((l) => l + '\n'))));
                     }
                     else if (os == userAgentOS_1.userAgentOS.WINDOWS) {
@@ -267,6 +397,7 @@ class WebServer {
                         readable = stream_1.Readable.from([
                             `Set-Item "env:CERTSERVER_HOST" -Value "${hostname}"\n`,
                             `Set-Item "env:REQUEST_PATH" -Value "${request.path}"\n`,
+                            `Set-Item "env:AUTH_REQUIRED" -Value "${Number(this._hashSecret != null).toString()}"\n`,
                         ].concat(((yield (0, promises_1.readFile)('src/files/windowshelperscript.ps1', { encoding: 'utf8' })).split('\n').map((l) => l + '\n'))));
                     }
                     else {
@@ -279,73 +410,17 @@ class WebServer {
                     logger.error(err);
                 }
             }));
-            // this._app.post('/createCACert', async (request, _response, next) => {
-            //     request.url = '/api/createCACert'
-            //     next();
-            // });
-            // this._app.post('/createIntermediateCert', async (request, _response, next) => {
-            //     request.url = '/api/createIntermediateCert';
-            //     next();
-            // });
-            // this._app.post('/createLeafCert', async (request, _response, next) => {
-            //     request.url = '/api/createLeafCert';
-            //     next();
-            // });
-            this._app.post('/updateCertTag', (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
+            this._app.get('/api/authrequired', (_request, response) => {
+                response.status(200).json({ authRequired: this._hashSecret != null });
+            });
+            this._app.post('/updateCertTag', auth, (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
                 request.url = '/api/updateCertTag';
                 request.query['id'] = request.body.toTag;
                 next();
             }));
-            // this._app.delete('/deleteCert', ((request: any, _response: any, next: NextFunction) => {
-            //     request.url = '/api/deleteCert';
-            //     next();
-            // }));
-            // this._app.get('/certList', (request: any, _response: any, next: NextFunction) => {
-            //     request.url = '/api/certList';
-            //     next();
-            // });
-            // this._app.get('/certDetails', async (request: any, _response: any, next: NextFunction) => {
-            //     request.url = '/api/certDetails';
-            //     next();
-            // });
-            // this._app.delete('/deleteKey', ((request, _response, next: NextFunction) => {
-            //     request.url = '/api/deleteKey';
-            //     next();
-            // }))
-            // this._app.get('/keyList', (request, _response, next: NextFunction) => {
-            //     request.url = '/certList';
-            //     next();
-            // });
-            // this._app.get('/keyDetails', async (request, _response, next) => {
-            //     request.url = '/api/keyDetails';
-            //     next();
-            // });
-            this._app.post(/\/api\/create.*Cert/i, (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.post(/\/api\/create.*Cert/i, auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     logger.debug(request.body);
-                    // let certInput: CertificateInput = WebServer._validateCertificateInput(CertTypes.root, request.body);
-                    // const { privateKey, publicKey } = pki.rsa.generateKeyPair(2048);
-                    // const attributes = WebServer._setAttributes(certInput.subject);
-                    // const extensions: ExtensionParent[] = [
-                    //     new ExtensionBasicConstraints({ cA: true, critical: true }),
-                    //     new ExtensionKeyUsage({ keyCertSign: true, cRLSign: true }),
-                    //     // new ExtensionAuthorityKeyIdentifier({ authorityCertIssuer: true, keyIdentifier: true }),
-                    //     new ExtensionSubjectKeyIdentifier({ }),
-                    // ]
-                    // // Create an empty Certificate
-                    // let cert = pki.createCertificate();
-                    // // Set the Certificate attributes for the new Root CA
-                    // cert.publicKey = publicKey;
-                    // // cert.privateKey = privateKey;
-                    // cert.serialNumber = WebServer._getRandomSerialNumber();
-                    // cert.validity.notBefore = certInput.validFrom;
-                    // cert.validity.notAfter = certInput.validTo;
-                    // cert.setSubject(attributes);
-                    // cert.setIssuer(attributes);
-                    // cert.setExtensions(extensions.map((extension) => extension.getObject()));
-                    // // Self-sign the Certificate
-                    // cert.sign(privateKey, md.sha512.create());
-                    // Convert to PEM format
                     let type = request.url.includes('createCACert')
                         ? CertTypes_1.CertTypes.root
                         : request.url.includes('createIntermediateCert')
@@ -375,113 +450,7 @@ class WebServer {
                     return response.status(e.status).json(e.getResponse());
                 }
             }));
-            // this._app.post('/api/createIntermediateCert', async (request, response) => {
-            //     try {
-            //         logger.debug(request.body);
-            //         let certInput: CertificateInput = WebServer._validateCertificateInput(CertTypes.intermediate, request.body);
-            //         const cRow = CertificateStores.findOne({ $loki: parseInt(certInput.signer) });
-            //         const kRow = KeyStores.findOne({ $loki: cRow.keyId })
-            //         if (!cRow || !kRow) {
-            //             return response.status(404).json({ error: 'Signing certificate or key are either missing or invalid' });
-            //         }
-            //         const c: pki.Certificate = await cRow.getpkiCert();
-            //         const k: pki.PrivateKey = await kRow.getpkiKey(certInput.password);
-            //         const { privateKey, publicKey } = pki.rsa.generateKeyPair(2048);
-            //         const attributes = WebServer._setAttributes(certInput.subject);
-            //         const extensions: ExtensionParent[] = [
-            //             new ExtensionBasicConstraints({ cA: true, critical: true }),
-            //             new ExtensionKeyUsage({ keyCertSign: true, cRLSign: true }),
-            //             new ExtensionAuthorityKeyIdentifier({ keyIdentifier: c.generateSubjectKeyIdentifier().getBytes(), authorityCertSerialNumber: true }),
-            //             new ExtensionSubjectKeyIdentifier({ }),
-            //         ];
-            //         if (certInput.san.domains.length > 0 || certInput.san.IPs.length > 0) {
-            //             let sal: ExtensionSubjectAltNameOptions = {};
-            //             sal.domains = certInput.san.domains;
-            //             sal.IPs = certInput.san.IPs;
-            //             extensions.push(new ExtensionSubjectAltName(sal));
-            //         }
-            //         // Create an empty Certificate
-            //         let cert = pki.createCertificate();
-            //         // Set the Certificate attributes for the new Root CA
-            //         cert.publicKey = publicKey;
-            //         cert.serialNumber = WebServer._getRandomSerialNumber();
-            //         cert.validity.notBefore = certInput.validFrom;
-            //         cert.validity.notAfter = certInput.validTo;
-            //         cert.setSubject(attributes);
-            //         cert.setIssuer(c.subject.attributes);
-            //         cert.setExtensions(extensions.map((extension) => extension.getObject()));
-            //         // Sign with parent certificate's private key
-            //         cert.sign(k, md.sha512.create());
-            //         // Convert to PEM format
-            //         let certResult = await this._tryAddCertificate({ pemString: pki.certificateToPem(cert) });
-            //         let keyResult = await this._tryAddKey({ pemString: pki.privateKeyToPem(privateKey) });
-            //         certResult.merge(keyResult);
-            //         certResult.name = `${certResult.name}/${keyResult.name}`;
-            //         this._broadcast(certResult);
-            //         let certId = certResult.added[0].id;
-            //         let keyId = keyResult.added[0].id;
-            //         return response.status(200)
-            //             .json({ message: `Certificate/Key ${certResult.name} added`, ids: { certificateId: certId, keyId: keyId } });
-            //     }
-            //     catch (err) {
-            //         logger.error(`Failed to create intermediate certificate: ${err.message}`);
-            //         return response.status(500).json({ error: err.message });
-            //     }
-            // });
-            // this._app.post('/api/createLeafCert', async (request, response) => {
-            //     try {
-            //         logger.debug(request.body);
-            //         let certInput: CertificateInput = WebServer._validateCertificateInput(CertTypes.leaf, request.body);
-            //         const cRow = CertificateStores.findOne({ $loki: parseInt(certInput.signer) });
-            //         const kRow = KeyStores.findOne({ $loki: cRow.keyId })
-            //         if (!cRow || !kRow) {
-            //             return response.status(500).json({ error: 'Signing certificate or key are either missing or invalid'});
-            //         }
-            //         const c: pki.Certificate = await cRow.getpkiCert();
-            //         const k: pki.PrivateKey = await kRow.getpkiKey(certInput.password);
-            //         const { privateKey, publicKey } = pki.rsa.generateKeyPair(2048);
-            //         const attributes = WebServer._setAttributes(certInput.subject);
-            //         let sal:ExtensionSubjectAltNameOptions = { };
-            //         sal.domains = certInput.san.domains;
-            //         sal.IPs = certInput.san.IPs;
-            //         let extensions: ExtensionParent[] = [
-            //             new ExtensionBasicConstraints({ cA: false }),
-            //             new ExtensionSubjectKeyIdentifier({ }),
-            //             new ExtensionKeyUsage({ nonRepudiation: true, digitalSignature: true, keyEncipherment: true }),
-            //             new ExtensionAuthorityKeyIdentifier({ keyIdentifier: c.generateSubjectKeyIdentifier().getBytes(), authorityCertSerialNumber: true }),
-            //             new ExtensionExtKeyUsage({ serverAuth: true, clientAuth: true,  }),
-            //             new ExtensionSubjectAltName(sal),
-            //         ];
-            //         // Create an empty Certificate
-            //         let cert = pki.createCertificate();
-            //         // Set the Certificate attributes for the new Root CA
-            //         cert.publicKey = publicKey;
-            //         // cert.privateKey = privateKey;
-            //         cert.serialNumber = WebServer._getRandomSerialNumber();
-            //         cert.validity.notBefore = certInput.validFrom;
-            //         cert.validity.notAfter = certInput.validTo;
-            //         cert.setSubject(attributes);
-            //         cert.setIssuer(c.subject.attributes);
-            //         cert.setExtensions(extensions.map((extension) => extension.getObject()));
-            //         // Sign the certificate with the parent's key
-            //         cert.sign(k, md.sha512.create());
-            //         // Convert to PEM format
-            //         let certResult = await this._tryAddCertificate({ pemString: pki.certificateToPem(cert) });
-            //         let keyResult = await this._tryAddKey({ pemString: pki.privateKeyToPem(privateKey) });
-            //         certResult.merge(keyResult);
-            //         certResult.name = `${certResult.name}/${keyResult.name}`;
-            //         this._broadcast(certResult);
-            //         let certId = certResult.added[0].id;
-            //         let keyId = keyResult.added[0].id;
-            //         return response.status(200)
-            //             .json({ message: `Certificate/Key ${certResult.name} added`, ids: { certificateId: certId, keyId: keyId } });
-            //     }
-            //     catch (err) {
-            //         logger.error(`Error creating leaf certificate: ${err.message}`);
-            //         return response.status(500).json({ error: err.message })
-            //     }
-            // });
-            this._app.get('/api/certName', (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.get('/api/certName', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 var _a;
                 try {
                     let c = this._resolveCertificateQuery(request.query);
@@ -492,7 +461,7 @@ class WebServer {
                     return response.status(e.status).json(e.getResponse());
                 }
             }));
-            this._app.get('/api/certDetails', (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.get('/api/certDetails', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     let c = this._resolveCertificateQuery(request.query);
                     let retVal = c.certificateBrief();
@@ -503,12 +472,12 @@ class WebServer {
                     response.status(e.status).json(e.getResponse());
                 }
             }));
-            this._app.get('/api/keyList', (request, _response, next) => {
+            this._app.get('/api/keyList', auth, (request, _response, next) => {
                 request.url = '/api/certList';
                 request.query = { type: 'key' };
                 next();
             });
-            this._app.get('/api/keyDetails', (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.get('/api/keyDetails', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     let retVal = k.keyBrief;
@@ -519,7 +488,7 @@ class WebServer {
                     response.status(e.status).json(e.getResponse());
                 }
             }));
-            this._app.get('/api/certList', (request, response) => {
+            this._app.get('/api/certList', auth, (request, response) => {
                 try {
                     let type = CertTypes_1.CertTypes[request.query.type];
                     if (type == undefined) {
@@ -556,11 +525,7 @@ class WebServer {
                     return response.status(e.status).json(e.getResponse());
                 }
             });
-            // this._app.get('/api/getCertPem', async (request, _response, next) => {
-            //     request.url = '/api/getCertificatePem';
-            //     next();
-            // });
-            this._app.get('/api/getCertificatePem', (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.get('/api/getCertificatePem', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     let c = this._resolveCertificateQuery(request.query);
                     response.download(c.absoluteFilename, c.name + '.pem', (err) => {
@@ -575,7 +540,7 @@ class WebServer {
                     return response.status(e.status).json(e.getResponse());
                 }
             }));
-            this._app.delete('/api/deleteCert', (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.delete('/api/deleteCert', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     let c = this._resolveCertificateQuery(request.query);
                     let result = yield this._tryDeleteCert(c);
@@ -587,7 +552,7 @@ class WebServer {
                     return response.status(e.status).json(e.getResponse());
                 }
             }));
-            this._app.post('/api/updateCertTag', (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.post('/api/updateCertTag', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     let tags = request.body;
                     if (tags.tags === undefined)
@@ -611,7 +576,7 @@ class WebServer {
                     return response.status(e.status).json(e.getResponse());
                 }
             }));
-            this._app.get('/api/keyname', (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.get('/api/keyname', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     response.status(200).json({ name: k.name, id: k.$loki, tags: [] });
@@ -621,11 +586,7 @@ class WebServer {
                     return response.status(e.status).json(e.getResponse());
                 }
             }));
-            // this._app.post('/api/uploadKey', async (request, _response, next) => {
-            //     request.url = '/api/uploadPem';
-            //     next();
-            // });
-            this._app.delete('/api/deleteKey', (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.delete('/api/deleteKey', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     let result = yield this._tryDeleteKey(k);
@@ -637,7 +598,7 @@ class WebServer {
                     return response.status(e.status).json(e.getResponse());
                 }
             }));
-            this._app.get('/api/getKeyPem', (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.get('/api/getKeyPem', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     response.download(k.absoluteFilename, k.name + '.pem', (err) => {
@@ -656,7 +617,7 @@ class WebServer {
              * Upload pem format files. These can be key, a certificate, or a file that
              * contains keys or certificates.
              */
-            this._app.post('/uploadPem', ((request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.post('/uploadPem', auth, ((request, response) => __awaiter(this, void 0, void 0, function* () {
                 // FUTURE: Allow der and pfx files to be submitted
                 if (!request.files || Object.keys(request.files).length == 0) {
                     return response.status(400).json({ error: 'No file selected' });
@@ -681,7 +642,7 @@ class WebServer {
                     return response.status(e.status).json(e.getResponse());
                 }
             })));
-            this._app.post('/api/uploadPem', (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.post('/api/uploadPem', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     if (request.headers['content-type'] != 'text/plain') {
                         return response.status(400).json(new OperationResult_1.OperationResult('').pushMessage('Content type must be text/plain', OperationResult_1.ResultType.Failed).getResponse());
@@ -698,7 +659,7 @@ class WebServer {
                     return response.status(e.status).json(e.getResponse());
                 }
             }));
-            this._app.get('/api/ChainDownload', (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.get('/api/ChainDownload', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 // BUG - Breaks if there chain is not complete
                 try {
                     let c = this._resolveCertificateQuery(request.query);
@@ -821,7 +782,7 @@ class WebServer {
                             row.remove();
                         }
                     });
-                    files = fs_1.default.readdirSync(certificateStores_1.CertificateStores.CertificatePath);
+                    files = fs_1.default.readdirSync(certificateStores_1.CertificateStores.certificatePath);
                     let adding = [];
                     files.forEach((file) => __awaiter(this, void 0, void 0, function* () {
                         let cert = certificateStores_1.CertificateStores.findOne({ $loki: certificateUtil_1.CertificateUtil.getIdFromFileName(file) });
@@ -1193,59 +1154,6 @@ class WebServer {
             logger.info('Database is a supported version for this release');
         });
     }
-    // private static _validateCertificateInput(type: CertTypes, bodyIn: any): CertificateInput {
-    //     // FUTURE Needs a mechanism to force parts of the RDA sequence to be omitted
-    //     try {
-    //         if (typeof bodyIn !== 'object') {
-    //             throw new CertError(400, 'Bad POST data format - use Content-type: application/json');
-    //         }
-    //         let body: GenerateCertRequest = bodyIn;
-    //         let result: CertificateInput = {
-    //             validFrom: body.validFrom ? new Date(body.validFrom) : new Date(),
-    //             validTo: new Date(body.validTo),
-    //             signer: body.signer?? null,
-    //             password: body.password?? null,
-    //             subject: {
-    //                 C: body.country? body.country : null,
-    //                 ST: body.state? body.state : null,
-    //                 L: body.location? body.location : null,
-    //                 O: body.organization? body.organization : null,
-    //                 OU: body.unit? body.unit : null,
-    //                 CN: body.commonName? body.commonName : null
-    //             },
-    //             san: {
-    //                 domains: [],
-    //                 IPs: [],
-    //             }
-    //         };
-    //         let errString: string[] = [];
-    //         if (!result.subject.CN) errString.push('Common name is required');
-    //         if (!result.validTo) errString.push('Valid to is required');
-    //         if (type != CertTypes.root && !body.signer) errString.push('Signing certificate is required')
-    //         if (isNaN(result.validTo.valueOf())) errString.push('Valid to is invalid');
-    //         if (body.validFrom && isNaN(result.validFrom.valueOf())) errString.push('Valid from is invalid');
-    //         if (result.subject.C != null && result.subject.C.length != 2) errString.push('Country code must be omitted or have two characters');
-    //         let rc: { valid: boolean, message?: string } = WebServer._isValidRNASequence([result.subject.C, result.subject.ST, result.subject.L, result.subject.O, result.subject.OU, result.subject.CN]);
-    //         if (!rc.valid) errString.push(rc.message);
-    //         if (errString.length > 0) {
-    //             throw new CertError(500, errString.join(';'));
-    //         }
-    //         if (type == CertTypes.leaf) {
-    //             result.san.domains.push(body.commonName);
-    //         }
-    //         if (type != CertTypes.root && body.SANArray) {
-    //             let SANArray = Array.isArray(body.SANArray) ? body.SANArray : [body.SANArray];
-    //             let domains = SANArray.filter((entry: string) => entry.startsWith('DNS:')).map((entry: string) => entry.split(' ')[1]);
-    //             let ips = SANArray.filter((entry: string) => entry.startsWith('IP:')).map((entry: string) => entry.split(' ')[1]);
-    //             if (domains.length > 0) result.san.domains = result.san.domains.concat(domains);
-    //             if (ips.length > 0) result.san.IPs = ips;
-    //         }
-    //         return result;
-    //     }
-    //     catch (err) {
-    //         throw new CertError(500, err.message);
-    //     }
-    // }
     /**
      * Attempts to guess the client OS from the user agent string
      *

@@ -1,6 +1,6 @@
 import { pki, pem, util, random, md, /*jsbn*/ } from "node-forge";
 import { CertTypes } from "../webservertypes/CertTypes";
-import { CertificateRow } from "../webservertypes/CertificateRow";
+import { CertificateRow } from "./CertificateRow";
 import { CertificateSubject } from "../webservertypes/CertificateSubject";
 import { CertificateStores } from "./certificateStores";
 import { CertError } from "../webservertypes/CertError";
@@ -163,7 +163,7 @@ export class CertificateUtil implements CertificateRow, LokiObj {
                     reject(new CertError(409, `${this.name} already exists (fingerprint256: ${this.fingerprint256}) - ignored`));
                     return;
                 }
-                let inserted = CertificateStores.CertificateDb.insertOne(this._row);
+                let inserted = CertificateStores.certificateDb.insertOne(this._row);
 
                 let updates: OperationResultItem[] = [];
 
@@ -257,7 +257,7 @@ export class CertificateUtil implements CertificateRow, LokiObj {
      * @returns {OperationResultItem} The operation result item.
      */
     public update(): OperationResultItem {
-        CertificateStores.CertificateDb.update(this.row);
+        CertificateStores.certificateDb.update(this.row);
         return this.getOperationalResultItem();
     }
 
@@ -280,7 +280,7 @@ export class CertificateUtil implements CertificateRow, LokiObj {
             result.pushUpdated(new OperationResultItem(cert.type, cert.$loki));
         });
 
-        CertificateStores.CertificateDb.remove(this.row);
+        CertificateStores.certificateDb.remove(this.row);
         result.pushMessage(`Certificate ${this.name} removed`, ResultType.Success);
 
         return result;
@@ -363,7 +363,7 @@ export class CertificateUtil implements CertificateRow, LokiObj {
      * @returns The absolute filename of the certificate.
      */
     public get absoluteFilename(): string {
-        return Path.join(CertificateStores.CertificatePath, CertificateUtil._getKeyFilename(this.name, this.$loki));
+        return Path.join(CertificateStores.certificatePath, CertificateUtil._getKeyFilename(this.name, this.$loki));
     }
 
     /**

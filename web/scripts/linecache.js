@@ -289,21 +289,6 @@ class LineCache {
      */
     async postToServer(url, data) {
         return this._ajaxCall('POST', url, data);
-        // return new Promise((resolve, reject) => {
-        //     $.ajax({
-        //         url: url,
-        //         method: 'POST',
-        //         processData: false,
-        //         contentType: false,
-        //         data: data,
-        //         error: (xhr, _msg, err) => {
-        //             reject(new Error(err + ': ' + JSON.parse(xhr.responseText).error));
-        //         },
-        //         success: async (result, status) => {
-        //             resolve();
-        //         }
-        //     });
-        // });
     }
 
     /**
@@ -321,8 +306,14 @@ class LineCache {
                 method: verb,
                 processData: false,
                 contentType: false,
+                headers: {
+                    "Authorization": "Bearer " + sessionStorage.getItem('token')
+                },
                 data: data,
                 error: (xhr, _msg, err) => {
+                    if (xhr.status == 401) {
+                        window.location.href = '/signin';
+                    }
                     reject(xhr.responseJSON);
                 },
                 success: async (result, _status) => {

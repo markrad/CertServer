@@ -188,7 +188,7 @@ class CertificateUtil {
                         reject(new CertError_1.CertError(409, `${this.name} already exists (fingerprint256: ${this.fingerprint256}) - ignored`));
                         return;
                     }
-                    let inserted = certificateStores_1.CertificateStores.CertificateDb.insertOne(this._row);
+                    let inserted = certificateStores_1.CertificateStores.certificateDb.insertOne(this._row);
                     let updates = [];
                     if (this.type == CertTypes_1.CertTypes.root) {
                         updates.push(this.updateSignedById(this.$loki));
@@ -271,7 +271,7 @@ class CertificateUtil {
      * @returns {OperationResultItem} The operation result item.
      */
     update() {
-        certificateStores_1.CertificateStores.CertificateDb.update(this.row);
+        certificateStores_1.CertificateStores.certificateDb.update(this.row);
         return this.getOperationalResultItem();
     }
     /**
@@ -290,7 +290,7 @@ class CertificateUtil {
                 cert.signedById = null;
                 result.pushUpdated(new OperationResultItem_1.OperationResultItem(cert.type, cert.$loki));
             });
-            certificateStores_1.CertificateStores.CertificateDb.remove(this.row);
+            certificateStores_1.CertificateStores.certificateDb.remove(this.row);
             result.pushMessage(`Certificate ${this.name} removed`, OperationResult_1.ResultType.Success);
             return result;
         });
@@ -364,7 +364,7 @@ class CertificateUtil {
      * @returns The absolute filename of the certificate.
      */
     get absoluteFilename() {
-        return path_1.default.join(certificateStores_1.CertificateStores.CertificatePath, CertificateUtil._getKeyFilename(this.name, this.$loki));
+        return path_1.default.join(certificateStores_1.CertificateStores.certificatePath, CertificateUtil._getKeyFilename(this.name, this.$loki));
     }
     /**
      * Writes the PEM content to a file.

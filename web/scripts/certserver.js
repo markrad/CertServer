@@ -705,64 +705,6 @@ function showMessage(result) {
 }
 
 /**
- * Shows a modal dialog with a mix of informational and error messages. Messages tagged with zero will be treated as informational, 
- * everything else will be treated as an error.
- * 
- * @param {{ level: number, message: string}[]} messages array of messages to display with informational or error flag
- */
-function showMultiMessage(messages) {
-    let msg = $('#messageDialogMessage');
-    for (let i in messages) {
-        if (messages[i].level == 0) {
-            msg.append(`<p class="msg-good-color">${messages[i].message}</p>`);
-        }
-        else {
-            msg.append(`<p class="msg-error-color">${messages[i].message}</p>`);
-        }
-    }
-    $('#messageDialog').dialog({
-        title: 'Upload Results',
-        resizable: false,
-        maxheight: 260,
-        maxWidth: 1000,
-        modal: true,
-        classes: {
-            'ui-dialog': 'ui-state-default'
-        },
-        buttons: {
-            "Ok": function() {
-                msg.empty();
-                $(this).dialog('close');
-            }
-        }
-    });
-}
-
-/**
- * Shows a modal dialog with an error message.
- * 
- * @param {string} error error dialog title
- * @param {string} message message to display 
- */ 
-// function showError(error, message) {
-//     $('#messageDialogMessage').text(`${error}: ${message}`);
-//     $('#messageDialog').dialog({
-//         title: 'Error',
-//         resizable: false,
-//         maxheight: 260,
-//         modal: true,
-//         classes: {
-//             'ui-dialog': 'ui-state-error'
-//         },
-//         buttons: {
-//             "Ok": function() {
-//                 $(this).dialog('close');
-//             }
-//         }
-//     });
-// }
-
-/**
  * Called when a new CA is successfully created.
  * 
  * @param {{ message: string }} result result when creating a new CA
@@ -906,6 +848,12 @@ function tagAdd(tagArrayId) {
  * This function is automatically called by jQuery when the webpage is loaded. It initializes stuff.
  */
 $(async function() {
+
+    // May have been redirected to the sign in page
+    if (window.location.pathname != '/') {
+        return;
+    }
+
     // Initialize date input boxes
     let datePicker;
     datePicker = $('#CAValidFrom');

@@ -140,7 +140,7 @@ class KeyUtil {
                 break;
             }
         }
-        keyStores_1.KeyStores.KeyDb.insert(this._row);
+        keyStores_1.KeyStores.keyDb.insert(this._row);
         result.pushAdded(this.getOperationalResultItem());
         if (certPair) {
             result.pushUpdated(certPair.updateKeyId(this.$loki));
@@ -186,7 +186,7 @@ class KeyUtil {
         });
     }
     get absoluteFilename() {
-        return path_1.default.join(keyStores_1.KeyStores.KeyPath, KeyUtil._getKeyFilename(this.name, this.$loki));
+        return path_1.default.join(keyStores_1.KeyStores.keyPath, KeyUtil._getKeyFilename(this.name, this.$loki));
     }
     writeFile() {
         return __awaiter(this, void 0, void 0, function* () {
@@ -208,7 +208,7 @@ class KeyUtil {
         return parseInt(path_1.default.parse(name).name.split('_').slice(-1)[0].split('.')[0]);
     }
     update() {
-        keyStores_1.KeyStores.KeyDb.update(this.row);
+        keyStores_1.KeyStores.keyDb.update(this.row);
         return new OperationResultItem_1.OperationResultItem(this.type, this.$loki);
     }
     remove() {
@@ -253,7 +253,7 @@ class KeyUtil {
         });
     }
     static _getKeyDir(filename) {
-        return path_1.default.join(keyStores_1.KeyStores.KeyPath, filename);
+        return path_1.default.join(keyStores_1.KeyStores.keyPath, filename);
     }
     /**
      * Determines the filename of a key from the database record

@@ -1,6 +1,27 @@
 Set-Item "env:REQUEST_PATH" -Value "/api/test"
 Write-Host Exported CERTSERVER_HOST =((Get-Item -Path "Env:/CERTSERVER_HOST").Value)
 
+function Autenticate {
+    $userId = Read-Host -Prompt "Enter your username"
+    $password = Read-Host -Prompt "Enter your password" -MaskInput
+
+    $resp = Invoke-RestMethod -Method Post -Uri (Get-URIPrefix "login") -Body @{
+        userId = $userId
+        password = $password
+    }
+    if ($resp.success -ne $true) {
+        Write-Host -ForegroundColor Red Authentication failed: $resp.Error
+        Exit 4
+    }
+    else {
+        Set-Item "env:CERTSERVER_TOKEN" -Value $resp.token
+        Write-Host -ForegroundColor Green Authentication successful
+    }
+}
+if ((Get-Item "Env:/AUTH_REQUIRED").Value -eq "1") {
+    Write-Host Authentication Required
+    Autenticate
+}
 function Get-ContentDispositionHeader {
     param (
         [Parameter(Mandatory)]

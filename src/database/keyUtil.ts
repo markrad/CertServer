@@ -1,5 +1,5 @@
 import { jsbn, pem, pki } from "node-forge";
-import { PrivateKeyRow } from "../webservertypes/PrivateKeyRow";
+import { PrivateKeyRow } from "./PrivateKeyRow";
 
 import * as log4js from "log4js";
 import { CertError } from "../webservertypes/CertError";
@@ -117,7 +117,7 @@ export class KeyUtil implements PrivateKeyRow, LokiObj {
                 break;
             }
         }
-        KeyStores.KeyDb.insert(this._row);
+        KeyStores.keyDb.insert(this._row);
         result.pushAdded(this.getOperationalResultItem());
 
         if (certPair) {
@@ -169,7 +169,7 @@ export class KeyUtil implements PrivateKeyRow, LokiObj {
     }
 
     public get absoluteFilename(): string {
-        return Path.join(KeyStores.KeyPath, KeyUtil._getKeyFilename(this.name, this.$loki));
+        return Path.join(KeyStores.keyPath, KeyUtil._getKeyFilename(this.name, this.$loki));
     }
 
     public async writeFile(): Promise<void> {
@@ -191,7 +191,7 @@ export class KeyUtil implements PrivateKeyRow, LokiObj {
     }
 
     public update(): OperationResultItem {
-        KeyStores.KeyDb.update(this.row);
+        KeyStores.keyDb.update(this.row);
         return new OperationResultItem(this.type, this.$loki);
     }
 
@@ -239,7 +239,7 @@ export class KeyUtil implements PrivateKeyRow, LokiObj {
     } 
 
     public static _getKeyDir(filename: string): string {
-        return Path.join(KeyStores.KeyPath, filename);
+        return Path.join(KeyStores.keyPath, filename);
     }
 
     /**

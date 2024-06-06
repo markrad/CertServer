@@ -47,6 +47,20 @@
             "type": "node",
         },
         {
+            "name": "User Tool",
+            "program": "${workspaceFolder}/output/src/tools/users.js",
+            "request": "launch",
+            "outputCapture": "std",
+            "args": [
+                "data/db/certs.db",
+                "list"
+            ],
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "type": "node",
+        },
+        {
             "type": "bashdb",
             "request": "launch",
             "name": "Launch build script",

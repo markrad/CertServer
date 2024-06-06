@@ -4,6 +4,7 @@ export type Config = {
         root: string;
         certificate?: string;
         key?: string;
+        hashSecret?: string;
         subject: {
             C: string;
             ST: string;

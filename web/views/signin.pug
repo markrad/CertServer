@@ -1,0 +1,28 @@
+extends layout
+
+block layout-content
+
+  div.View
+    span 
+     h1.Banner 
+      | Local Certificate Manager
+
+  div.text-center
+    form(class="form-signin" method="POST" action="/login" id="loginForm" onsubmit="onSignIn(event)")
+      #error
+        if error
+          p.text-danger Error!!!
+        div.label Please sign in
+          // input userid
+          div
+            label( for="inputUserId" class="sr-only") User Identity:
+            input(type="text" name="userId" id="input" class="form-control" placeholder="User Identity" required autofocus)
+          div
+            // input password
+            label(for="inputPassword" class="sr-only") Password:
+            input(type="password" name="password" id="inputPassword" class="form-control" placeholder="Password" required)
+          div 
+            input(type="submit" class="btn btn-lg btn-primary btn-block" value="Sign in")
+          //- // signIn button
+          //- - var buttonClass=['btn', 'btn-lg', 'btn-primary', 'btn-block'];
+          //- button(class=buttonClass type="submit") Sign in

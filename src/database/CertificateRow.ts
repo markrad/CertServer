@@ -1,5 +1,5 @@
-import { CertTypes } from './CertTypes';
-import { CertificateSubject } from './CertificateSubject';
+import { CertTypes } from '../webservertypes/CertTypes';
+import { CertificateSubject } from '../webservertypes/CertificateSubject';
 
 /**
  * The LokiDb certificate row definition

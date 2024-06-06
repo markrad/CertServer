@@ -1,5 +1,5 @@
 import { pki } from "node-forge";
-import { PrivateKeyRow } from "../webservertypes/PrivateKeyRow";
+import { PrivateKeyRow } from "./PrivateKeyRow";
 import { KeyUtil } from "./keyUtil";
 // import { CertificateUtil } from "./certificateUtil";
 // import { CertificateStores } from "./certificateStores";
@@ -8,7 +8,7 @@ export class KeyStores {
     private static _privateKeyDb: Collection<PrivateKeyRow> = null;
     private static _privateKeyPath: string = null;
 
-    public static Init(privateKeyDb: Collection<PrivateKeyRow>, privateKeyPath: string) {
+    public static init(privateKeyDb: Collection<PrivateKeyRow>, privateKeyPath: string) {
         if (privateKeyDb == null) throw new Error("Missing value for privateKeyDb");
         if (privateKeyPath == null) throw new Error("Missing value for privateKeyPath");
 
@@ -16,27 +16,27 @@ export class KeyStores {
         KeyStores._privateKeyPath = privateKeyPath;
     }
 
-    public static get KeyDb(): Collection<PrivateKeyRow> {
+    public static get keyDb(): Collection<PrivateKeyRow> {
         if (KeyStores._privateKeyDb == null) throw new Error("KeyStores had not been initialized");
         return KeyStores._privateKeyDb;
     }
 
-    public static get KeyPath(): string {
+    public static get keyPath(): string {
         if (KeyStores._privateKeyPath == null) throw new Error("KeyStores had not been initialized");
         return KeyStores._privateKeyPath;
     }
 
     public static find(query?: LokiQuery<PrivateKeyRow & LokiObj>): KeyUtil[] {
-        return KeyStores.KeyDb.find(query).map((r) => new KeyUtil(r));
+        return KeyStores.keyDb.find(query).map((r) => new KeyUtil(r));
     }
 
     public static findOne(query?: LokiQuery<PrivateKeyRow & LokiObj>): KeyUtil {
-        let r = KeyStores.KeyDb.findOne(query);
+        let r = KeyStores.keyDb.findOne(query);
         return r == null? null : new KeyUtil(r);
     }
 
     public static remove(id: number) {
-        KeyStores.KeyDb.remove(id);
+        KeyStores.keyDb.remove(id);
     }
 
     public static isIdentical(k: KeyUtil): KeyUtil {

@@ -5,7 +5,7 @@ const keyUtil_1 = require("./keyUtil");
 // import { CertificateUtil } from "./certificateUtil";
 // import { CertificateStores } from "./certificateStores";
 class KeyStores {
-    static Init(privateKeyDb, privateKeyPath) {
+    static init(privateKeyDb, privateKeyPath) {
         if (privateKeyDb == null)
             throw new Error("Missing value for privateKeyDb");
         if (privateKeyPath == null)
@@ -13,25 +13,25 @@ class KeyStores {
         KeyStores._privateKeyDb = privateKeyDb;
         KeyStores._privateKeyPath = privateKeyPath;
     }
-    static get KeyDb() {
+    static get keyDb() {
         if (KeyStores._privateKeyDb == null)
             throw new Error("KeyStores had not been initialized");
         return KeyStores._privateKeyDb;
     }
-    static get KeyPath() {
+    static get keyPath() {
         if (KeyStores._privateKeyPath == null)
             throw new Error("KeyStores had not been initialized");
         return KeyStores._privateKeyPath;
     }
     static find(query) {
-        return KeyStores.KeyDb.find(query).map((r) => new keyUtil_1.KeyUtil(r));
+        return KeyStores.keyDb.find(query).map((r) => new keyUtil_1.KeyUtil(r));
     }
     static findOne(query) {
-        let r = KeyStores.KeyDb.findOne(query);
+        let r = KeyStores.keyDb.findOne(query);
         return r == null ? null : new keyUtil_1.KeyUtil(r);
     }
     static remove(id) {
-        KeyStores.KeyDb.remove(id);
+        KeyStores.keyDb.remove(id);
     }
     static isIdentical(k) {
         let keyIn = k.setRsaPublicKey();

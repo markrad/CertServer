@@ -1,11 +1,12 @@
-# All the values below have been set to their default value
+# All the values below have been set to their default value. If a secret key is provided, you should take steps to ensure this file is not world readable.
 
 certServer:
-  root: ./data            # Root directory to keep database, certificates, and keys
-  port: 4141              # Webserver port number
-  certificate: ''         # If both this and the key are provided the server will start in https
-  key: ''                 # See above
-  subject:                # Certificate subject defaults
+  root: ./data                  # Root directory to keep database, certificates, and keys
+  port: 4141                    # Webserver port number
+  certificate: ''               # If both this and the key are provided the server will start in https
+  key: ''                       # See above
+  hashSecret: 'somesecretkey'   # Secret key to hash the password
+  subject:                      # Certificate subject defaults
     C: US
     ST: Washington
     L: Redmond
