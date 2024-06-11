@@ -388,3 +388,50 @@ button.button2-red:hover {
     border-width: 0px;
     outline: none;
 }
+
+.signin-label {
+    display: inline-block;
+    width: 150px;
+    text-align: right;
+}
+
+.user-id {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: medium;
+    font-weight: bolder;
+    cursor: pointer;
+    /* width: 15%; */
+    padding: 10px 10px 10px 10px;
+    /* padding-right: 10px; */
+}
+
+.user-id-input {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: medium;
+    font-weight: bolder;
+    cursor: pointer;
+    /* width: 15%; */
+    margin: 0px 0px 10px 10px;
+    /* padding-right: 10px; */
+}
+
+.password {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: medium;
+    font-weight: bolder;
+    cursor: pointer;
+    /* width: 15%; */
+    padding: 10px 10px 10px 10px;
+    /* padding-bottom: 10px;
+    padding-right: 10px; */
+}
+
+.password-input {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: medium;
+    font-weight: bolder;
+    cursor: pointer;
+    /* width: 15%; */
+    margin: 0px 0px 10px 10px;
+    /* padding-right: 10px; */
+}

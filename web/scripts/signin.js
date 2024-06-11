@@ -1,5 +1,3 @@
-// var token = null;
-
 function onSignIn(event) {
     event.preventDefault();
     console.log('Sign in');
