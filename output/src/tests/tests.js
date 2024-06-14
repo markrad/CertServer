@@ -23,25 +23,48 @@ const node_forge_1 = require("node-forge");
 const stream_1 = require("stream");
 const node_readline_1 = __importDefault(require("node:readline"));
 const node_process_1 = require("node:process");
+const crypto_1 = __importDefault(require("crypto"));
 const ws_1 = __importDefault(require("ws"));
 // import * as wtfnode from 'wtfnode';
 const eventWaiter_1 = require("../utility/eventWaiter");
 const OperationResultItem_1 = require("../webservertypes/OperationResultItem");
 const generatesastoken_1 = require("../utility/generatesastoken");
+const js_yaml_1 = require("js-yaml");
 const testPath = path_1.default.join(__dirname, '../testdata');
 const testConfig = path_1.default.join(testPath, 'testconfig.yml');
-const url = 'http://localhost:9997';
-const config = `certServer:
-  root: ${testPath}
-  port: 9997       
-  certificate: ''  
-  key: ''          
-  subject:         
-    C: US
-    ST: TestState
-    L: TestCity
-    O: TestOrg
-    OU: TestUnit`;
+let useTls = false;
+let useAuth = false;
+const host = 'localhost:9997';
+let url = `http://${host}`;
+let hashSecret = crypto_1.default.randomBytes(16).toString('hex');
+let bearerToken = '';
+let config = {
+    certServer: {
+        root: testPath,
+        port: 9997,
+        certificate: '',
+        key: '',
+        hashSecret: null,
+        subject: {
+            C: 'US',
+            ST: 'TestState',
+            L: 'TestCity',
+            O: 'TestOrg',
+            OU: 'TestUnit',
+        }
+    }
+};
+// const config: string = `certServer:
+//   root: ${testPath}
+//   port: 9997       
+//   certificate: ''  
+//   key: ''          
+//   subject:         
+//     C: US
+//     ST: TestState
+//     L: TestCity
+//     O: TestOrg
+//     OU: TestUnit`;
 let then = new Date();
 then.setFullYear(then.getFullYear() + 1);
 const newCA = {
@@ -107,7 +130,7 @@ var TestResult;
 let tests = [
     { description: 'Set up', runCondition: TestType.RunForAllTests, runOnFailure: true, testFunction: setup, result: TestResult.TestNotYetRun },
     { description: 'Create webserver', runCondition: TestType.RunForAllTests, runOnFailure: true, testFunction: createWebserver, result: TestResult.TestNotYetRun },
-    { description: 'Connect WebSocket', runCondition: TestType.RunForAllTests, runOnFailure: true, testFunction: connectWebSocket, result: TestResult.TestNotYetRun },
+    { description: 'Connect WebSocket', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: connectWebSocket, result: TestResult.TestNotYetRun },
     { description: 'Ensure the database is empty', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: checkForEmptyDatabase, result: TestResult.TestNotYetRun },
     { description: 'Generate CA certificate', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: createCACertificate, result: TestResult.TestNotYetRun },
     { description: 'Generate intermediate certificate', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: createIntermediateCertificate, result: TestResult.TestNotYetRun },
@@ -164,10 +187,38 @@ let nextCertId = 0;
 let nextKeyId = 0;
 function setup() {
     return __awaiter(this, void 0, void 0, function* () {
-        if (!fs_1.default.existsSync(testPath))
-            yield (0, promises_1.mkdir)(testPath);
-        yield (0, promises_1.writeFile)(testConfig, config);
-        return true;
+        try {
+            if (!fs_1.default.existsSync(testPath))
+                yield (0, promises_1.mkdir)(`${testPath}/db`, { recursive: true });
+            if (process.env.USE_TLS == '1') {
+                if (!fs_1.default.existsSync(process.env.TLS_CERT))
+                    console.log('Certificate not found - TLS will not be used');
+                else if (!fs_1.default.existsSync(process.env.TLS_KEY))
+                    console.log('Key not found - TLS will not be used');
+                else {
+                    config.certServer.certificate = process.env.TLS_CERT;
+                    config.certServer.key = process.env.TLS_KEY;
+                    useTls = true;
+                    url = useTls ? `https://${host}` : `http://${host}`;
+                }
+            }
+            if (process.env.USE_AUTH == '1') {
+                if (!process.env.AUTH_USERID || !process.env.AUTH_PASSWORD)
+                    console.log('Authentication user or password not found - Authentication will not be used');
+                else {
+                    let db = path_1.default.join(testPath, '/db/certs.db');
+                    (0, child_process_1.execSync)(`node ${path_1.default.join(__dirname, '../tools/users.js')} ${db} add --user ${process.env.AUTH_USERID} --password ${process.env.AUTH_PASSWORD}`);
+                    config.certServer.hashSecret = hashSecret;
+                    useAuth = true;
+                }
+            }
+            yield (0, promises_1.writeFile)(testConfig, (0, js_yaml_1.dump)(config));
+            return true;
+        }
+        catch (err) {
+            console.log(`Setup failed: ${err}`);
+            return false;
+        }
     });
 }
 function createWebserver() {
@@ -179,13 +230,19 @@ function createWebserver() {
         webServer.stdout.on('data', (data) => { if (process.env.LOG_SERVER_STDOUT == "1")
             console.log(data.toString().trimEnd()); });
         yield new Promise((resolve) => setTimeout(() => resolve(), 2000));
+        if (useAuth) {
+            res = yield httpRequest('post', `${url}/api/login`, null, JSON.stringify({ userId: process.env.AUTH_USERID, password: process.env.AUTH_PASSWORD }));
+            node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
+            (0, node_assert_1.default)(res.body.token, 'No token returned from server');
+            bearerToken = res.body.token;
+        }
         return true;
     });
 }
 function connectWebSocket() {
     return __awaiter(this, void 0, void 0, function* () {
         let ewLocal = new eventWaiter_1.EventWaiter();
-        ws = new ws_1.default('ws://localhost:9997');
+        ws = new ws_1.default(`${useTls ? 'wss' : 'ws'}://${host}`);
         ws.on('error', (err) => { throw err; });
         ws.on('open', () => {
             console.log('WebSocket open');
@@ -712,7 +769,8 @@ function pwshRemDevice() {
 }
 function cleanUp() {
     return __awaiter(this, void 0, void 0, function* () {
-        ws.close();
+        if (ws)
+            ws.close();
         webServer.kill('SIGTERM');
         yield (0, promises_1.unlink)(path_1.default.join(testPath, 'testconfig.yml'));
         yield (0, promises_1.rm)(testPath, { recursive: true, force: true });
@@ -720,13 +778,21 @@ function cleanUp() {
     });
 }
 function runTests() {
+    var _a, _b, _c, _d;
     return __awaiter(this, void 0, void 0, function* () {
+        let onoff = (value) => Number(value) ? 'on' : 'off';
         console.log(`Running ${tests.length} test${tests.length == 1 ? '' : 's'}`);
-        console.log(`LOG_SERVER_STDOUT: ${process.env.LOG_SERVER_STDOUT}`);
-        console.log(`RUN_API_TESTS: ${process.env.RUN_API_TESTS}`);
-        console.log(`RUN_IOTHUB_TESTS: ${process.env.RUN_IOTHUB_TESTS}`);
-        console.log(`RUN_BASH_HELPER_TESTS: ${process.env.RUN_BASH_HELPER_TESTS}`);
-        console.log(`RUN_POWERSHELL_HELPER_TESTS: ${process.env.RUN_POWERSHELL_HELPER_TESTS}`);
+        console.log(`LOG_SERVER_STDOUT: ${onoff(process.env.LOG_SERVER_STDOUT)}`);
+        console.log(`RUN_API_TESTS: ${onoff(process.env.RUN_API_TESTS)}`);
+        console.log(`RUN_IOTHUB_TESTS: ${onoff(process.env.RUN_IOTHUB_TESTS)}`);
+        console.log(`RUN_BASH_HELPER_TESTS: ${onoff(process.env.RUN_BASH_HELPER_TESTS)}`);
+        console.log(`RUN_POWERSHELL_HELPER_TESTS: ${onoff(process.env.RUN_POWERSHELL_HELPER_TESTS)}`);
+        console.log(`USE_TLS: ${onoff(process.env.USE_TLS)}`);
+        console.log(`TLS_CERT: ${(_a = process.env.TLS_CERT) !== null && _a !== void 0 ? _a : 'None'}`);
+        console.log(`TLS_KEY: ${(_b = process.env.TLS_KEY) !== null && _b !== void 0 ? _b : 'None'}`);
+        console.log(`USE_AUTH: ${onoff(process.env.USE_AUTH)}`);
+        console.log(`AUTH_USERID: ${(_c = process.env.AUTH_USERID) !== null && _c !== void 0 ? _c : 'None'}`);
+        console.log(`AUTH_PASSWORD: ${(_d = process.env.AUTH_PASSWORD) !== null && _d !== void 0 ? _d : 'None'}`);
         let testSelection = (process.env.RUN_API_TESTS == '1' ? TestType.RunForAPITests : TestType.NoRun) |
             (process.env.RUN_BASH_HELPER_TESTS == '1' ? TestType.RunForBashTests : TestType.NoRun) |
             (process.env.RUN_POWERSHELL_HELPER_TESTS == '1' ? TestType.RunForPowerShellTests : TestType.NoRun);
@@ -895,6 +961,9 @@ function httpRequest(method, url, headers = null, body = null, contentType = 'ap
             };
             if (body) {
                 options.headers = { 'Content-Length': Buffer.byteLength(body), 'Content-Type': contentType };
+            }
+            if (useAuth && bearerToken) {
+                options.headers = Object.assign(Object.assign({}, options.headers), { 'Authorization': `Bearer ${bearerToken}` });
             }
             if (headers) {
                 options.headers = Object.assign(Object.assign({}, options.headers), headers);

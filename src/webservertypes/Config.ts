@@ -5,6 +5,7 @@ export type Config = {
         certificate?: string;
         key?: string;
         hashSecret?: string;
+        keySecret?: string;
         subject: {
             C: string;
             ST: string;

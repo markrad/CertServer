@@ -104,8 +104,13 @@ function main(args) {
             }
             finally {
                 if (db) {
-                    db.saveDatabase();
-                    db.close();
+                    db.saveDatabase((err) => {
+                        if (err) {
+                            logger.error(err.message);
+                            process.exit(4);
+                        }
+                        db.close();
+                    });
                 }
             }
         };
@@ -123,6 +128,7 @@ function main(args) {
         }
         catch (err) {
             logger.error(err.message);
+            process.exit(4);
         }
     });
 }
@@ -134,8 +140,18 @@ function validateArgs(args) {
     if (validCommands.indexOf(args[1]) === -1) {
         throw new Error(`Invalid command: ${args[1]}`);
     }
-    if (fs_1.default.statSync(args[0]).isDirectory()) {
-        throw new Error(`Database name must be a file: ${args[0]}`);
+    let stat;
+    try {
+        stat = fs_1.default.statSync(args[0]);
+        if (stat.isDirectory()) {
+            throw new Error(`Database name must be a file: ${args[0]}`);
+        }
+    }
+    catch (err) {
+        // Missing file is okay
+        if (err.code !== 'ENOENT') {
+            throw new Error(`Unexpected error: ${err.message}`);
+        }
     }
     const mArgs = (0, minimist_1.default)(args);
     mArgs['user'] = mArgs['user'] || undefined;

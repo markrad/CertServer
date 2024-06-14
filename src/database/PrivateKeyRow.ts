@@ -1,8 +1,12 @@
 import { jsbn } from 'node-forge';
 import { CertTypes } from '../webservertypes/CertTypes';
+import { KeyEncryption } from './keyEncryption';
 
 /**
  * Data structure for the keys in the database
+ */
+/**
+ * Represents a private key row in the database.
  */
 export interface PrivateKeyRow {
     /** CN from the certificate otherwise 'unknown_key' - used with the $loki to generate the filename */
@@ -19,4 +23,6 @@ export interface PrivateKeyRow {
     pairCN: string;
     /** Set to true if encrypted */
     encrypted: boolean;
-};
+    /** The type of key encryption */
+    encryptedType: KeyEncryption;
+}

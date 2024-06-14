@@ -20,7 +20,15 @@ function Autenticate {
 }
 if ((Get-Item "Env:/AUTH_REQUIRED").Value -eq "1") {
     Write-Host Authentication Required
-    Autenticate
+    # Autenticate
+}
+function Get-Auth {
+    if ((Get-Item "Env:/AUTH_REQUIRED").Value -eq "1") {
+        @{ 'Authorization' = Get-Item "Env:CERTSERVER_TOKEN" }
+    }
+    else {
+        @{ }
+    }
 }
 function Get-ContentDispositionHeader {
     param (
@@ -29,7 +37,7 @@ function Get-ContentDispositionHeader {
     )
     $filename = ''
     try {
-        $req = Invoke-WebRequest -Uri ((Get-URIPrefix) + $UriSuffix)
+        $req = Invoke-WebRequest -Headers (Get-Auth) -Uri ((Get-URIPrefix) + $UriSuffix)
         $filename = $req.Headers.'Content-Disposition'.split(';')[1].Split('=')[1].Replace('"', '')
     }
     catch {
@@ -52,7 +60,7 @@ function Get-File_ {
         [string]$UriSuffix
     )
     $filename = Get-ContentDispositionHeader $UriSuffix
-    Invoke-WebRequest -Uri (Get-URIPrefix $UriSuffix) -OutFile ".\$filename"
+    Invoke-WebRequest -Headers (Get-Auth) -Uri (Get-URIPrefix $UriSuffix) -OutFile ".\$filename"
     Write-Host ".\$filename written"
 }
 function New-SAS-Token {
@@ -192,14 +200,14 @@ function Push-CertPem {
         [Parameter(Mandatory)]
         [string]$CertificateFilename
     )
-    Invoke-RestMethod -Method Post -Uri (Get-URIPrefix "/api/uploadCert") -InFile $CertificateFilename -ContentType 'text/plain'
+    Invoke-RestMethod -Method Post -Headers (Get-Auth) -Uri (Get-URIPrefix "/api/uploadCert") -InFile $CertificateFilename -ContentType 'text/plain'
 }
 function Push-KeyPem {
     param (
         [Parameter(Mandatory)]
         [string]$KeyFilename
     )
-    Invoke-RestMethod -Method Post -Uri (Get-URIPrefix "/api/uploadKey") -InFile $KeyFilename -ContentType 'text/plain'
+    Invoke-RestMethod -Method Post -Headers (Get-Auth) -Uri (Get-URIPrefix "/api/uploadKey") -InFile $KeyFilename -ContentType 'text/plain'
 }
 function Get-CertDetailsByName {
     param (
@@ -332,7 +340,7 @@ class Internal {
     static [ReturnCode] GetCertDetailsByName([string]$CertificateCommonName) {
         try {
             $httprc = -1
-            $resp = Invoke-RestMethod -Uri (Get-URIPrefix "certdetails?name=$CertificateCommonName") -SkipHttpErrorCheck -StatusCodeVariable "httprc"
+            $resp = Invoke-RestMethod -Headers (Get-Auth) -Uri (Get-URIPrefix "certdetails?name=$CertificateCommonName") -SkipHttpErrorCheck -StatusCodeVariable "httprc"
             if ($httprc -ne 200) {
                 return [ReturnCode]::new(
                     @{
@@ -368,7 +376,7 @@ class Internal {
     static [ReturnCode] GetCertDetailsById([int]$CertificateId) {
         try {
             $httprc = -1
-            $resp = Invoke-RestMethod -Uri (Get-URIPrefix "certdetails?id=$CertificateId") -SkipHttpErrorCheck -StatusCodeVariable "httprc"
+            $resp = Invoke-RestMethod -Headers (Get-Auth) -Uri (Get-URIPrefix "certdetails?id=$CertificateId") -SkipHttpErrorCheck -StatusCodeVariable "httprc"
             if ($httprc -ne 200) {
                 return [ReturnCode]::new(
                     @{
@@ -414,7 +422,7 @@ class Internal {
             $headers = @{
                 'Content-Type' = "application/json"
             }
-            $resp = Invoke-RestMethod -Method POST -Uri (Get-URIPrefix "createleafcert") -Headers $headers -Body $jsonBody -SkipHttpErrorCheck -StatusCodeVariable "httprc"
+            $resp = Invoke-RestMethod -Method POST -Headers (Get-Auth) -Uri (Get-URIPrefix "createleafcert") -Headers $headers -Body $jsonBody -SkipHttpErrorCheck -StatusCodeVariable "httprc"
             if ($httprc -ne 200) {
                 return [ReturnCode]::new(
                     @{
@@ -450,7 +458,7 @@ class Internal {
     static [ReturnCode] DeleteDeviceCertificate([int] $CertificateId) {
         try {
             $httprc = -1
-            $resp = Invoke-RestMethod -Method DELETE -Uri (Get-URIPrefix "deletecert?id=${CertificateId}") -SkipHttpErrorCheck -StatusCodeVariable "httprc"
+            $resp = Invoke-RestMethod -Method DELETE -Headers (Get-Auth) -Uri (Get-URIPrefix "deletecert?id=${CertificateId}") -SkipHttpErrorCheck -StatusCodeVariable "httprc"
             if ($httprc -ne 200) {
                 return [ReturnCode]::new(
                     @{
@@ -486,7 +494,7 @@ class Internal {
     static [ReturnCode] DeleteDeviceKey([int] $KeyId) {
         try {
             $httprc = -1
-            $resp = Invoke-RestMethod -Method DELETE -Uri (Get-URIPrefix "deletekey?id=${KeyId}") -SkipHttpErrorCheck -StatusCodeVariable "httprc"
+            $resp = Invoke-RestMethod -Method DELETE -Headers (Get-Auth) -Uri (Get-URIPrefix "deletekey?id=${KeyId}") -SkipHttpErrorCheck -StatusCodeVariable "httprc"
             if ($httprc -ne 200) {
                 return [ReturnCode]::new(
                     @{
@@ -759,7 +767,6 @@ function Get-Device {
         Write-Host "An unexpected error occured: $_"
     }
 }
-
 function Remove-Device {
     param (
         [Parameter(Mandatory)]
@@ -827,7 +834,6 @@ function Remove-Device {
         
     }
 }
-
 function New-Device {
     param (
         [Parameter(Mandatory)]

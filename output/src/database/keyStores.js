@@ -5,13 +5,14 @@ const keyUtil_1 = require("./keyUtil");
 // import { CertificateUtil } from "./certificateUtil";
 // import { CertificateStores } from "./certificateStores";
 class KeyStores {
-    static init(privateKeyDb, privateKeyPath) {
+    static init(privateKeyDb, privateKeyPath, keySecret) {
         if (privateKeyDb == null)
             throw new Error("Missing value for privateKeyDb");
         if (privateKeyPath == null)
             throw new Error("Missing value for privateKeyPath");
         KeyStores._privateKeyDb = privateKeyDb;
         KeyStores._privateKeyPath = privateKeyPath;
+        KeyStores._keySecret = keySecret ? keySecret : null;
     }
     static get keyDb() {
         if (KeyStores._privateKeyDb == null)
@@ -22,6 +23,9 @@ class KeyStores {
         if (KeyStores._privateKeyPath == null)
             throw new Error("KeyStores had not been initialized");
         return KeyStores._privateKeyPath;
+    }
+    static get keySecret() {
+        return KeyStores._keySecret;
     }
     static find(query) {
         return KeyStores.keyDb.find(query).map((r) => new keyUtil_1.KeyUtil(r));
@@ -47,4 +51,5 @@ class KeyStores {
 exports.KeyStores = KeyStores;
 KeyStores._privateKeyDb = null;
 KeyStores._privateKeyPath = null;
+KeyStores._keySecret = null;
 //# sourceMappingURL=keyStores.js.map

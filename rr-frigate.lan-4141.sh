@@ -1,3 +1,25 @@
+export CERTSERVER_HOST=https://rr-frigate.lan:4141
+export REQUEST_PATH=/api/helper
+export AUTH_REQUIRED=1
+echo Exported CERTSERVER_HOST=$CERTSERVER_HOST
+echo To make this permanent add export CERTSERVER_HOST=$CERTSERVER_HOST to your .bashrc file
+echo 
+echo To source in one step run
+echo "source <(curl ${CERTSERVER_HOST}${REQUEST_PATH})"
+echo 
+command -v curl &> /dev/null
+if [ $? -ne 0 ]; then
+    echo *** ERROR *** Command curl is required!
+    return 4
+fi
+if [ $AUTH_REQUIRED == "1" ]; then
+    echo "Authentication is required"
+    authenticate
+fi
+function isAuthRequired() {
+    auth=$(curl -s --fail-with-body $CERTSERVER_HOST/api/AuthRequired)
+    echo $auth
+}
 function authenticate() {
     echo "Please enter your username and password"
     echo "Username:"
@@ -19,25 +41,6 @@ function authenticate() {
     token=$(echo $token | tr -d '{' | tr -d '}' | cut -d ':' -f3 | tr -d '"')
     export CERTSERVER_TOKEN="Authorization: Bearer $token"
     echo "Authenticated - header exported as $CERTSERVER_TOKEN"
-}
-echo Exported CERTSERVER_HOST=$CERTSERVER_HOST
-echo To make this permanent add export CERTSERVER_HOST=$CERTSERVER_HOST to your .bashrc file
-echo 
-echo To source in one step run
-echo "source <(curl ${CERTSERVER_HOST}${REQUEST_PATH})"
-echo 
-command -v curl &> /dev/null
-if [ $? -ne 0 ]; then
-    echo *** ERROR *** Command curl is required!
-    return 4
-fi
-if [ $AUTH_REQUIRED == "1" ]; then
-    echo "Authentication is required"
-    # authenticate
-fi
-function isAuthRequired() {
-    auth=$(curl -s --fail-with-body $CERTSERVER_HOST/api/AuthRequired)
-    echo $auth
 }
 function _get_device() {
     # * internal

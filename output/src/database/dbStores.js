@@ -21,6 +21,33 @@ class DbStores {
     static update(dbRow) {
         return DbStores.dbDb.update(dbRow);
     }
+    static updateVersion(version) {
+        const row = DbStores.dbDb.findOne({});
+        if (row == null) {
+            DbStores.insert({ version: version, keySecret: null });
+        }
+        else {
+            row.version = version;
+            DbStores.dbDb.update(row);
+        }
+    }
+    static getKeySecret() {
+        const row = DbStores.dbDb.findOne({});
+        if (row == null) {
+            return null;
+        }
+        return row.keySecret;
+    }
+    static updateKeySecret(keySecret) {
+        const row = DbStores.dbDb.findOne({});
+        if (row == null) {
+            throw new Error("DBVersionRow not found");
+        }
+        else {
+            row.keySecret = keySecret;
+            DbStores.dbDb.update(row);
+        }
+    }
     static remove(dbRow) {
         return DbStores.dbDb.remove(dbRow);
     }

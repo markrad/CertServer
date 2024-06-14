@@ -85,6 +85,7 @@ const OperationResultItem_1 = require("./webservertypes/OperationResultItem");
 const dbStores_1 = require("./database/dbStores");
 const dbName_1 = require("./database/dbName");
 const userStore_1 = require("./database/userStore");
+const keyEncryption_1 = require("./database/keyEncryption");
 const logger = log4js.getLogger('CertServer');
 logger.level = "debug";
 /**
@@ -112,8 +113,9 @@ class WebServer {
         this._certificate = null;
         this._key = null;
         this._hashSecret = null;
+        this._keySecret = null;
         this._version = 'v' + require('../../package.json').version;
-        this._currentVersion = 4;
+        this._currentVersion = 0;
         this._config = config;
         this._port = config.certServer.port;
         this._dataPath = config.certServer.root;
@@ -130,6 +132,7 @@ class WebServer {
             }
             this._hashSecret = config.certServer.hashSecret;
         }
+        this._keySecret = config.certServer.keySecret ? config.certServer.keySecret : null;
         if (config.certServer.subject.C && config.certServer.subject.C.length != 2) {
             throw new Error(`Invalid country code ${config.certServer.subject.C} - must be two characters`);
         }
@@ -189,7 +192,7 @@ class WebServer {
                 yield ew.EventWait();
                 this._db = db;
                 certificateStores_1.CertificateStores.init(certificates, path_1.default.join(this._dataPath, 'certificates'));
-                keyStores_1.KeyStores.init(privateKeys, path_1.default.join(this._dataPath, 'privatekeys'));
+                keyStores_1.KeyStores.init(privateKeys, path_1.default.join(this._dataPath, 'privatekeys'), this._keySecret);
                 dbStores_1.DbStores.init(dbVersion);
                 userStore_1.UserStore.init(userStore);
                 yield this._dbInit();
@@ -242,11 +245,14 @@ class WebServer {
             let auth = (request, response, next) => {
                 try {
                     if (this._hashSecret) {
-                        if (!request.headers.authorization) {
-                            throw new CertError_1.CertError(401, 'No token provided');
+                        let token = null;
+                        if (request.headers.authorization) {
+                            token = request.headers.authorization.split(' ')[1];
                         }
-                        let token = request.headers.authorization.split(' ')[1];
-                        if (!token) {
+                        else if (request.session.token) {
+                            token = request.session.token;
+                        }
+                        else {
                             throw new CertError_1.CertError(401, 'No token provided');
                         }
                         let decoded = jsonwebtoken_1.default.verify(token, this._hashSecret);
@@ -336,7 +342,10 @@ class WebServer {
                 });
             });
             this._app.get('/signin', (_request, response) => {
-                response.render('signin', { title: 'Sign In' });
+                response.render('signin', {
+                    title: 'Sign In',
+                    version: this._version,
+                });
             });
             // FUTURE: Add a signout route?
             this._app.post('/api/login', (request, response) => {
@@ -441,7 +450,7 @@ class WebServer {
                         .json({
                         success: true,
                         title: 'Certificate/Key Added',
-                        messages: [`Certificate/Key ${certResult.name}/${keyResult.name} added`],
+                        messages: [{ type: 0, message: `Certificate/Key ${certResult.name}/${keyResult.name} added` }],
                         newIds: { certificateId: certId, keyId: keyId }
                     });
                 }
@@ -601,11 +610,9 @@ class WebServer {
             this._app.get('/api/getKeyPem', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     let k = this._resolveKeyQuery(request.query);
-                    response.download(k.absoluteFilename, k.name + '.pem', (err) => {
-                        if (err) {
-                            throw new CertError_1.CertError(404, `Failed to file for ${request.query.id}: ${err.message}`);
-                        }
-                    });
+                    response.setHeader('content-disposition', `attachment; filename="${k.name}.pem"`);
+                    let readable = stream_1.Readable.from([yield k.getPemString()]);
+                    readable.pipe(response);
                 }
                 catch (err) {
                     logger.error('Key download failed: ', err.message);
@@ -711,19 +718,20 @@ class WebServer {
                         key: this._key,
                     };
                     server = https_1.default.createServer(options, this._app).listen(this._port, '0.0.0.0');
+                    logger.info(`Listening on ${this._port} with TLS enabled`);
                 }
                 else {
                     server = http_1.default.createServer(this._app).listen(this._port, '0.0.0.0');
-                    server.on('error', (err) => {
-                        logger.fatal(`Webserver error: ${err.message}`);
-                        process.exit(4);
-                    });
+                    logger.info(`Listening on ${this._port}`);
                 }
-                logger.info('Listening on ' + this._port);
             }
             catch (err) {
                 logger.fatal(`Failed to start webserver: ${err}`);
             }
+            server.on('error', (err) => {
+                logger.fatal(`Webserver error: ${err.message}`);
+                process.exit(4);
+            });
             server.on('upgrade', (request, socket, head) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     this._ws.handleUpgrade(request, socket, head, (ws) => {
@@ -755,7 +763,8 @@ class WebServer {
                         process.exit(4);
                     }
                     else if (version.length == 0) {
-                        dbStores_1.DbStores.insert({ version: this._currentVersion });
+                        this._currentVersion = WebServer._defaultDBVersion;
+                        dbStores_1.DbStores.updateVersion(this._currentVersion);
                     }
                     else {
                         this._currentVersion = version[0].version;
@@ -819,7 +828,7 @@ class WebServer {
                         let key = keyStores_1.KeyStores.findOne({ $loki: keyUtil_1.KeyUtil.getIdFromFileName(file) });
                         if (!key) {
                             try {
-                                adding.push(this._tryAddKey({ filename: path_1.default.join(this._privatekeysPath, file) }));
+                                adding.push(this._tryAddKey({ filename: path_1.default.join(this._privatekeysPath, file), password: this._keySecret }));
                             }
                             catch (err) {
                                 logger.debug('WTF');
@@ -830,15 +839,47 @@ class WebServer {
                     this._db.saveDatabase((err) => {
                         if (err)
                             reject(err);
-                        else
-                            resolve();
                     });
                     yield this._databaseFixUp();
+                    yield this._keySecretFixUp();
+                    resolve();
                 }
                 catch (err) {
                     reject(err);
                 }
             }));
+        });
+    }
+    _keySecretFixUp() {
+        return __awaiter(this, void 0, void 0, function* () {
+            const currentKeySecret = dbStores_1.DbStores.getKeySecret();
+            if (this._keySecret != currentKeySecret) {
+                if (currentKeySecret == null) {
+                    logger.info('Key secret has been added - encrypting all keys');
+                    let keys = keyStores_1.KeyStores.find({ encryptedType: { $eq: keyEncryption_1.KeyEncryption.NONE } });
+                    for (let k of keys) {
+                        yield k.encrypt(this._keySecret, keyEncryption_1.KeyEncryption.SYSTEM);
+                    }
+                    logger.info(`Encrypted ${keys.length} keys`);
+                }
+                else if (this._keySecret == null) {
+                    logger.info('Key secret has been removed - decrypting all keys');
+                    let keys = keyStores_1.KeyStores.find({ encryptedType: { $eq: keyEncryption_1.KeyEncryption.SYSTEM } });
+                    for (let k of keys) {
+                        yield k.decrypt(currentKeySecret);
+                    }
+                    logger.info(`Decrypted ${keys.length} keys`);
+                }
+                else {
+                    logger.info('Key secret has been changed - re-encrypting all keys');
+                    let keys = keyStores_1.KeyStores.find({ encryptedType: { $eq: keyEncryption_1.KeyEncryption.SYSTEM } });
+                    for (let k of keys) {
+                        yield k.decrypt(this._keySecret);
+                        yield k.encrypt(currentKeySecret, keyEncryption_1.KeyEncryption.SYSTEM);
+                    }
+                }
+                dbStores_1.DbStores.updateKeySecret(this._keySecret);
+            }
         });
     }
     /**
@@ -1148,10 +1189,20 @@ class WebServer {
                 console.error(`Database version ${this._currentVersion} is not supported by the release - try installing the previous minor version`);
                 process.exit(4);
             }
-            // this._certificates.find({ $and: [{ signedById: null }, { type: 1 }] }).forEach(r => logger.warn(`Bad signed (${r.$loki}): ${r.subject.CN} - fixing`));
-            // this._certificates.chain().find({ $and: [ { signedById: null }, { type: 1 } ] }).update((r) => r.signedById = r.$loki);
             // Check that the database is an older version that needs to be modified
             logger.info('Database is a supported version for this release');
+            // Add the encryption type in preperation for system encryption
+            if (this._currentVersion == 4) {
+                logger.info(`Updating database to version ${++this._currentVersion}`);
+                let keys = keyStores_1.KeyStores.find();
+                for (let k of keys) {
+                    k.encryptedType = k.encrypted ? keyEncryption_1.KeyEncryption.USER : keyEncryption_1.KeyEncryption.NONE;
+                    k.update();
+                }
+                dbStores_1.DbStores.updateVersion(this._currentVersion);
+                logger.info(`Updated ${keys.length} keys`);
+                logger.info(`Database updated to version ${this._currentVersion}`);
+            }
         });
     }
     /**
@@ -1187,5 +1238,6 @@ class WebServer {
 }
 exports.WebServer = WebServer;
 WebServer.instance = null;
-WebServer._lowestDBVersion = 0;
+WebServer._lowestDBVersion = 4; // The lowest version of the database that is supported
+WebServer._defaultDBVersion = 5; // The version of the database that will be created if it doesn't exist
 //# sourceMappingURL=webserver.js.map

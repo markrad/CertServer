@@ -26,6 +26,36 @@ export class DbStores {
         return DbStores.dbDb.update(dbRow) as (DBVersionRow & LokiObj);
     }
 
+    public static updateVersion(version: number): void {
+        const row = DbStores.dbDb.findOne({});
+        if (row == null) {
+            DbStores.insert({ version: version, keySecret: null });
+        }
+        else {
+            row.version = version;
+            DbStores.dbDb.update(row);
+        }
+    }
+
+    public static getKeySecret(): string {
+        const row = DbStores.dbDb.findOne({});
+        if (row == null) {
+            return null;
+        }
+        return row.keySecret;
+    }
+
+    public static updateKeySecret(keySecret: string): void {
+        const row = DbStores.dbDb.findOne({});
+        if (row == null) {
+            throw new Error("DBVersionRow not found");
+        }
+        else {
+            row.keySecret = keySecret;
+            DbStores.dbDb.update(row);
+        }
+    }
+
     public static remove(dbRow: DBVersionRow & LokiObj): DBVersionRow {
         return DbStores.dbDb.remove(dbRow);
     }

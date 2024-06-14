@@ -76,8 +76,13 @@ async function main(args: string[]) {
         }
         finally {
             if (db) {
-                db.saveDatabase();
-                db.close();
+                db.saveDatabase((err) => {
+                    if (err) {
+                        logger.error(err.message);
+                        process.exit(4);
+                    }
+                    db.close();
+                });
             }
         }
     }
@@ -95,6 +100,7 @@ async function main(args: string[]) {
     }
     catch (err) {
         logger.error(err.message);
+        process.exit(4);
     }
 }
 
@@ -109,8 +115,19 @@ function validateArgs(args: string[]): options {
         throw new Error(`Invalid command: ${args[1]}`);
     }
 
-    if (fs.statSync(args[0]).isDirectory()) {
-        throw new Error(`Database name must be a file: ${args[0]}`);
+    let stat: fs.Stats;
+
+    try {
+        stat = fs.statSync(args[0]);
+        if (stat.isDirectory()) {
+            throw new Error(`Database name must be a file: ${args[0]}`);
+        }
+    }
+    catch (err) {
+        // Missing file is okay
+        if (err.code !== 'ENOENT') {
+            throw new Error(`Unexpected error: ${err.message}`);
+        }
     }
 
     const mArgs = minimist(args);

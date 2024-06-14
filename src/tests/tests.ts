@@ -9,6 +9,7 @@ import { pki } from 'node-forge';
 import { Readable } from 'stream';
 import readline from 'node:readline';
 import { stdin as input, stdout as output } from 'node:process';
+import crypto from 'crypto';
 
 import WebSocket from 'ws';
 // import * as wtfnode from 'wtfnode';
@@ -17,11 +18,18 @@ import { EventWaiter } from '../utility/eventWaiter';
 import { OperationResult } from '../webservertypes/OperationResult';
 import { OperationResultItem } from '../webservertypes/OperationResultItem';
 import { getSASToken, ConnectionInfo } from '../utility/generatesastoken'
+import { Config } from '../webservertypes/Config';
+import { dump } from 'js-yaml';
 
 
 const testPath = path.join(__dirname, '../testdata');
 const testConfig = path.join(testPath, 'testconfig.yml');
-const url = 'http://localhost:9997';
+let useTls = false;
+let useAuth = false;
+const host = 'localhost:9997';
+let url: string = `http://${host}`;
+let hashSecret = crypto.randomBytes(16).toString('hex');
+let bearerToken: string = '';
 
 type Response = {
     statusCode: number,
@@ -29,17 +37,33 @@ type Response = {
     body: any,
 }
 
-const config: string = `certServer:
-  root: ${testPath}
-  port: 9997       
-  certificate: ''  
-  key: ''          
-  subject:         
-    C: US
-    ST: TestState
-    L: TestCity
-    O: TestOrg
-    OU: TestUnit`;
+let config: Config = {
+    certServer: {
+        root: testPath,
+        port: 9997,
+        certificate: '',
+        key: '',
+        hashSecret: null,
+        subject: {
+            C: 'US',
+            ST: 'TestState',
+            L: 'TestCity',
+            O: 'TestOrg',
+            OU: 'TestUnit',
+        }
+    }
+};
+// const config: string = `certServer:
+//   root: ${testPath}
+//   port: 9997       
+//   certificate: ''  
+//   key: ''          
+//   subject:         
+//     C: US
+//     ST: TestState
+//     L: TestCity
+//     O: TestOrg
+//     OU: TestUnit`;
 
 let then = new Date();
     then.setFullYear(then.getFullYear() + 1);
@@ -135,7 +159,7 @@ enum TestResult {
 let tests: Test[] = [
     { description: 'Set up', runCondition: TestType.RunForAllTests, runOnFailure: true, testFunction: setup, result: TestResult.TestNotYetRun },
     { description: 'Create webserver', runCondition: TestType.RunForAllTests, runOnFailure: true, testFunction: createWebserver, result: TestResult.TestNotYetRun },
-    { description: 'Connect WebSocket', runCondition: TestType.RunForAllTests, runOnFailure: true, testFunction: connectWebSocket, result: TestResult.TestNotYetRun },
+    { description: 'Connect WebSocket', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: connectWebSocket, result: TestResult.TestNotYetRun },
     { description: 'Ensure the database is empty', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: checkForEmptyDatabase, result: TestResult.TestNotYetRun },
     { description: 'Generate CA certificate', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: createCACertificate, result: TestResult.TestNotYetRun },
     { description: 'Generate intermediate certificate', runCondition: TestType.RunForAllTests, runOnFailure: false, testFunction: createIntermediateCertificate, result: TestResult.TestNotYetRun },
@@ -193,9 +217,34 @@ let nextCertId = 0;
 let nextKeyId = 0;
 
 async function setup():  Promise<boolean> {
-    if (!fs.existsSync(testPath)) await mkdir(testPath);
-    await writeFile(testConfig, config);
-    return true;
+    try {
+        if (!fs.existsSync(testPath)) await mkdir(`${testPath}/db`, { recursive: true });
+        if (process.env.USE_TLS == '1') {
+            if (!fs.existsSync(process.env.TLS_CERT)) console.log('Certificate not found - TLS will not be used');
+            else if (!fs.existsSync(process.env.TLS_KEY)) console.log('Key not found - TLS will not be used');
+            else {
+                config.certServer.certificate = process.env.TLS_CERT;
+                config.certServer.key = process.env.TLS_KEY;
+                useTls = true;
+                url = useTls ? `https://${host}` : `http://${host}`;
+            }
+        }
+        if (process.env.USE_AUTH == '1') {
+            if (!process.env.AUTH_USERID || !process.env.AUTH_PASSWORD) console.log('Authentication user or password not found - Authentication will not be used');
+            else {
+                let db = path.join(testPath, '/db/certs.db');
+                execSync(`node ${path.join(__dirname, '../tools/users.js')} ${db} add --user ${process.env.AUTH_USERID} --password ${process.env.AUTH_PASSWORD}`);
+                config.certServer.hashSecret = hashSecret;
+                useAuth = true;
+            }
+        }
+        await writeFile(testConfig, dump(config));
+        return true;
+    }
+    catch (err) {
+        console.log(`Setup failed: ${err}`);
+        return false;
+    }
 }
 
 async function createWebserver(): Promise<boolean> {
@@ -205,13 +254,19 @@ async function createWebserver(): Promise<boolean> {
     webServer.on('close', (code, signal) => console.log(`Server terminated = code=${code};signal=${signal}`));
     webServer.stdout.on('data', (data) => { if (process.env.LOG_SERVER_STDOUT == "1") console.log(data.toString().trimEnd()); });
     await new Promise<void>((resolve) => setTimeout(() => resolve(), 2000));
+    if (useAuth) {
+        res = await httpRequest('post', `${url}/api/login`, null, JSON.stringify({ userId: process.env.AUTH_USERID, password: process.env.AUTH_PASSWORD }));
+        assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
+        assert(res.body.token, 'No token returned from server');
+        bearerToken = res.body.token;
+    }
     return true;
 }
 
 async function connectWebSocket(): Promise<boolean> {
 
     let ewLocal: EventWaiter = new EventWaiter();
-    ws = new WebSocket('ws://localhost:9997');
+    ws = new WebSocket(`${useTls? 'wss' : 'ws'}://${host}`);
     ws.on('error', (err) => { throw err });
     ws.on('open', () => {
         console.log('WebSocket open');
@@ -702,7 +757,7 @@ async function pwshRemDevice(): Promise<boolean> {
 }
 
 async function cleanUp(): Promise<boolean> {
-    ws.close();
+    if (ws) ws.close();
     webServer.kill('SIGTERM');
     await unlink(path.join(testPath, 'testconfig.yml'));
     await rm(testPath, { recursive: true, force: true });
@@ -711,12 +766,21 @@ async function cleanUp(): Promise<boolean> {
 }
 
 async function runTests() {
+    let onoff: (value: string) => string = (value: string) => Number(value)? 'on' : 'off';
+
     console.log(`Running ${tests.length} test${tests.length == 1? '' : 's'}`);
-    console.log(`LOG_SERVER_STDOUT: ${process.env.LOG_SERVER_STDOUT}`);
-    console.log(`RUN_API_TESTS: ${process.env.RUN_API_TESTS}`);
-    console.log(`RUN_IOTHUB_TESTS: ${process.env.RUN_IOTHUB_TESTS}`);
-    console.log(`RUN_BASH_HELPER_TESTS: ${process.env.RUN_BASH_HELPER_TESTS}`);
-    console.log(`RUN_POWERSHELL_HELPER_TESTS: ${process.env.RUN_POWERSHELL_HELPER_TESTS}`);
+    console.log(`LOG_SERVER_STDOUT: ${onoff(process.env.LOG_SERVER_STDOUT)}`);
+    console.log(`RUN_API_TESTS: ${onoff(process.env.RUN_API_TESTS)}`);
+    console.log(`RUN_IOTHUB_TESTS: ${onoff(process.env.RUN_IOTHUB_TESTS)}`);
+    console.log(`RUN_BASH_HELPER_TESTS: ${onoff(process.env.RUN_BASH_HELPER_TESTS)}`);
+    console.log(`RUN_POWERSHELL_HELPER_TESTS: ${onoff(process.env.RUN_POWERSHELL_HELPER_TESTS)}`);
+    console.log(`USE_TLS: ${onoff(process.env.USE_TLS)}`);
+    console.log(`TLS_CERT: ${process.env.TLS_CERT ?? 'None'}`);
+    console.log(`TLS_KEY: ${process.env.TLS_KEY ?? 'None'}`);
+    console.log(`USE_AUTH: ${onoff(process.env.USE_AUTH)}`);
+    console.log(`AUTH_USERID: ${process.env.AUTH_USERID ?? 'None'}`);
+    console.log(`AUTH_PASSWORD: ${process.env.AUTH_PASSWORD ?? 'None'}`);
+
     let testSelection: TestType = 
         (process.env.RUN_API_TESTS == '1'? TestType.RunForAPITests : TestType.NoRun) |
         (process.env.RUN_BASH_HELPER_TESTS == '1' ? TestType.RunForBashTests : TestType.NoRun) |
@@ -897,6 +961,10 @@ async function httpRequest(method: 'get' | 'post' | 'delete' | 'head', url: URL 
 
         if (body) {
             options.headers = { 'Content-Length': Buffer.byteLength(body), 'Content-Type': contentType };
+        }
+
+        if (useAuth && bearerToken) {
+            options.headers = { ...options.headers, 'Authorization': `Bearer ${bearerToken}` };
         }
 
         if (headers) {

@@ -7,13 +7,15 @@ import { KeyUtil } from "./keyUtil";
 export class KeyStores {
     private static _privateKeyDb: Collection<PrivateKeyRow> = null;
     private static _privateKeyPath: string = null;
+    private static _keySecret: string = null;
 
-    public static init(privateKeyDb: Collection<PrivateKeyRow>, privateKeyPath: string) {
+    public static init(privateKeyDb: Collection<PrivateKeyRow>, privateKeyPath: string, keySecret: string) {
         if (privateKeyDb == null) throw new Error("Missing value for privateKeyDb");
         if (privateKeyPath == null) throw new Error("Missing value for privateKeyPath");
 
         KeyStores._privateKeyDb = privateKeyDb;
         KeyStores._privateKeyPath = privateKeyPath;
+        KeyStores._keySecret = keySecret? keySecret : null;
     }
 
     public static get keyDb(): Collection<PrivateKeyRow> {
@@ -24,6 +26,10 @@ export class KeyStores {
     public static get keyPath(): string {
         if (KeyStores._privateKeyPath == null) throw new Error("KeyStores had not been initialized");
         return KeyStores._privateKeyPath;
+    }
+
+    public static get keySecret(): string {
+        return KeyStores._keySecret;
     }
 
     public static find(query?: LokiQuery<PrivateKeyRow & LokiObj>): KeyUtil[] {

@@ -61,6 +61,7 @@ import { DbStores } from './database/dbStores';
 import { DB_NAME } from './database/dbName';
 import { UserStore } from './database/userStore';
 import { UserRow } from './database/UserRow';
+import { KeyEncryption } from './database/keyEncryption';
 
 const logger = log4js.getLogger('CertServer');
 logger.level = "debug";
@@ -91,10 +92,12 @@ export class WebServer {
     private _certificate: string = null;
     private _key: string = null;
     private _hashSecret: string = null;
+    private _keySecret: string = null;
     private _config: Config;
     private _version = 'v' + require('../../package.json').version;
-    private static readonly _lowestDBVersion: number = 0;
-    private _currentVersion: number = 4;
+    private static readonly _lowestDBVersion: number = 4;           // The lowest version of the database that is supported
+    public static readonly _defaultDBVersion: number = 5;           // The version of the database that will be created if it doesn't exist
+    private _currentVersion: number = 0;
     get port() { return this._port; }
     get dataPath() { return this._dataPath; }
     /**
@@ -122,6 +125,8 @@ export class WebServer {
 
             this._hashSecret = config.certServer.hashSecret;
         }
+
+        this._keySecret = config.certServer.keySecret? config.certServer.keySecret : null;
 
         if (config.certServer.subject.C && config.certServer.subject.C.length != 2) {
             throw new Error(`Invalid country code ${config.certServer.subject.C} - must be two characters`);
@@ -193,7 +198,7 @@ export class WebServer {
             this._db = db;
 
             CertificateStores.init(certificates, path.join(this._dataPath, 'certificates'));
-            KeyStores.init(privateKeys, path.join(this._dataPath, 'privatekeys'));
+            KeyStores.init(privateKeys, path.join(this._dataPath, 'privatekeys'), this._keySecret);
             DbStores.init(dbVersion);
             UserStore.init(userStore);
 
@@ -249,13 +254,16 @@ export class WebServer {
         let auth = (request: any, response: any, next: NextFunction) => {
             try {
                 if (this._hashSecret) {
-                    if (!request.headers.authorization) {
-                        throw new CertError(401, 'No token provided');
+                    let token: string = null;
+                    if (request.headers.authorization) {
+                        token = request.headers.authorization.split(' ')[1];
                     }
-                    let token = request.headers.authorization.split(' ')[1];
-                    if (!token) {
-                        throw new CertError(401, 'No token provided');
+                    else if (request.session.token) {
+                        token = request.session.token;
                     }
+                    else {
+                        throw new CertError(401, 'No token provided');
+                    } 
                     let decoded = jwt.verify(token, this._hashSecret);
                     logger.debug(decoded);
                     if (!UserStore.getUser((decoded as any).userId)) {
@@ -342,7 +350,10 @@ export class WebServer {
             });
         });
         this._app.get('/signin', (_request, response) => {
-            response.render('signin', { title: 'Sign In' });
+            response.render('signin', { 
+                title: 'Sign In',
+                version: this._version,
+            });
         });
         // FUTURE: Add a signout route?
         this._app.post('/api/login', (request: any, response) => {
@@ -453,7 +464,7 @@ export class WebServer {
                     .json({ 
                         success: true,
                         title: 'Certificate/Key Added',
-                        messages: [ `Certificate/Key ${certResult.name}/${keyResult.name} added` ], 
+                        messages: [{ type: 0, message: `Certificate/Key ${certResult.name}/${keyResult.name} added` }], 
                         newIds: { certificateId: certId, keyId: keyId } 
                     });
             }
@@ -612,11 +623,9 @@ export class WebServer {
 
             try {
                 let k: KeyUtil = this._resolveKeyQuery(request.query as QueryType);
-                response.download(k.absoluteFilename, k.name + '.pem', (err) => {
-                    if (err) {
-                        throw new CertError(404, `Failed to file for ${request.query.id}: ${err.message}`);
-                    }
-                })
+                response.setHeader('content-disposition', `attachment; filename="${k.name}.pem"`);
+                let readable = Readable.from([await k.getPemString()]);
+                readable.pipe(response);
             }
             catch (err) {
                 logger.error('Key download failed: ', err.message);
@@ -727,19 +736,21 @@ export class WebServer {
                     key: this._key,
                 };
                 server = https.createServer(options, this._app).listen(this._port, '0.0.0.0');
+                logger.info(`Listening on ${this._port} with TLS enabled`);
             }
             else {
                 server = http.createServer(this._app).listen(this._port, '0.0.0.0');
-                server.on('error', (err) => {
-                    logger.fatal(`Webserver error: ${err.message}`);
-                    process.exit(4);
-                })
+                logger.info(`Listening on ${this._port}`);
             }
-            logger.info('Listening on ' + this._port);
         }
         catch (err) {
             logger.fatal(`Failed to start webserver: ${err}`);
         }
+
+        server.on('error', (err) => {
+            logger.fatal(`Webserver error: ${err.message}`);
+            process.exit(4);
+        })
 
         server.on('upgrade', async (request, socket, head) => {
             try {
@@ -772,7 +783,8 @@ export class WebServer {
                     process.exit(4);
                 }
                 else if (version.length == 0) {
-                    DbStores.insert({ version: this._currentVersion });
+                    this._currentVersion = WebServer._defaultDBVersion;
+                    DbStores.updateVersion(this._currentVersion);
                 }
                 else {
                     this._currentVersion = version[0].version;
@@ -850,7 +862,7 @@ export class WebServer {
                     let key: KeyUtil = KeyStores.findOne({ $loki: KeyUtil.getIdFromFileName(file) });
                     if (!key) {
                         try {
-                            adding.push(this._tryAddKey({ filename: path.join(this._privatekeysPath, file) }));
+                            adding.push(this._tryAddKey({ filename: path.join(this._privatekeysPath, file), password: this._keySecret }));
                         }
                         catch (err) {
                             logger.debug('WTF');
@@ -862,15 +874,47 @@ export class WebServer {
 
                 this._db.saveDatabase((err) => {
                     if (err) reject(err);
-                    else resolve();
                 });
 
                 await this._databaseFixUp();
+                await this._keySecretFixUp();
+                resolve();
             }
             catch (err) {
                 reject(err);
             }
         });
+    }
+
+    private async _keySecretFixUp(): Promise<void> {
+        const currentKeySecret = DbStores.getKeySecret();
+        if (this._keySecret != currentKeySecret) {
+            if (currentKeySecret == null) {
+                logger.info('Key secret has been added - encrypting all keys');
+                let keys = KeyStores.find({ encryptedType: { $eq: KeyEncryption.NONE }});
+                for (let k of keys) {
+                    await k.encrypt(this._keySecret, KeyEncryption.SYSTEM);
+                }
+                logger.info(`Encrypted ${keys.length} keys`);
+            }
+            else if (this._keySecret == null) {
+                logger.info('Key secret has been removed - decrypting all keys');
+                let keys = KeyStores.find({ encryptedType: { $eq: KeyEncryption.SYSTEM }});
+                for (let k of keys) {
+                    await k.decrypt(currentKeySecret);
+                }
+                logger.info(`Decrypted ${keys.length} keys`);
+            }
+            else {
+                logger.info('Key secret has been changed - re-encrypting all keys');
+                let keys = KeyStores.find({ encryptedType: { $eq: KeyEncryption.SYSTEM }});
+                for (let k of keys) {
+                    await k.decrypt(this._keySecret);
+                    await k.encrypt(currentKeySecret, KeyEncryption.SYSTEM);
+                }
+            }
+            DbStores.updateKeySecret(this._keySecret);
+        }
     }
 
     /**
@@ -1202,11 +1246,22 @@ export class WebServer {
             console.error(`Database version ${this._currentVersion} is not supported by the release - try installing the previous minor version`);
             process.exit(4);
         }
-        // this._certificates.find({ $and: [{ signedById: null }, { type: 1 }] }).forEach(r => logger.warn(`Bad signed (${r.$loki}): ${r.subject.CN} - fixing`));
-        // this._certificates.chain().find({ $and: [ { signedById: null }, { type: 1 } ] }).update((r) => r.signedById = r.$loki);
 
         // Check that the database is an older version that needs to be modified
         logger.info('Database is a supported version for this release');
+
+        // Add the encryption type in preperation for system encryption
+        if (this._currentVersion == 4) {
+            logger.info(`Updating database to version ${++this._currentVersion}`);
+            let keys = KeyStores.find();
+            for (let k of keys) {
+                k.encryptedType = k.encrypted? KeyEncryption.USER : KeyEncryption.NONE;
+                k.update();
+            }
+            DbStores.updateVersion(this._currentVersion);
+            logger.info(`Updated ${keys.length} keys`);
+            logger.info(`Database updated to version ${this._currentVersion}`);
+        }
     }
 
     /**

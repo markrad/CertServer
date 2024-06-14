@@ -15,7 +15,7 @@ block layout-content
           input.button3#tagReset(type="button" title="reset", onclick="resetTagForm()", value="Cancel")
           input.button3#tagSubmit.form-submit-button(type="submit" title="submit", value="OK")
   div#newIntermediate(title='** Title **')
-    form#newIntermediateForm(action="/createIntermediateCert", method="post", encType="application/x-www-form-urlencoded")
+    form#newIntermediateForm(action="/createIntermediateCert", method="post", encType="application/x-www-form-urlencoded" onsubmit="onCreateIntermediateCert(event)")
       fieldset
         label.modal-label(for="Password") Password (if key is encrypted):
         input(type='password' name='password' id='intPassword' value='' class='text ui-widget-content ui-corner-all')
@@ -48,7 +48,7 @@ block layout-content
           input.button2#generateIntermediateReset(type="reset", value="Reset" title="Reset", onClick="resetIntermediateForm")
           input.button2#generateIntermediateButton.form-submit-button(type="submit" title="submit", value="Generate")
   div#newLeaf(title='** Title **')
-    form#newLeafForm(action="/createLeafCert", method="post", encType="application/x-www-form-urlencoded")
+    form#newLeafForm(action="/createLeafCert", method="post", encType="application/x-www-form-urlencoded" onsubmit="onCreateLeafCert(event)")
       fieldset
         label.modal-label(for="Password") Password (if key is encrypted):
         input(type='password' name='password' id='leafPassword' value='' class='text ui-widget-content ui-corner-all')
@@ -104,7 +104,7 @@ block layout-content
         div.form-buttons
           input#fileCertReset(type="reset")
           button#uploadCertButton.form-submit-button(type="button", onClick="uploadPem()" title="submit", value="Upload") Upload
-    form#generateCertForm(action="/createCACert" method="post" class='slide-form top-slide' encType="application/x-www-form-urlencoded") This will generate a private key and self-signed root CA pair
+    form#generateCertForm(action="/createCACert" method="post" class='slide-form top-slide' encType="application/x-www-form-urlencoded" onsubmit="onGenerateCert(event)") This will generate a private key and self-signed root CA pair
       .Country 
         span.subject-title
           | Country:

@@ -23,7 +23,14 @@
 		"RUN_API_TESTS": "1",
 		"RUN_BASH_HELPER_TESTS": "1",
 		"RUN_POWERSHELL_HELPER_TESTS": "1",
-		"RUN_IOTHUB_TESTS": "0"
+		"RUN_IOTHUB_TESTS": "0",
+		"USE_TLS": "1",
+		"TLS_CERT": "src/tests/rr-frigate_lan.pem",
+		"TLS_KEY": "src/tests/rr-frigate.lan_key.pem",
+		"USE_AUTH": "1",
+		"AUTH_USERID": "test",
+		"AUTH_PASSWORD": "test",
+		"NODE_EXTRA_CA_CERTS": "src/tests/CertServer-Test.pem"
 	},
 	// "runArgs": [ "--network=host" ],
 	// "forwardPorts": [ 4141 ]
@@ -36,7 +43,7 @@
 	// "forwardPorts": [],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "tsc --watch"
+	"postCreateCommand": "./.devcontainer/init.sh"
 
 	// Configure tool-specific properties.
 	// "customizations": {},

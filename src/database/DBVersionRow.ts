@@ -4,4 +4,6 @@
 export type DBVersionRow = {
     /** Database version number */
     version: number;
+    /** The secret key used to encrypt the private keys */
+    keySecret: string;
 };

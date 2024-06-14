@@ -703,7 +703,20 @@ function showMessage(result) {
         }, 3000);
     }
 }
-
+function onGenerateCert(event) {
+    event.preventDefault();
+    let frm = $('#generateCertForm');
+    $.ajax({
+        type: frm.attr('method'),
+        url: frm.attr('action'),
+        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` },
+        data: frm.serialize(),
+        success: createCACertResponse,
+        error: function(data) {
+            showMessage(data.responseJSON);
+        }
+    });
+}
 /**
  * Called when a new CA is successfully created.
  * 
@@ -711,9 +724,22 @@ function showMessage(result) {
  */
 function createCACertResponse(result) {
     $('#generateCAReset').trigger('click');
-    showMessage(result.message);
+    showMessage(result);
 }
-
+function onCreateIntermediateCert(event) {
+    event.preventDefault();
+    let frm = $('#newIntermediateForm');
+    $.ajax({
+        type: frm.attr('method'),
+        url: frm.attr('action'),
+        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` },
+        data: frm.serialize(),
+        success: createIntermediateCertResponse,
+        error: function(data) {
+            showMessage(data.responseJSON);
+        }
+    });
+}
 /**
  * Called when a new intermediate is successfully created.
  * 
@@ -721,7 +747,7 @@ function createCACertResponse(result) {
  */
 function createIntermediateCertResponse(result) {
     $('#generateIntermediateReset').trigger('click');
-    showMessage(result.message);
+    showMessage(result);
     $('#newIntermediate').dialog('close');
 }
 
@@ -734,7 +760,20 @@ function resetIntermediateForm() {
     $('#IntermediateSANList').empty();
     $('#intermediateSigner').val(signer); 
 }
-
+function onCreateLeafCert(event) {
+    event.preventDefault();
+    let frm = $('#newLeafForm');
+    $.ajax({
+        type: frm.attr('method'),
+        url: frm.attr('action'),
+        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` },
+        data: frm.serialize(),
+        success: createLeafCertResponse,
+        error: function(data) {
+            showMessage(data.responseJSON);
+        }
+    });
+}
 /**
  * Called when a new leaf is successfully created.
  * 
@@ -742,7 +781,7 @@ function resetIntermediateForm() {
  */
 function createLeafCertResponse(result) {
     $('#generateLeafReset').trigger('click');
-    showMessage(result.message);
+    showMessage(result);
     $('#newLeaf').dialog('close');
 }
 

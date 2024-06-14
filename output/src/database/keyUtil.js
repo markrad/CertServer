@@ -47,30 +47,49 @@ const exists_1 = require("../utility/exists");
 const OperationResultItem_1 = require("../webservertypes/OperationResultItem");
 const OperationResult_1 = require("../webservertypes/OperationResult");
 const certificateStores_1 = require("./certificateStores");
+const keyEncryption_1 = require("./keyEncryption");
 let logger = log4js.getLogger();
 class KeyUtil {
+    /**
+     * Creates a KeyUtil instance from a PEM string.
+     *
+     * @param pemString - The PEM string representing the key.
+     * @param password - The password to decrypt the encrypted private key (optional).
+     * @returns A Promise that resolves to a KeyUtil instance.
+     * @throws CertError if the key is encrypted and no password is provided.
+     */
     static CreateFromPem(pemString, password) {
         return __awaiter(this, void 0, void 0, function* () {
             let k;
             let r;
             let msg = node_forge_1.pem.decode(pemString)[0];
-            let encrypted = false;
+            let encrypted = keyEncryption_1.KeyEncryption.NONE;
             if (msg.type == 'ENCRYPTED PRIVATE KEY') {
                 if (!password) {
                     logger.warn(`Encrypted key requires password`);
                     throw (new CertError_1.CertError(400, 'Password is required for key'));
                 }
                 k = node_forge_1.pki.decryptRsaPrivateKey(pemString, password);
-                encrypted = true;
+                encrypted = password != keyStores_1.KeyStores.keySecret ? keyEncryption_1.KeyEncryption.USER : keyEncryption_1.KeyEncryption.SYSTEM;
             }
             else {
                 k = node_forge_1.pki.privateKeyFromPem(pemString);
+                if (keyStores_1.KeyStores.keySecret) {
+                    pemString = node_forge_1.pki.encryptRsaPrivateKey(k, keyStores_1.KeyStores.keySecret);
+                    encrypted = keyEncryption_1.KeyEncryption.SYSTEM;
+                }
             }
             r = KeyUtil._createRow(k, encrypted);
             return new KeyUtil(r, pemString);
         });
     }
-    static _createRow(k, encrypted) {
+    /**
+     * Creates a private key row object.
+     * @param k - The RSA private key.
+     * @param encryptedType - The type of key encryption.
+     * @returns The private key row object.
+     */
+    static _createRow(k, encryptedType) {
         return {
             e: k.e,
             n: k.n,
@@ -78,7 +97,8 @@ class KeyUtil {
             pairCN: null,
             name: null,
             type: CertTypes_1.CertTypes.key,
-            encrypted: encrypted,
+            encrypted: encryptedType != keyEncryption_1.KeyEncryption.NONE,
+            encryptedType: encryptedType,
             $loki: undefined,
             meta: {
                 created: null,
@@ -88,13 +108,19 @@ class KeyUtil {
             }
         };
     }
+    /**
+     * Creates a KeyUtil object from a database row.
+     * @constructor
+     * @param row - The database row representing the key.
+     * @param pem - The PEM string representing the key (optional).
+     */
     constructor(row, pem) {
         this._pem = null;
         if (row == null) {
             throw new Error("Key row is required to construct this object");
         }
         this._row = row;
-        this._pem = pem;
+        this._pem = pem || null;
     }
     get row() { return this._row; }
     get e() { return this.row.e; }
@@ -104,6 +130,9 @@ class KeyUtil {
     get name() { return this.row.name; }
     get type() { return this.row.type; }
     get encrypted() { return this.row.encrypted; }
+    get encryptedType() { return this.row.encryptedType; }
+    // TODO: Remove this after the database has been upgraded
+    set encryptedType(value) { this._row.encryptedType = value; }
     /** LokiObj fields */
     get $loki() { return this.row.$loki; }
     get meta() {
@@ -114,9 +143,17 @@ class KeyUtil {
             version: this.row.meta.version
         };
     }
+    /**
+     * Generates an operational result item from this instance.
+     * @returns {OperationResultItem} The operational result item.
+     */
     getOperationalResultItem() {
         return new OperationResultItem_1.OperationResultItem(this.type, this.$loki);
     }
+    /**
+     * Returns a brief representation of the key.
+     * @returns The key brief object.
+     */
     get keyBrief() {
         return {
             id: this.$loki,
@@ -125,6 +162,67 @@ class KeyUtil {
             encrypted: this.encrypted,
         };
     }
+    /**
+     * Encrypts the private key with the specified password and encryption type.
+     * @param password - The password to encrypt the private key.
+     * @param encryptedType - The encryption type to use.
+     * @returns A promise that resolves to an OperationResultItem.
+     */
+    encrypt(password, encryptedType) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    if (this.encryptedType != keyEncryption_1.KeyEncryption.NONE) {
+                        throw new CertError_1.CertError(400, 'Key is already encrypted');
+                    }
+                    let pem = this._pem ? this._pem : yield this.readFile();
+                    let k = node_forge_1.pki.privateKeyFromPem(pem);
+                    this._pem = node_forge_1.pki.encryptRsaPrivateKey(k, password);
+                    yield this.deleteFile();
+                    yield this.writeFile();
+                    this._row.encryptedType = encryptedType;
+                    this._row.encrypted = true;
+                    resolve(this.update());
+                }
+                catch (err) {
+                    reject(err);
+                }
+            }));
+        });
+    }
+    /**
+     * Decrypts the private key using the provided password.
+     * @param password - The password used for decryption.
+     * @returns A Promise that resolves to an OperationResultItem.
+     * @throws CertError if the key is not encrypted.
+     */
+    decrypt(password) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    if (this.encryptedType == keyEncryption_1.KeyEncryption.NONE) {
+                        throw new CertError_1.CertError(400, 'Key is not encrypted');
+                    }
+                    let pem = this._pem ? this._pem : yield this.readFile();
+                    let k = node_forge_1.pki.decryptRsaPrivateKey(pem, password);
+                    this._pem = node_forge_1.pki.privateKeyToPem(k);
+                    yield this.deleteFile();
+                    yield this.writeFile();
+                    this._row.encryptedType = keyEncryption_1.KeyEncryption.NONE;
+                    this._row.encrypted = false;
+                    resolve(this.update());
+                }
+                catch (err) {
+                    reject(err);
+                }
+            }));
+        });
+    }
+    /**
+     * Inserts a new key into the key database.
+     *
+     * @returns An OperationResult object representing the result of the insertion.
+     */
     insert() {
         // Check for a certificate
         let cRows = certificateStores_1.CertificateStores.find({ keyId: null });
@@ -140,6 +238,9 @@ class KeyUtil {
                 break;
             }
         }
+        if (this._row.name == null) {
+            this._row.name = 'unknown_key';
+        }
         keyStores_1.KeyStores.keyDb.insert(this._row);
         result.pushAdded(this.getOperationalResultItem());
         if (certPair) {
@@ -147,11 +248,23 @@ class KeyUtil {
         }
         return result;
     }
+    /**
+     * Sets the RSA public key.
+     * @returns The RSA public key.
+     */
     setRsaPublicKey() {
         return node_forge_1.pki.setRsaPublicKey(this.n, this.e);
     }
+    /**
+     * Checks if the provided public key is identical to the current instance's public key.
+     * @param inPublicKey - The public key to compare.
+     * @returns `true` if the public keys are identical, `false` otherwise.
+     */
     isIdentical(inPublicKey) {
         let myPublicKey = this.setRsaPublicKey();
+        if (inPublicKey instanceof KeyUtil) {
+            inPublicKey = inPublicKey.setRsaPublicKey();
+        }
         if (myPublicKey.n.data.length != inPublicKey.n.data.length) {
             return false;
         }
@@ -190,7 +303,17 @@ class KeyUtil {
     }
     writeFile() {
         return __awaiter(this, void 0, void 0, function* () {
-            yield (0, promises_1.writeFile)(this.absoluteFilename, this._pem, { encoding: 'utf8' });
+            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    if (!this._pem)
+                        throw new Error('No PEM data to write'); // This should not happen
+                    yield (0, promises_1.writeFile)(this.absoluteFilename, this._pem, { encoding: 'utf8' });
+                    resolve();
+                }
+                catch (err) {
+                    reject(err);
+                }
+            }));
         });
     }
     deleteFile() {
@@ -202,6 +325,15 @@ class KeyUtil {
             else {
                 return false;
             }
+        });
+    }
+    /**
+        * Reads the contents of the associated pem file and returns it as a string.
+        * @returns A promise that resolves with the contents of the file as a string.
+        */
+    readFile() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return yield (0, promises_1.readFile)(this.absoluteFilename, { encoding: 'utf8' });
         });
     }
     static getIdFromFileName(name) {
@@ -233,17 +365,40 @@ class KeyUtil {
                 // TODO: Should already have a flag that says it is encrypted
                 try {
                     let p = yield (0, promises_1.readFile)(this.absoluteFilename, { encoding: 'utf8' });
-                    let msg = node_forge_1.pem.decode(p)[0];
-                    if (msg.type.startsWith('ENCRYPTED')) {
-                        if (password) {
+                    switch (this.encryptedType) {
+                        case keyEncryption_1.KeyEncryption.SYSTEM:
+                            resolve(node_forge_1.pki.decryptRsaPrivateKey(p, keyStores_1.KeyStores.keySecret));
+                            break;
+                        case keyEncryption_1.KeyEncryption.USER:
+                            if (!password) {
+                                throw new CertError_1.CertError(400, 'Password required for encrypted key');
+                            }
                             resolve(node_forge_1.pki.decryptRsaPrivateKey(p, password));
-                        }
-                        else {
-                            throw new CertError_1.CertError(400, 'No password provided for encrypted key');
-                        }
+                            break;
+                        default:
+                            resolve(node_forge_1.pki.privateKeyFromPem(p));
+                            break;
+                    }
+                    if (this.encryptedType == keyEncryption_1.KeyEncryption.USER && !password) {
+                        throw new CertError_1.CertError(400, 'Password required for encrypted key');
+                    }
+                }
+                catch (err) {
+                    reject(err);
+                }
+            }));
+        });
+    }
+    getPemString() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    if (this.encryptedType != keyEncryption_1.KeyEncryption.SYSTEM) {
+                        resolve(yield this.readFile());
                     }
                     else {
-                        resolve(node_forge_1.pki.privateKeyFromPem(p));
+                        let k = yield this.getpkiKey();
+                        resolve(node_forge_1.pki.privateKeyToPem(k));
                     }
                 }
                 catch (err) {
