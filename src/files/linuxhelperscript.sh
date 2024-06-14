@@ -1,9 +1,14 @@
 function authenticate() {
-    echo "Please enter your username and password"
-    echo "Username:"
-    read -r USERNAME
-    echo "Password:"
-    read -r -s PASSWORD
+    if [ $# -ne 2 ]; then
+        echo "Please enter your username and password"
+        echo "Username:"
+        read -r USERNAME
+        echo "Password:"
+        read -r -s PASSWORD
+    else
+        USERNAME=$1
+        PASSWORD=$2
+    fi
     echo
     echo "Authenticating..."
     token=$(curl -s -X POST -H "Content-Type: application/json" -d "{\"userId\":\"${USERNAME}\",\"password\":\"$PASSWORD\"}" $CERTSERVER_HOST/login)
@@ -33,6 +38,7 @@ if [ $? -ne 0 ]; then
 fi
 if [ $AUTH_REQUIRED == "1" ]; then
     echo "Authentication is required"
+    echo "Use authenticate <username> <password> to authenticate"
     # authenticate
 fi
 function isAuthRequired() {
