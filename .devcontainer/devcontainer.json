@@ -30,6 +30,7 @@
 		"USE_AUTH": "1",
 		"AUTH_USERID": "test",
 		"AUTH_PASSWORD": "test",
+		"ENCRYPT_KEYS": "1",
 		"NODE_EXTRA_CA_CERTS": "src/tests/CertServer-Test.pem"
 	},
 	// "runArgs": [ "--network=host" ],
