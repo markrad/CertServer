@@ -26,9 +26,11 @@ const testPath = path.join(__dirname, '../testdata');
 const testConfig = path.join(testPath, 'testconfig.yml');
 let useTls = false;
 let useAuth = false;
+let encryptKeys = false;
 const host = 'localhost:9997';
 let url: string = `http://${host}`;
-let hashSecret = crypto.randomBytes(16).toString('hex');
+let hashSecret = crypto.randomBytes(32).toString('hex');
+let keyEncryptionKey = crypto.randomBytes(32).toString('hex');
 let bearerToken: string = '';
 
 type Response = {
@@ -238,6 +240,10 @@ async function setup():  Promise<boolean> {
                 useAuth = true;
             }
         }
+        if (process.env.ENCRYPT_KEYS == '1') {
+            config.certServer.keySecret = keyEncryptionKey;
+            encryptKeys = true;
+        }
         await writeFile(testConfig, dump(config));
         return true;
     }
@@ -266,8 +272,14 @@ async function createWebserver(): Promise<boolean> {
 async function connectWebSocket(): Promise<boolean> {
 
     let ewLocal: EventWaiter = new EventWaiter();
-    ws = new WebSocket(`${useTls? 'wss' : 'ws'}://${host}`);
-    ws.on('error', (err) => { throw err });
+    let err: Error = null;
+    let headers: OutgoingHttpHeaders = {};
+    if (useAuth) headers['Authorization'] = `Bearer ${bearerToken}`;
+    ws = new WebSocket(`${useTls? 'wss' : 'ws'}://${host}`, { headers: headers });
+    ws.on('error', (e) => { 
+        err = e
+        ewLocal.EventSet();
+    });
     ws.on('open', () => {
         console.log('WebSocket open');
         ewLocal.EventSet();
@@ -281,7 +293,8 @@ async function connectWebSocket(): Promise<boolean> {
     });
     ws.on('close', () => console.log('WebSocket closed'));
     await ewLocal.EventWait();
-    return true;
+    if (err) console.error(`WebSocket connection failed: ${err}`);
+    return err == null;
 }
 
 async function checkForEmptyDatabase(): Promise<boolean> {
@@ -305,6 +318,10 @@ async function createCACertificate(): Promise<boolean> {
     msg = JSON.parse(wsQueue.shift() as string);
     checkPacket(msg, 'someName/someName_key', 2, 0, 0);
     checkItems(msg.added, [OperationResultItem.makeResult({ type: 1, id: nextCertId }), OperationResultItem.makeResult({ type: 4, id: nextKeyId })]);
+    if (encryptKeys) {
+        let key = await readFile(path.join(testPath, 'privatekeys/someName_key_1.pem'), { encoding: 'utf8' });
+        assert(key.startsWith('-----BEGIN ENCRYPTED PRIVATE KEY-----'), 'Key is not encrypted');
+    }
     return true;
 }
 
@@ -488,7 +505,7 @@ async function getLeafChainFile(): Promise<boolean> {
 async function getKeyFile(): Promise<boolean> {
     res = await httpRequest('get', `${url}/api/getKeyPem?id=${nextKeyId - 1}`);
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
-    // assert.equal
+    assert(res.body.startsWith('-----BEGIN RSA PRIVATE KEY-----'), 'Key is not an RSA private key');
     await writeFile(path.join(testPath, 'intName_key.pem'), res.body);
     return true;
 }
@@ -780,6 +797,7 @@ async function runTests() {
     console.log(`USE_AUTH: ${onoff(process.env.USE_AUTH)}`);
     console.log(`AUTH_USERID: ${process.env.AUTH_USERID ?? 'None'}`);
     console.log(`AUTH_PASSWORD: ${process.env.AUTH_PASSWORD ?? 'None'}`);
+    console.log(`ENCRYPT_KEYS: ${onoff(process.env.ENCRYPT_KEYS)}`);
 
     let testSelection: TestType = 
         (process.env.RUN_API_TESTS == '1'? TestType.RunForAPITests : TestType.NoRun) |

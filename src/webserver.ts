@@ -162,6 +162,10 @@ export class WebServer {
         }
         const csHost: (c: cshostType) => string = ({ protocol, hostname, port }) => `${protocol}://${hostname}:${port}`;
         logger.info(`CertServer starting - ${this._version}`);
+        logger.info(`Data path: ${this._dataPath}`);
+        logger.info(`TLS enabled: ${this._certificate != null}`);
+        logger.info(`Authentication enabled: ${this._hashSecret != null}`);
+        logger.info(`Key encryption enabled: ${this._keySecret != null}`);
         let getCollections: () => void = function() {
             if (null == (certificates = db.getCollection<CertificateRow>('certificates'))) {
                 certificates = db.addCollection<CertificateRow>('certificates', { });
@@ -284,6 +288,18 @@ export class WebServer {
                 return response.status(e.status).json(e.getResponse());
             }
         }
+        let verifyToken = async (token: string, secret: string) => {
+            return new Promise<string | jwt.JwtPayload>((resolve, reject) => {
+                jwt.verify(token, secret, (err, decoded) => {
+                    if (err) {
+                        reject(err);
+                    }
+                    else {
+                        resolve(decoded);
+                    }
+                });
+            });
+        }
 
         this._app.use(Express.urlencoded({ extended: true }));
         this._app.use(serveFavicon(path.join(__dirname, "../../web/icons/doc_lock.ico"), { maxAge: 2592000000 }));
@@ -373,6 +389,30 @@ export class WebServer {
                 else {
                     throw new CertError(401,'Invalid credentials');
                 }
+            }
+            catch (err) {
+                logger.error(err.message);
+                let e: (CertError | CertMultiError) = CertMultiError.getCertError(err);
+                return response.status(e.status).json(e.getResponse());
+            }
+        });
+        this._app.post('/api/token', auth, async (request: any, response: any) => {
+            try {
+                if (!request.session.token) {
+                    throw new CertError(401, 'You must be logged in to get a temporary token');
+                }
+                // const { userId } = request.body;
+                // if (userId != request.session.userId) {
+                //     throw new CertError(401, 'You can only get a token for your own session');
+                // }
+                let decoded = await verifyToken(request.session.token, this._hashSecret);
+                logger.debug(decoded)
+                if ((decoded as any).userId != request.session.userId) {
+                    throw new CertError(401, 'You can only get a token for your own session');
+                }
+                let token = jwt.sign({ userId: 'aa' }, this._hashSecret, { expiresIn: 5 });
+                logger.debug('Temporary token creation successful');
+                return response.status(200).json({ success: true, token: token });
             }
             catch (err) {
                 logger.error(err.message);
@@ -753,7 +793,28 @@ export class WebServer {
         })
 
         server.on('upgrade', async (request, socket, head) => {
+            let token: string = null;
             try {
+                if (this._hashSecret) {
+                    if (request.url.startsWith('/?token=')) {
+                        token = request.url.split('=')[1];
+                    }
+                    else if (request.headers['authorization'] != null) {
+                        token = request.headers['authorization'].split(' ')[1];
+                    }
+                    else {
+                        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+                        socket.end();
+                        throw new CertError(401, 'No token provided');
+                    }
+                    let decoded = jwt.verify(token, this._hashSecret);
+                    logger.debug(decoded);
+                    if (!UserStore.getUser((decoded as any).userId)) {
+                        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+                        socket.end();
+                        throw new CertError(401, `User ${(decoded as any).userId} not found`);
+                    }
+                }
                 this._ws.handleUpgrade(request, socket, head, (ws) => {
                     ws.send('Connected');
                     logger.debug('WebSocket client connected');

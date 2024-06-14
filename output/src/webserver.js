@@ -159,6 +159,10 @@ class WebServer {
         return __awaiter(this, void 0, void 0, function* () {
             const csHost = ({ protocol, hostname, port }) => `${protocol}://${hostname}:${port}`;
             logger.info(`CertServer starting - ${this._version}`);
+            logger.info(`Data path: ${this._dataPath}`);
+            logger.info(`TLS enabled: ${this._certificate != null}`);
+            logger.info(`Authentication enabled: ${this._hashSecret != null}`);
+            logger.info(`Key encryption enabled: ${this._keySecret != null}`);
             let getCollections = function () {
                 if (null == (certificates = db.getCollection('certificates'))) {
                     certificates = db.addCollection('certificates', {});
@@ -275,6 +279,18 @@ class WebServer {
                     return response.status(e.status).json(e.getResponse());
                 }
             };
+            let verifyToken = (token, secret) => __awaiter(this, void 0, void 0, function* () {
+                return new Promise((resolve, reject) => {
+                    jsonwebtoken_1.default.verify(token, secret, (err, decoded) => {
+                        if (err) {
+                            reject(err);
+                        }
+                        else {
+                            resolve(decoded);
+                        }
+                    });
+                });
+            });
             this._app.use(express_1.default.urlencoded({ extended: true }));
             this._app.use((0, serve_favicon_1.default)(path_1.default.join(__dirname, "../../web/icons/doc_lock.ico"), { maxAge: 2592000000 }));
             this._app.use(express_1.default.json({ type: '*/json' }));
@@ -372,6 +388,30 @@ class WebServer {
                     return response.status(e.status).json(e.getResponse());
                 }
             });
+            this._app.post('/api/token', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    if (!request.session.token) {
+                        throw new CertError_1.CertError(401, 'You must be logged in to get a temporary token');
+                    }
+                    // const { userId } = request.body;
+                    // if (userId != request.session.userId) {
+                    //     throw new CertError(401, 'You can only get a token for your own session');
+                    // }
+                    let decoded = yield verifyToken(request.session.token, this._hashSecret);
+                    logger.debug(decoded);
+                    if (decoded.userId != request.session.userId) {
+                        throw new CertError_1.CertError(401, 'You can only get a token for your own session');
+                    }
+                    let token = jsonwebtoken_1.default.sign({ userId: 'aa' }, this._hashSecret, { expiresIn: 5 });
+                    logger.debug('Temporary token creation successful');
+                    return response.status(200).json({ success: true, token: token });
+                }
+                catch (err) {
+                    logger.error(err.message);
+                    let e = CertMultiError_1.CertMultiError.getCertError(err);
+                    return response.status(e.status).json(e.getResponse());
+                }
+            }));
             this._app.get('/api/helper', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     response.setHeader('content-type', 'application/text');
@@ -733,7 +773,28 @@ class WebServer {
                 process.exit(4);
             });
             server.on('upgrade', (request, socket, head) => __awaiter(this, void 0, void 0, function* () {
+                let token = null;
                 try {
+                    if (this._hashSecret) {
+                        if (request.url.startsWith('/?token=')) {
+                            token = request.url.split('=')[1];
+                        }
+                        else if (request.headers['authorization'] != null) {
+                            token = request.headers['authorization'].split(' ')[1];
+                        }
+                        else {
+                            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+                            socket.end();
+                            throw new CertError_1.CertError(401, 'No token provided');
+                        }
+                        let decoded = jsonwebtoken_1.default.verify(token, this._hashSecret);
+                        logger.debug(decoded);
+                        if (!userStore_1.UserStore.getUser(decoded.userId)) {
+                            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+                            socket.end();
+                            throw new CertError_1.CertError(401, `User ${decoded.userId} not found`);
+                        }
+                    }
                     this._ws.handleUpgrade(request, socket, head, (ws) => {
                         ws.send('Connected');
                         logger.debug('WebSocket client connected');

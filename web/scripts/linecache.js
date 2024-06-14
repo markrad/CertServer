@@ -13,10 +13,16 @@ class LineCache {
      * Constructs a new detail cache and connects to the server's WebSocket.
      */
     constructor() {
-        let connectWebSocket = () => {
+        let connectWebSocket = async () => {
             let wsURL = (window.location.protocol == 'https:' ? 'wss://' : 'ws://') +
                 window.location.hostname +
                 ':' + window.location.port;
+            if (sessionStorage.getItem('token') != null) {
+                let res = await this.postToServer('/api/token', JSON.stringify({ userId: sessionStorage.getItem('userId') }));
+                if (res.success) {
+                    wsURL += '?token=' + res.token;
+                }
+            }
             const ws = new WebSocket(wsURL);
             ws.onopen = wsonopen;
             ws.onclose = wsonclose;

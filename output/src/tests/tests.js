@@ -34,9 +34,11 @@ const testPath = path_1.default.join(__dirname, '../testdata');
 const testConfig = path_1.default.join(testPath, 'testconfig.yml');
 let useTls = false;
 let useAuth = false;
+let encryptKeys = false;
 const host = 'localhost:9997';
 let url = `http://${host}`;
-let hashSecret = crypto_1.default.randomBytes(16).toString('hex');
+let hashSecret = crypto_1.default.randomBytes(32).toString('hex');
+let keyEncryptionKey = crypto_1.default.randomBytes(32).toString('hex');
 let bearerToken = '';
 let config = {
     certServer: {
@@ -212,6 +214,10 @@ function setup() {
                     useAuth = true;
                 }
             }
+            if (process.env.ENCRYPT_KEYS == '1') {
+                config.certServer.keySecret = keyEncryptionKey;
+                encryptKeys = true;
+            }
             yield (0, promises_1.writeFile)(testConfig, (0, js_yaml_1.dump)(config));
             return true;
         }
@@ -242,8 +248,15 @@ function createWebserver() {
 function connectWebSocket() {
     return __awaiter(this, void 0, void 0, function* () {
         let ewLocal = new eventWaiter_1.EventWaiter();
-        ws = new ws_1.default(`${useTls ? 'wss' : 'ws'}://${host}`);
-        ws.on('error', (err) => { throw err; });
+        let err = null;
+        let headers = {};
+        if (useAuth)
+            headers['Authorization'] = `Bearer ${bearerToken}`;
+        ws = new ws_1.default(`${useTls ? 'wss' : 'ws'}://${host}`, { headers: headers });
+        ws.on('error', (e) => {
+            err = e;
+            ewLocal.EventSet();
+        });
         ws.on('open', () => {
             console.log('WebSocket open');
             ewLocal.EventSet();
@@ -257,7 +270,9 @@ function connectWebSocket() {
         });
         ws.on('close', () => console.log('WebSocket closed'));
         yield ewLocal.EventWait();
-        return true;
+        if (err)
+            console.error(`WebSocket connection failed: ${err}`);
+        return err == null;
     });
 }
 function checkForEmptyDatabase() {
@@ -282,6 +297,10 @@ function createCACertificate() {
         msg = JSON.parse(wsQueue.shift());
         checkPacket(msg, 'someName/someName_key', 2, 0, 0);
         checkItems(msg.added, [OperationResultItem_1.OperationResultItem.makeResult({ type: 1, id: nextCertId }), OperationResultItem_1.OperationResultItem.makeResult({ type: 4, id: nextKeyId })]);
+        if (encryptKeys) {
+            let key = yield (0, promises_1.readFile)(path_1.default.join(testPath, 'privatekeys/someName_key_1.pem'), { encoding: 'utf8' });
+            (0, node_assert_1.default)(key.startsWith('-----BEGIN ENCRYPTED PRIVATE KEY-----'), 'Key is not encrypted');
+        }
         return true;
     });
 }
@@ -480,7 +499,7 @@ function getKeyFile() {
     return __awaiter(this, void 0, void 0, function* () {
         res = yield httpRequest('get', `${url}/api/getKeyPem?id=${nextKeyId - 1}`);
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
-        // assert.equal
+        (0, node_assert_1.default)(res.body.startsWith('-----BEGIN RSA PRIVATE KEY-----'), 'Key is not an RSA private key');
         yield (0, promises_1.writeFile)(path_1.default.join(testPath, 'intName_key.pem'), res.body);
         return true;
     });
@@ -793,6 +812,7 @@ function runTests() {
         console.log(`USE_AUTH: ${onoff(process.env.USE_AUTH)}`);
         console.log(`AUTH_USERID: ${(_c = process.env.AUTH_USERID) !== null && _c !== void 0 ? _c : 'None'}`);
         console.log(`AUTH_PASSWORD: ${(_d = process.env.AUTH_PASSWORD) !== null && _d !== void 0 ? _d : 'None'}`);
+        console.log(`ENCRYPT_KEYS: ${onoff(process.env.ENCRYPT_KEYS)}`);
         let testSelection = (process.env.RUN_API_TESTS == '1' ? TestType.RunForAPITests : TestType.NoRun) |
             (process.env.RUN_BASH_HELPER_TESTS == '1' ? TestType.RunForBashTests : TestType.NoRun) |
             (process.env.RUN_POWERSHELL_HELPER_TESTS == '1' ? TestType.RunForPowerShellTests : TestType.NoRun);
