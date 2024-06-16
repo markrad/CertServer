@@ -126,7 +126,13 @@ export class WebServer {
             this._hashSecret = config.certServer.hashSecret;
         }
 
-        this._keySecret = config.certServer.keySecret? config.certServer.keySecret : null;
+        if (config.certServer.keySecret) {
+            if (!config.certServer.certificate) {
+                throw new Error('Key secret requires TLS encryption to be enabled');
+            }
+
+            this._keySecret = config.certServer.keySecret;
+        }
 
         if (config.certServer.subject.C && config.certServer.subject.C.length != 2) {
             throw new Error(`Invalid country code ${config.certServer.subject.C} - must be two characters`);
