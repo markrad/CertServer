@@ -17,11 +17,11 @@ block layout-content
           // input userid
           div.user-id
             label.signin-label(for="inputUserId") User Identity:
-            input.user-id-input(type="text" name="userId" id="input" class="form-control" placeholder="User Identity" required autofocus)
+            input.user-id-input(type="text" name="userId" autocomplete="username" id="input" class="form-control" placeholder="User Identity" required autofocus)
           div.password
             // input password
             label.signin-label(for="inputPassword") Password:
-            input.password-input(type="password" name="password" id="inputPassword" class="form-control" placeholder="Password" required)
+            input.password-input(type="password" name="password" autocomplete="current-password" id="inputPassword" class="form-control" placeholder="Password" required)
           div 
             input.button2(type="submit" class="btn btn-lg btn-primary btn-block" value="Sign in")
           //- // signIn button
