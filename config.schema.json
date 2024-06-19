@@ -1,0 +1,71 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "title": "CertServer config file",
+    "description": "Describes the options allowed in the CertServer config file and assists in validation.",
+    "type": "object",
+    "properties": {
+        "certServer": {
+            "type": "object",
+            "properties": {
+                "root": {
+                    "type": "string",
+                    "description": "The root directory for CertServer's database and files."
+                },
+                "port": {
+                    "type": "integer",
+                    "description": "The port CertServer will listen on for incoming connections.",
+                    "default": 4141
+                },
+                "certificate": {
+                    "type": "string",
+                    "description": "The path to the SSL certificate file.",
+                    "default": null
+                },
+                "key": {
+                    "type": "string",
+                    "description": "The path to the SSL key file.",
+                    "default": null
+                },
+                "hashSecret": {
+                    "type": "string",
+                    "description": "The secret used to hash passwords when authentication is used."
+                },
+                "keySecret": {
+                    "type": "string",
+                    "description": "The secret used to encrypt and decrypt keys."
+                },
+                "subject": {
+                    "description": "The default subject information for created certificates.",
+                    "properties": {
+                        "C": {
+                            "type": "string",
+                            "description": "The country code for the certificate subject.",
+                            "default": "US"
+                        },
+                        "ST": {
+                            "type": "string",
+                            "description": "The state or province for the certificate subject.",
+                            "default": "Washington"
+                        },
+                        "L": {
+                            "type": "string",
+                            "description": "The locality for the certificate subject.",
+                            "default": "Redmond"
+                        },
+                        "O": {
+                            "type": "string",
+                            "description": "The organization for the certificate subject.",
+                            "default": "None"
+                        },
+                        "OU": {
+                            "type": "string",
+                            "description": "The organizational unit for the certificate subject.",
+                            "default": "None"
+                        }
+                    }
+                }
+            },
+            "required": ["root"]
+        }
+    }
+}
