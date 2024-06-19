@@ -132,7 +132,12 @@ class WebServer {
             }
             this._hashSecret = config.certServer.hashSecret;
         }
-        this._keySecret = config.certServer.keySecret ? config.certServer.keySecret : null;
+        if (config.certServer.keySecret) {
+            if (!config.certServer.certificate) {
+                throw new Error('Key secret requires TLS encryption to be enabled');
+            }
+            this._keySecret = config.certServer.keySecret;
+        }
         if (config.certServer.subject.C && config.certServer.subject.C.length != 2) {
             throw new Error(`Invalid country code ${config.certServer.subject.C} - must be two characters`);
         }
@@ -291,6 +296,18 @@ class WebServer {
                     });
                 });
             });
+            let generateToken = (userId, secret, expires) => __awaiter(this, void 0, void 0, function* () {
+                return new Promise((resolve, reject) => {
+                    jsonwebtoken_1.default.sign({ userId: userId }, secret, { expiresIn: expires }, (err, token) => {
+                        if (err) {
+                            reject(err);
+                        }
+                        else {
+                            resolve({ token: token, expiresAt: (0, jsonwebtoken_1.decode)(token).exp });
+                        }
+                    });
+                });
+            });
             this._app.use(express_1.default.urlencoded({ extended: true }));
             this._app.use((0, serve_favicon_1.default)(path_1.default.join(__dirname, "../../web/icons/doc_lock.ico"), { maxAge: 2592000000 }));
             this._app.use(express_1.default.json({ type: '*/json' }));
@@ -364,19 +381,18 @@ class WebServer {
                 });
             });
             // FUTURE: Add a signout route?
-            this._app.post('/api/login', (request, response) => {
+            this._app.post('/api/login', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     const { userId, password } = request.body;
                     logger.debug(`Login request - User: ${userId}`);
                     if (userStore_1.UserStore.authenticate(userId, password)) {
-                        let token = jsonwebtoken_1.default.sign({ userId: userId }, this._hashSecret, { expiresIn: '1h' });
-                        // TODO - Does not handle multiple signins
+                        let { token, expiresAt } = yield generateToken(userId, this._hashSecret, WebServer.tokenLife);
                         request.session.userId = userId;
                         request.session.token = token;
                         request.session.lastSignedIn = new Date();
-                        request.session.tokenExpiration = new Date(Date.now() + 3600000);
+                        request.session.tokenExpiration = expiresAt;
                         logger.debug('Login successful');
-                        return response.status(200).json({ success: true, token: token });
+                        return response.status(200).json({ success: true, token: token, userId: userId, expiresAt: expiresAt });
                     }
                     else {
                         throw new CertError_1.CertError(401, 'Invalid credentials');
@@ -387,24 +403,38 @@ class WebServer {
                     let e = CertMultiError_1.CertMultiError.getCertError(err);
                     return response.status(e.status).json(e.getResponse());
                 }
-            });
+            }));
+            this._app.post('/api/tokenrefresh', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    if (!request.session.token) {
+                        throw new CertError_1.CertError(401, 'You must be logged in to refresh a token');
+                    }
+                    let { token, expiresAt } = yield generateToken(request.session.userId, this._hashSecret, WebServer.tokenLife);
+                    request.session.token = token;
+                    request.session.tokenExpiration = expiresAt;
+                    logger.debug('Token refresh successful');
+                    return response.status(200).json({ success: true, token: token, expiresAt: expiresAt });
+                }
+                catch (err) {
+                    logger.error(err.message);
+                    let e = CertMultiError_1.CertMultiError.getCertError(err);
+                    return response.status(e.status).json(e.getResponse());
+                }
+            }));
             this._app.post('/api/token', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
+                    // Returns a shortlived token to be used for a WebSockets connection
                     if (!request.session.token) {
                         throw new CertError_1.CertError(401, 'You must be logged in to get a temporary token');
                     }
-                    // const { userId } = request.body;
-                    // if (userId != request.session.userId) {
-                    //     throw new CertError(401, 'You can only get a token for your own session');
-                    // }
                     let decoded = yield verifyToken(request.session.token, this._hashSecret);
                     logger.debug(decoded);
                     if (decoded.userId != request.session.userId) {
                         throw new CertError_1.CertError(401, 'You can only get a token for your own session');
                     }
-                    let token = jsonwebtoken_1.default.sign({ userId: 'aa' }, this._hashSecret, { expiresIn: 5 });
+                    let token = yield generateToken(decoded.userId, this._hashSecret, 5);
                     logger.debug('Temporary token creation successful');
-                    return response.status(200).json({ success: true, token: token });
+                    return response.status(200).json({ success: true, token: token.token });
                 }
                 catch (err) {
                     logger.error(err.message);
@@ -1299,6 +1329,7 @@ class WebServer {
 }
 exports.WebServer = WebServer;
 WebServer.instance = null;
+WebServer.tokenLife = '5m';
 WebServer._lowestDBVersion = 4; // The lowest version of the database that is supported
 WebServer._defaultDBVersion = 5; // The version of the database that will be created if it doesn't exist
 //# sourceMappingURL=webserver.js.map

@@ -160,8 +160,8 @@ function keyDownload(id) {
 async function keyDelete(name, id) {
     try {
         if (confirm(`This will delete key ${name}. \n\nDo you wish to continue?`)) {
-            await lineCache.deleteKey(id);
-            showMessage(`Key ${name} deleted`);
+            res = await lineCache.deleteKey(id);
+            showMessage(res);
         }
     }
     catch (err) {
@@ -169,7 +169,12 @@ async function keyDelete(name, id) {
     }
 }
 
-// Adds certificates to the section passed
+/**
+ * Builds a list of certificates and appends it to the target element.
+ * 
+ * @param {jQuery} target - The target element to append the certificate list to.
+ * @param {Array} files - An array of certificate files.
+ */
 function buildCertList(target, files) {
     target.empty();
     if (files.length == 0)
@@ -454,8 +459,8 @@ async function certClick(id) {
 async function certDelete(name, id) {
     try {
         if (confirm(`This will delete certificate ${name}. \n\nDo you wish to continue?`)) {
-            await lineCache.deleteCert(id);
-            showMessage(`Certificate ${name} deleted`);
+            let res = await lineCache.deleteCert(id);
+            showMessage(res);
         }
     }
     catch (err) {
@@ -892,6 +897,35 @@ $(async function() {
     if (window.location.pathname != '/') {
         return;
     }
+
+    let calcRefresh = () => {
+        let expiresAt = sessionStorage.getItem('expiresAt');
+        let expiresIn = Number(expiresAt) - (Date.now() / 1000);
+        let diff = expiresIn - 60;
+        console.log(`${new Date()} Refresh in ${diff} seconds`);
+        setTimeout(() => {
+            $.ajax({
+                type: 'POST',
+                url: '/api/tokenrefresh',
+                headers: {
+                    "Authorization": `Bearer ${sessionStorage.getItem('token')}`
+                },
+                error: (xhr, _msg, err) => {
+                    console.error(xhr);
+                },
+                success: (data) => {
+                    if (data.success == true) {
+                        sessionStorage.setItem('token', data.token);
+                        sessionStorage.setItem('expiresAt', data.expiresAt);
+                        calcRefresh();
+                        console.log(`${new Date()} Token refreshed`);
+                    }
+                }
+            });
+        }, diff * 1000);
+    }
+    // Check the token time to live
+    calcRefresh();
 
     // Initialize date input boxes
     let datePicker;

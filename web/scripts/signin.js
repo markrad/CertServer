@@ -1,3 +1,7 @@
+/**
+ * Handles the sign-in event by sending a POST request to the server. If valid, the server will respond with a jwt token.
+ * @param {Event} event - The sign-in event.
+ */
 function onSignIn(event) {
     event.preventDefault();
     console.log('Sign in');
@@ -10,9 +14,10 @@ function onSignIn(event) {
             console.log(data);
             if (data.success == true) {
                 sessionStorage.setItem('token', data.token);
+                sessionStorage.setItem('expiresAt', data.expiresAt);
                 window.location.href = '/';
             } else {
-                alert('Sign in failed: No reasone was provided');
+                alert('Sign in failed: No reason was provided');
             }
         },
         error: function(data) {

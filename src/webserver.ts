@@ -34,7 +34,7 @@ import session from 'express-session'
 import WsServer from 'ws';
 import { Readable } from 'stream';
 import * as log4js from 'log4js';
-import jwt, { JsonWebTokenError } from 'jsonwebtoken';
+import jwt, { JsonWebTokenError, decode } from 'jsonwebtoken';
 
 import { EventWaiter } from './utility/eventWaiter';
 import { exists } from './utility/exists';
@@ -81,6 +81,7 @@ export class WebServer {
     static getWebServer(): WebServer {
         return WebServer.instance;
     }
+    static readonly tokenLife: string | number = '5m';
     private _port: number;
     private _dataPath: string;
     private _certificatesPath: string;
@@ -307,6 +308,19 @@ export class WebServer {
             });
         }
 
+        let generateToken = async (userId: string, secret: string, expires: number | string) => {
+            return new Promise<{ token: string, expiresAt: number }>((resolve, reject) => {
+                jwt.sign({ userId: userId }, secret, { expiresIn: expires }, (err, token) => {
+                    if (err) {
+                        reject(err);
+                    }
+                    else {
+                        resolve({ token: token, expiresAt: (decode(token) as jwt.JwtPayload).exp });
+                    }
+                });
+            });
+        }
+
         this._app.use(Express.urlencoded({ extended: true }));
         this._app.use(serveFavicon(path.join(__dirname, "../../web/icons/doc_lock.ico"), { maxAge: 2592000000 }));
         this._app.use(Express.json({ type: '*/json' }));
@@ -378,19 +392,18 @@ export class WebServer {
             });
         });
         // FUTURE: Add a signout route?
-        this._app.post('/api/login', (request: any, response) => {
+        this._app.post('/api/login', async (request: any, response) => {
             try {
                 const { userId, password } = request.body;
                 logger.debug(`Login request - User: ${userId}`);
                 if (UserStore.authenticate(userId, password)) {
-                    let token = jwt.sign({ userId: userId }, this._hashSecret, {expiresIn: '1h' });
-                    // TODO - Does not handle multiple signins
+                    let { token, expiresAt } = await generateToken(userId, this._hashSecret, WebServer.tokenLife);
                     request.session.userId = userId;
                     request.session.token = token;
                     request.session.lastSignedIn = new Date();
-                    request.session.tokenExpiration = new Date(Date.now() + 3600000);
+                    request.session.tokenExpiration = expiresAt;
                     logger.debug('Login successful');
-                    return response.status(200).json({ success: true, token: token });
+                    return response.status(200).json({ success: true, token: token, userId: userId, expiresAt: expiresAt });
                 }
                 else {
                     throw new CertError(401,'Invalid credentials');
@@ -402,23 +415,37 @@ export class WebServer {
                 return response.status(e.status).json(e.getResponse());
             }
         });
-        this._app.post('/api/token', auth, async (request: any, response: any) => {
+        this._app.post('/api/tokenrefresh', auth, async (request: any, response: any) => {
             try {
                 if (!request.session.token) {
+                    throw new CertError(401, 'You must be logged in to refresh a token');
+                }
+                let { token, expiresAt } = await generateToken(request.session.userId, this._hashSecret, WebServer.tokenLife);
+                request.session.token = token;
+                request.session.tokenExpiration = expiresAt;
+                logger.debug('Token refresh successful');
+                return response.status(200).json({ success: true, token: token, expiresAt: expiresAt });
+            }
+            catch (err) {
+                logger.error(err.message);
+                let e: (CertError | CertMultiError) = CertMultiError.getCertError(err);
+                return response.status(e.status).json(e.getResponse());
+            }
+        });
+        this._app.post('/api/token', auth, async (request: any, response: any) => {
+            try {
+                // Returns a shortlived token to be used for a WebSockets connection
+                if (!request.session.token) { 
                     throw new CertError(401, 'You must be logged in to get a temporary token');
                 }
-                // const { userId } = request.body;
-                // if (userId != request.session.userId) {
-                //     throw new CertError(401, 'You can only get a token for your own session');
-                // }
                 let decoded = await verifyToken(request.session.token, this._hashSecret);
                 logger.debug(decoded)
-                if ((decoded as any).userId != request.session.userId) {
+                if ((decoded as jwt.JwtPayload).userId != request.session.userId) {
                     throw new CertError(401, 'You can only get a token for your own session');
                 }
-                let token = jwt.sign({ userId: 'aa' }, this._hashSecret, { expiresIn: 5 });
+                let token = await generateToken((decoded as jwt.JwtPayload).userId, this._hashSecret, 5);
                 logger.debug('Temporary token creation successful');
-                return response.status(200).json({ success: true, token: token });
+                return response.status(200).json({ success: true, token: token.token });
             }
             catch (err) {
                 logger.error(err.message);
