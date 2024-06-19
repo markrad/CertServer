@@ -51,7 +51,8 @@
 		"vscode": {
 			"extensions": [
 				"gruntfuggly.todo-tree",
-				"maixiaojie.git-emoji"
+				"maixiaojie.git-emoji",
+				"redhat-developer.vscode-yaml"
 			]
 		}
 	}
