@@ -744,12 +744,33 @@ export class WebServer {
                     return response.status(400).json(new OperationResult('').pushMessage('Content type must be text/plain', ResultType.Failed).getResponse());
                 }
                 if (!(request.body as string).includes('\n')) {
-                    return response.status(400).json(new OperationResult('').pushMessage('Key must be in standard 64 byte line length format - try --data-binary with curl', ResultType.Failed).getResponse());
+                    return response.status(400).json(new OperationResult('').pushMessage('Pem must be in standard 64 byte line length format - try --data-binary with curl', ResultType.Failed).getResponse());
                 }
 
                 let result: OperationResult = await this._processMultiFile(request.body);
                 this._broadcast(result);
                 return response.status(200).json(result.getResponse()); 
+            }
+            catch (err) {
+                let e: (CertError | CertMultiError) = CertMultiError.getCertError(err);
+                return response.status(e.status).json(e.getResponse());
+            }
+        });
+        this._app.post('/api/uploadEncryptedKey', auth, async (request, response) => {
+            try {
+                if (request.headers['content-type'] != 'text/plain') {
+                    return response.status(400).json(new OperationResult('').pushMessage('Content type must be text/plain', ResultType.Failed).getResponse());
+                }
+                if (!(request.body as string).includes('\n')) {
+                    return response.status(400).json(new OperationResult('').pushMessage('Key must be in standard 64 byte line length format - try --data-binary with curl', ResultType.Failed).getResponse());
+                }
+                if (!request.query.password) {
+                    return response.status(400).json(new OperationResult('').pushMessage('No password provided', ResultType.Failed).getResponse());
+                }
+
+                let result: OperationResult = await this._tryAddKey({ pemString: request.body, password: request.query.password as string });
+                this._broadcast(result);
+                return response.status(200).json(result.getResponse());
             }
             catch (err) {
                 let e: (CertError | CertMultiError) = CertMultiError.getCertError(err);

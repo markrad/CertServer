@@ -725,9 +725,29 @@ class WebServer {
                         return response.status(400).json(new OperationResult_1.OperationResult('').pushMessage('Content type must be text/plain', OperationResult_1.ResultType.Failed).getResponse());
                     }
                     if (!request.body.includes('\n')) {
-                        return response.status(400).json(new OperationResult_1.OperationResult('').pushMessage('Key must be in standard 64 byte line length format - try --data-binary with curl', OperationResult_1.ResultType.Failed).getResponse());
+                        return response.status(400).json(new OperationResult_1.OperationResult('').pushMessage('Pem must be in standard 64 byte line length format - try --data-binary with curl', OperationResult_1.ResultType.Failed).getResponse());
                     }
                     let result = yield this._processMultiFile(request.body);
+                    this._broadcast(result);
+                    return response.status(200).json(result.getResponse());
+                }
+                catch (err) {
+                    let e = CertMultiError_1.CertMultiError.getCertError(err);
+                    return response.status(e.status).json(e.getResponse());
+                }
+            }));
+            this._app.post('/api/uploadEncryptedKey', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    if (request.headers['content-type'] != 'text/plain') {
+                        return response.status(400).json(new OperationResult_1.OperationResult('').pushMessage('Content type must be text/plain', OperationResult_1.ResultType.Failed).getResponse());
+                    }
+                    if (!request.body.includes('\n')) {
+                        return response.status(400).json(new OperationResult_1.OperationResult('').pushMessage('Key must be in standard 64 byte line length format - try --data-binary with curl', OperationResult_1.ResultType.Failed).getResponse());
+                    }
+                    if (!request.query.password) {
+                        return response.status(400).json(new OperationResult_1.OperationResult('').pushMessage('No password provided', OperationResult_1.ResultType.Failed).getResponse());
+                    }
+                    let result = yield this._tryAddKey({ pemString: request.body, password: request.query.password });
                     this._broadcast(result);
                     return response.status(200).json(result.getResponse());
                 }
