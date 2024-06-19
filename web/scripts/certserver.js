@@ -900,6 +900,9 @@ $(async function() {
 
     let calcRefresh = () => {
         let expiresAt = sessionStorage.getItem('expiresAt');
+        if (expiresAt == null) {
+            return;
+        }
         let expiresIn = Number(expiresAt) - (Date.now() / 1000);
         let diff = expiresIn - 60;
         console.log(`${new Date()} Refresh in ${diff} seconds`);
