@@ -158,6 +158,7 @@ enum TestResult {
     TestSkippedMissingOrInvalidConnectionString,
 }
 
+// TODO: Add test to upload an encrypted key
 let tests: Test[] = [
     { description: 'Set up', runCondition: TestType.RunForAllTests, runOnFailure: true, testFunction: setup, result: TestResult.TestNotYetRun },
     { description: 'Create webserver', runCondition: TestType.RunForAllTests, runOnFailure: true, testFunction: createWebserver, result: TestResult.TestNotYetRun },

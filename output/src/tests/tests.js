@@ -129,6 +129,7 @@ var TestResult;
     TestResult[TestResult["TestSkippedPreviousFailure"] = 6] = "TestSkippedPreviousFailure";
     TestResult[TestResult["TestSkippedMissingOrInvalidConnectionString"] = 7] = "TestSkippedMissingOrInvalidConnectionString";
 })(TestResult || (TestResult = {}));
+// TODO: Add test to upload an encrypted key
 let tests = [
     { description: 'Set up', runCondition: TestType.RunForAllTests, runOnFailure: true, testFunction: setup, result: TestResult.TestNotYetRun },
     { description: 'Create webserver', runCondition: TestType.RunForAllTests, runOnFailure: true, testFunction: createWebserver, result: TestResult.TestNotYetRun },
