@@ -7,6 +7,7 @@ RUN git -c advice.detachedHead=false clone -b v1.12.3 https://github.com/markrad
 RUN mkdir /config
 RUN printf "certServer:\n"  > /config/config.yml
 
+# TODO Switch to nonroot user
 WORKDIR /certserver
 
 RUN npm install
