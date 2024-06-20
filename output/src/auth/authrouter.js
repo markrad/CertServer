@@ -69,18 +69,14 @@ class AuthRouter {
             try {
                 const { userId, password } = request.body;
                 logger.debug(`Login request - User: ${userId}`);
-                if (userStore_1.UserStore.authenticate(userId, password)) {
-                    let { token, expiresAt } = yield this.generateToken(userId, this._hashSecret, tokenLife);
-                    request.session.userId = userId;
-                    request.session.token = token;
-                    request.session.lastSignedIn = new Date();
-                    request.session.tokenExpiration = expiresAt;
-                    logger.debug('Login successful');
-                    return response.status(200).json({ success: true, token: token, userId: userId, expiresAt: expiresAt });
-                }
-                else {
-                    throw new CertError_1.CertError(401, 'Invalid credentials');
-                }
+                let role = userStore_1.UserStore.authenticate(userId, password);
+                let { token, expiresAt } = yield this.generateToken({ userId: userId, role: role }, this._hashSecret, tokenLife);
+                request.session.userId = userId;
+                request.session.token = token;
+                request.session.lastSignedIn = new Date();
+                request.session.tokenExpiration = expiresAt;
+                logger.debug('Login successful');
+                return response.status(200).json({ success: true, token: token, userId: userId, expiresAt: expiresAt });
             }
             catch (err) {
                 logger.error(err.message);
@@ -290,10 +286,10 @@ class AuthRouter {
      * @param expires - The expiration time of the token, in seconds or a string describing a time span.
      * @returns A promise that resolves to an object containing the generated token and its expiration timestamp.
      */
-    generateToken(userId, secret, expires) {
+    generateToken(toSign, secret, expires) {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, reject) => {
-                (0, jsonwebtoken_1.sign)({ userId: userId }, secret, { expiresIn: expires }, (err, token) => {
+                (0, jsonwebtoken_1.sign)(toSign, secret, { expiresIn: expires }, (err, token) => {
                     if (err) {
                         reject(err);
                     }

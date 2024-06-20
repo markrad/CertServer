@@ -42,18 +42,14 @@ export class AuthRouter {
             try {
                 const { userId, password } = request.body;
                 logger.debug(`Login request - User: ${userId}`);
-                if (UserStore.authenticate(userId, password)) {
-                    let { token, expiresAt } = await this.generateToken(userId, this._hashSecret, tokenLife);
-                    request.session.userId = userId;
-                    request.session.token = token;
-                    request.session.lastSignedIn = new Date();
-                    request.session.tokenExpiration = expiresAt;
-                    logger.debug('Login successful');
-                    return response.status(200).json({ success: true, token: token, userId: userId, expiresAt: expiresAt });
-                }
-                else {
-                    throw new CertError(401, 'Invalid credentials');
-                }
+                let role =UserStore.authenticate(userId, password);
+                let { token, expiresAt } = await this.generateToken({ userId: userId, role: role }, this._hashSecret, tokenLife);
+                request.session.userId = userId;
+                request.session.token = token;
+                request.session.lastSignedIn = new Date();
+                request.session.tokenExpiration = expiresAt;
+                logger.debug('Login successful');
+                return response.status(200).json({ success: true, token: token, userId: userId, expiresAt: expiresAt });
             }
             catch (err) {
                 logger.error(err.message);
@@ -270,9 +266,9 @@ export class AuthRouter {
      * @param expires - The expiration time of the token, in seconds or a string describing a time span.
      * @returns A promise that resolves to an object containing the generated token and its expiration timestamp.
      */
-    private async generateToken(userId: string, secret: string, expires: number | string): Promise<{ token: string, expiresAt: number }> {
+    private async generateToken(toSign: object, secret: string, expires: number | string): Promise<{ token: string, expiresAt: number }> {
         return new Promise<{ token: string, expiresAt: number }>((resolve, reject) => {
-            sign({ userId: userId }, secret, { expiresIn: expires }, (err, token) => {
+            sign(toSign, secret, { expiresIn: expires }, (err, token) => {
                 if (err) {
                     reject(err);
                 }
