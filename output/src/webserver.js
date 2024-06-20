@@ -69,7 +69,6 @@ const express_session_1 = __importDefault(require("express-session"));
 const ws_1 = __importDefault(require("ws"));
 const stream_1 = require("stream");
 const log4js = __importStar(require("log4js"));
-const jsonwebtoken_1 = __importStar(require("jsonwebtoken"));
 const eventWaiter_1 = require("./utility/eventWaiter");
 const exists_1 = require("./utility/exists");
 const OperationResult_1 = require("./webservertypes/OperationResult");
@@ -86,6 +85,7 @@ const dbStores_1 = require("./database/dbStores");
 const dbName_1 = require("./database/dbName");
 const userStore_1 = require("./database/userStore");
 const keyEncryption_1 = require("./database/keyEncryption");
+const authrouter_1 = require("./auth/authrouter");
 const logger = log4js.getLogger('CertServer');
 logger.level = "debug";
 /**
@@ -115,6 +115,7 @@ class WebServer {
         this._hashSecret = null;
         this._keySecret = null;
         this._version = 'v' + require('../../package.json').version;
+        this._authRouter = null;
         this._currentVersion = 0;
         this._config = config;
         this._port = config.certServer.port;
@@ -132,6 +133,7 @@ class WebServer {
             }
             this._hashSecret = config.certServer.hashSecret;
         }
+        this._authRouter = new authrouter_1.AuthRouter(this._hashSecret);
         if (config.certServer.keySecret) {
             if (!config.certServer.certificate) {
                 throw new Error('Key secret requires TLS encryption to be enabled');
@@ -210,104 +212,6 @@ class WebServer {
                 logger.fatal('Failed to initialize the database: ' + err.message);
                 process.exit(4);
             }
-            /**
-             * Middleware function to check authentication before processing the request.
-             * If the user is not authenticated, it redirects to the signin page.
-             * If the user is authenticated, it verifies the session token and checks if the user exists.
-             * If authentication fails, it logs a warning and redirects to the signin page.
-             *
-             * @param request - The HTTP request object.
-             * @param response - The HTTP response object.
-             * @param next - The next function to be called in the middleware chain.
-             */
-            let checkAuth = (request, response, next) => {
-                try {
-                    if (this._hashSecret) {
-                        if (request.session.userId == '' || !request.session.token) {
-                            return response.redirect('/signin');
-                        }
-                        let decoded = jsonwebtoken_1.default.verify(request.session.token, this._hashSecret);
-                        logger.debug(decoded);
-                        if (!userStore_1.UserStore.getUser(decoded.userId)) {
-                            throw new CertError_1.CertError(401, `User ${decoded.userId} not found`);
-                        }
-                    }
-                    next();
-                }
-                catch (err) {
-                    // TODO - Pass error message to sign in page
-                    logger.warn(`Failed to authenticate: ${err.message}`);
-                    // let e: (CertError | CertMultiError) = CertMultiError.getCertError(err);
-                    // return response.status(e.status).json(e.getResponse());
-                    return response.redirect('/signin');
-                }
-            };
-            /**
-             * Middleware function for authentication.
-             * Verifies the token provided in the request headers and checks if the user exists.
-             * If the token is expired, it redirects to the sign-in page.
-             * If there is an error during authentication, it returns the appropriate error response.
-             * @param request - The HTTP request object.
-             * @param response - The HTTP response object.
-             * @param next - The next function to be called in the middleware chain.
-             */
-            let auth = (request, response, next) => {
-                try {
-                    if (this._hashSecret) {
-                        let token = null;
-                        if (request.headers.authorization) {
-                            token = request.headers.authorization.split(' ')[1];
-                        }
-                        else if (request.session.token) {
-                            token = request.session.token;
-                        }
-                        else {
-                            throw new CertError_1.CertError(401, 'No token provided');
-                        }
-                        let decoded = jsonwebtoken_1.default.verify(token, this._hashSecret);
-                        logger.debug(decoded);
-                        if (!userStore_1.UserStore.getUser(decoded.userId)) {
-                            throw new CertError_1.CertError(401, `User ${decoded.userId} not found`);
-                        }
-                    }
-                    next();
-                }
-                catch (err) {
-                    logger.warn(err.message);
-                    let e;
-                    if (err instanceof jsonwebtoken_1.JsonWebTokenError) {
-                        e = new CertError_1.CertError(401, err.message);
-                    }
-                    else {
-                        e = CertMultiError_1.CertMultiError.getCertError(err);
-                    }
-                    return response.status(e.status).json(e.getResponse());
-                }
-            };
-            let verifyToken = (token, secret) => __awaiter(this, void 0, void 0, function* () {
-                return new Promise((resolve, reject) => {
-                    jsonwebtoken_1.default.verify(token, secret, (err, decoded) => {
-                        if (err) {
-                            reject(err);
-                        }
-                        else {
-                            resolve(decoded);
-                        }
-                    });
-                });
-            });
-            let generateToken = (userId, secret, expires) => __awaiter(this, void 0, void 0, function* () {
-                return new Promise((resolve, reject) => {
-                    jsonwebtoken_1.default.sign({ userId: userId }, secret, { expiresIn: expires }, (err, token) => {
-                        if (err) {
-                            reject(err);
-                        }
-                        else {
-                            resolve({ token: token, expiresAt: (0, jsonwebtoken_1.decode)(token).exp });
-                        }
-                    });
-                });
-            });
             this._app.use(express_1.default.urlencoded({ extended: true }));
             this._app.use((0, serve_favicon_1.default)(path_1.default.join(__dirname, "../../web/icons/doc_lock.ico"), { maxAge: 2592000000 }));
             this._app.use(express_1.default.json({ type: '*/json' }));
@@ -326,6 +230,8 @@ class WebServer {
                 resave: false,
                 saveUninitialized: false
             }));
+            this._app.use('/', this._authRouter.router);
+            this._app.use('/api', this._authRouter.router);
             this._app.use((request, response, next) => {
                 var _a;
                 if (!request.session.userId) {
@@ -363,7 +269,7 @@ class WebServer {
                     response.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).json({ error: err.message });
                 }
             });
-            this._app.get('/', checkAuth, (_request, response) => {
+            this._app.get('/', this._authRouter.checkAuth, (_request, response) => {
                 response.render('index', {
                     title: 'Certificates Management Home',
                     C: this._config.certServer.subject.C,
@@ -374,74 +280,6 @@ class WebServer {
                     version: this._version,
                 });
             });
-            this._app.get('/signin', (_request, response) => {
-                response.render('signin', {
-                    title: 'Sign In',
-                    version: this._version,
-                });
-            });
-            // FUTURE: Add a signout route?
-            this._app.post('/api/login', (request, response) => __awaiter(this, void 0, void 0, function* () {
-                try {
-                    const { userId, password } = request.body;
-                    logger.debug(`Login request - User: ${userId}`);
-                    if (userStore_1.UserStore.authenticate(userId, password)) {
-                        let { token, expiresAt } = yield generateToken(userId, this._hashSecret, WebServer.tokenLife);
-                        request.session.userId = userId;
-                        request.session.token = token;
-                        request.session.lastSignedIn = new Date();
-                        request.session.tokenExpiration = expiresAt;
-                        logger.debug('Login successful');
-                        return response.status(200).json({ success: true, token: token, userId: userId, expiresAt: expiresAt });
-                    }
-                    else {
-                        throw new CertError_1.CertError(401, 'Invalid credentials');
-                    }
-                }
-                catch (err) {
-                    logger.error(err.message);
-                    let e = CertMultiError_1.CertMultiError.getCertError(err);
-                    return response.status(e.status).json(e.getResponse());
-                }
-            }));
-            this._app.post('/api/tokenrefresh', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
-                try {
-                    if (!request.session.token) {
-                        throw new CertError_1.CertError(401, 'You must be logged in to refresh a token');
-                    }
-                    let { token, expiresAt } = yield generateToken(request.session.userId, this._hashSecret, WebServer.tokenLife);
-                    request.session.token = token;
-                    request.session.tokenExpiration = expiresAt;
-                    logger.debug('Token refresh successful');
-                    return response.status(200).json({ success: true, token: token, expiresAt: expiresAt });
-                }
-                catch (err) {
-                    logger.error(err.message);
-                    let e = CertMultiError_1.CertMultiError.getCertError(err);
-                    return response.status(e.status).json(e.getResponse());
-                }
-            }));
-            this._app.post('/api/token', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
-                try {
-                    // Returns a shortlived token to be used for a WebSockets connection
-                    if (!request.session.token) {
-                        throw new CertError_1.CertError(401, 'You must be logged in to get a temporary token');
-                    }
-                    let decoded = yield verifyToken(request.session.token, this._hashSecret);
-                    logger.debug(decoded);
-                    if (decoded.userId != request.session.userId) {
-                        throw new CertError_1.CertError(401, 'You can only get a token for your own session');
-                    }
-                    let token = yield generateToken(decoded.userId, this._hashSecret, 5);
-                    logger.debug('Temporary token creation successful');
-                    return response.status(200).json({ success: true, token: token.token });
-                }
-                catch (err) {
-                    logger.error(err.message);
-                    let e = CertMultiError_1.CertMultiError.getCertError(err);
-                    return response.status(e.status).json(e.getResponse());
-                }
-            }));
             this._app.get('/api/helper', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     response.setHeader('content-type', 'application/text');
@@ -489,15 +327,12 @@ class WebServer {
                     logger.error(err);
                 }
             }));
-            this._app.get('/api/authrequired', (_request, response) => {
-                response.status(200).json({ authRequired: this._hashSecret != null });
-            });
-            this._app.post('/updateCertTag', auth, (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
+            this._app.post('/updateCertTag', this._authRouter.auth, (request, _response, next) => __awaiter(this, void 0, void 0, function* () {
                 request.url = '/api/updateCertTag';
                 request.query['id'] = request.body.toTag;
                 next();
             }));
-            this._app.post(/\/api\/create.*Cert/i, auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.post(/\/api\/create.*Cert/i, this._authRouter.auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     logger.debug(request.body);
                     let type = request.url.includes('createCACert')
@@ -529,7 +364,7 @@ class WebServer {
                     return response.status(e.status).json(e.getResponse());
                 }
             }));
-            this._app.get('/api/certName', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.get('/api/certName', this._authRouter.auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 var _a;
                 try {
                     let c = this._resolveCertificateQuery(request.query);
@@ -540,7 +375,7 @@ class WebServer {
                     return response.status(e.status).json(e.getResponse());
                 }
             }));
-            this._app.get('/api/certDetails', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.get('/api/certDetails', this._authRouter.auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     let c = this._resolveCertificateQuery(request.query);
                     let retVal = c.certificateBrief();
@@ -551,12 +386,12 @@ class WebServer {
                     response.status(e.status).json(e.getResponse());
                 }
             }));
-            this._app.get('/api/keyList', auth, (request, _response, next) => {
+            this._app.get('/api/keyList', this._authRouter.auth, (request, _response, next) => {
                 request.url = '/api/certList';
                 request.query = { type: 'key' };
                 next();
             });
-            this._app.get('/api/keyDetails', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.get('/api/keyDetails', this._authRouter.auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     let retVal = k.keyBrief;
@@ -567,7 +402,7 @@ class WebServer {
                     response.status(e.status).json(e.getResponse());
                 }
             }));
-            this._app.get('/api/certList', auth, (request, response) => {
+            this._app.get('/api/certList', this._authRouter.auth, (request, response) => {
                 try {
                     let type = CertTypes_1.CertTypes[request.query.type];
                     if (type == undefined) {
@@ -604,7 +439,7 @@ class WebServer {
                     return response.status(e.status).json(e.getResponse());
                 }
             });
-            this._app.get('/api/getCertificatePem', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.get('/api/getCertificatePem', this._authRouter.auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     let c = this._resolveCertificateQuery(request.query);
                     response.download(c.absoluteFilename, c.name + '.pem', (err) => {
@@ -619,7 +454,7 @@ class WebServer {
                     return response.status(e.status).json(e.getResponse());
                 }
             }));
-            this._app.delete('/api/deleteCert', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.delete('/api/deleteCert', this._authRouter.auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     let c = this._resolveCertificateQuery(request.query);
                     let result = yield this._tryDeleteCert(c);
@@ -631,7 +466,7 @@ class WebServer {
                     return response.status(e.status).json(e.getResponse());
                 }
             }));
-            this._app.post('/api/updateCertTag', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.post('/api/updateCertTag', this._authRouter.auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     let tags = request.body;
                     if (tags.tags === undefined)
@@ -655,7 +490,7 @@ class WebServer {
                     return response.status(e.status).json(e.getResponse());
                 }
             }));
-            this._app.get('/api/keyname', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.get('/api/keyname', this._authRouter.auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     response.status(200).json({ name: k.name, id: k.$loki, tags: [] });
@@ -665,7 +500,7 @@ class WebServer {
                     return response.status(e.status).json(e.getResponse());
                 }
             }));
-            this._app.delete('/api/deleteKey', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.delete('/api/deleteKey', this._authRouter.auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     let result = yield this._tryDeleteKey(k);
@@ -677,7 +512,7 @@ class WebServer {
                     return response.status(e.status).json(e.getResponse());
                 }
             }));
-            this._app.get('/api/getKeyPem', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.get('/api/getKeyPem', this._authRouter.auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     response.setHeader('content-disposition', `attachment; filename="${k.name}.pem"`);
@@ -694,7 +529,7 @@ class WebServer {
              * Upload pem format files. These can be key, a certificate, or a file that
              * contains keys or certificates.
              */
-            this._app.post('/uploadPem', auth, ((request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.post('/uploadPem', this._authRouter.auth, ((request, response) => __awaiter(this, void 0, void 0, function* () {
                 // FUTURE: Allow der and pfx files to be submitted
                 if (!request.files || Object.keys(request.files).length == 0) {
                     return response.status(400).json({ error: 'No file selected' });
@@ -719,7 +554,7 @@ class WebServer {
                     return response.status(e.status).json(e.getResponse());
                 }
             })));
-            this._app.post('/api/uploadPem', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.post('/api/uploadPem', this._authRouter.auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     if (request.headers['content-type'] != 'text/plain') {
                         return response.status(400).json(new OperationResult_1.OperationResult('').pushMessage('Content type must be text/plain', OperationResult_1.ResultType.Failed).getResponse());
@@ -736,7 +571,7 @@ class WebServer {
                     return response.status(e.status).json(e.getResponse());
                 }
             }));
-            this._app.post('/api/uploadEncryptedKey', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.post('/api/uploadEncryptedKey', this._authRouter.auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     if (request.headers['content-type'] != 'text/plain') {
                         return response.status(400).json(new OperationResult_1.OperationResult('').pushMessage('Content type must be text/plain', OperationResult_1.ResultType.Failed).getResponse());
@@ -756,7 +591,7 @@ class WebServer {
                     return response.status(e.status).json(e.getResponse());
                 }
             }));
-            this._app.get('/api/ChainDownload', auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
+            this._app.get('/api/ChainDownload', this._authRouter.auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 // BUG - Breaks if there chain is not complete
                 try {
                     let c = this._resolveCertificateQuery(request.query);
@@ -823,28 +658,8 @@ class WebServer {
                 process.exit(4);
             });
             server.on('upgrade', (request, socket, head) => __awaiter(this, void 0, void 0, function* () {
-                let token = null;
                 try {
-                    if (this._hashSecret) {
-                        if (request.url.startsWith('/?token=')) {
-                            token = request.url.split('=')[1];
-                        }
-                        else if (request.headers['authorization'] != null) {
-                            token = request.headers['authorization'].split(' ')[1];
-                        }
-                        else {
-                            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-                            socket.end();
-                            throw new CertError_1.CertError(401, 'No token provided');
-                        }
-                        let decoded = jsonwebtoken_1.default.verify(token, this._hashSecret);
-                        logger.debug(decoded);
-                        if (!userStore_1.UserStore.getUser(decoded.userId)) {
-                            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-                            socket.end();
-                            throw new CertError_1.CertError(401, `User ${decoded.userId} not found`);
-                        }
-                    }
+                    this._authRouter.socketUpgrade(request, socket);
                     this._ws.handleUpgrade(request, socket, head, (ws) => {
                         ws.send('Connected');
                         logger.debug('WebSocket client connected');
@@ -1349,7 +1164,6 @@ class WebServer {
 }
 exports.WebServer = WebServer;
 WebServer.instance = null;
-WebServer.tokenLife = '5m';
 WebServer._lowestDBVersion = 4; // The lowest version of the database that is supported
 WebServer._defaultDBVersion = 5; // The version of the database that will be created if it doesn't exist
 //# sourceMappingURL=webserver.js.map
