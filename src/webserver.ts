@@ -34,7 +34,6 @@ import session from 'express-session'
 import WsServer from 'ws';
 import { Readable } from 'stream';
 import * as log4js from 'log4js';
-import jwt from 'jsonwebtoken';
 
 import { EventWaiter } from './utility/eventWaiter';
 import { exists } from './utility/exists';
