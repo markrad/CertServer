@@ -350,12 +350,19 @@ export class WebServer {
         this._app.post(/\/api\/create.*Cert/i, this._authRouter.auth, async (request, response) => {
             try {
                 logger.debug(request.body);
-                let type: CertTypes =
-                      request.url.includes('createCACert') 
-                    ? CertTypes.root 
-                    : request.url.includes('createIntermediateCert')
-                    ? CertTypes.intermediate
-                    : CertTypes.leaf;
+                let type: CertTypes;
+                if (request.url.includes('createCACert')) {
+                    type = CertTypes.root;
+                }
+                else if (request.url.includes('createIntermediateCert')) {
+                    type = CertTypes.intermediate;
+                }
+                else if (request.url.includes('createLeafCert')) {
+                    type = CertTypes.leaf;
+                }
+                else {
+                    throw new CertError(404, 'Invalid certificate type');
+                }
 
                 let { certificatePem, keyPem, result } = await CertificateUtil.generateCertificatePair(type, request.body);
 

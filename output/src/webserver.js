@@ -338,11 +338,19 @@ class WebServer {
             this._app.post(/\/api\/create.*Cert/i, this._authRouter.auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     logger.debug(request.body);
-                    let type = request.url.includes('createCACert')
-                        ? CertTypes_1.CertTypes.root
-                        : request.url.includes('createIntermediateCert')
-                            ? CertTypes_1.CertTypes.intermediate
-                            : CertTypes_1.CertTypes.leaf;
+                    let type;
+                    if (request.url.includes('createCACert')) {
+                        type = CertTypes_1.CertTypes.root;
+                    }
+                    else if (request.url.includes('createIntermediateCert')) {
+                        type = CertTypes_1.CertTypes.intermediate;
+                    }
+                    else if (request.url.includes('createLeafCert')) {
+                        type = CertTypes_1.CertTypes.leaf;
+                    }
+                    else {
+                        throw new CertError_1.CertError(404, 'Invalid certificate type');
+                    }
                     let { certificatePem, keyPem, result } = yield certificateUtil_1.CertificateUtil.generateCertificatePair(type, request.body);
                     if (result.hasErrors) {
                         return response.status(result.statusCode).json(result.getResponse());
