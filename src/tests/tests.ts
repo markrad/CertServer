@@ -9,7 +9,6 @@ import { pki } from 'node-forge';
 import { Readable } from 'stream';
 import readline from 'node:readline';
 import { stdin as input, stdout as output } from 'node:process';
-import crypto from 'crypto';
 
 import WebSocket from 'ws';
 // import * as wtfnode from 'wtfnode';
@@ -29,9 +28,10 @@ let useAuth = false;
 let encryptKeys = false;
 const host = 'localhost:9997';
 let url: string = `http://${host}`;
-let hashSecret = crypto.randomBytes(32).toString('hex');
-let keyEncryptionKey = crypto.randomBytes(32).toString('hex');
 let bearerToken: string = '';
+
+let defaultUser = 'admin';
+let defaultPassword = 'changeme';
 
 type Response = {
     statusCode: number,
@@ -45,7 +45,8 @@ let config: Config = {
         port: 9997,
         certificate: '',
         key: '',
-        hashSecret: null,
+        encryptKeys: false,
+        useAuthentication: false,
         subject: {
             C: 'US',
             ST: 'TestState',
@@ -233,16 +234,11 @@ async function setup():  Promise<boolean> {
             }
         }
         if (process.env.USE_AUTH == '1') {
-            if (!process.env.AUTH_USERID || !process.env.AUTH_PASSWORD) console.log('Authentication user or password not found - Authentication will not be used');
-            else {
-                let db = path.join(testPath, '/db/certs.db');
-                execSync(`node ${path.join(__dirname, '../tools/users.js')} ${db} add --user ${process.env.AUTH_USERID} --password ${process.env.AUTH_PASSWORD}`);
-                config.certServer.hashSecret = hashSecret;
-                useAuth = true;
-            }
+            config.certServer.useAuthentication = true;
+            useAuth = true;
         }
         if (process.env.ENCRYPT_KEYS == '1') {
-            config.certServer.keySecret = keyEncryptionKey;
+            config.certServer.encryptKeys = true;
             encryptKeys = true;
         }
         await writeFile(testConfig, dump(config));
@@ -262,7 +258,7 @@ async function createWebserver(): Promise<boolean> {
     webServer.stdout.on('data', (data) => { if (process.env.LOG_SERVER_STDOUT == "1") console.log(data.toString().trimEnd()); });
     await new Promise<void>((resolve) => setTimeout(() => resolve(), 2000));
     if (useAuth) {
-        res = await httpRequest('post', `${url}/api/login`, null, JSON.stringify({ userId: process.env.AUTH_USERID, password: process.env.AUTH_PASSWORD }));
+        res = await httpRequest('post', `${url}/api/login`, null, JSON.stringify({ userId: defaultUser, password: defaultPassword }));
         assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         assert(res.body.token, 'No token returned from server');
         bearerToken = res.body.token;

@@ -19,7 +19,7 @@ export class UserStore {
 
         let user = UserStore._userDb.findOne({ username: username });
 
-        if (user != null || !bcrypt.compareSync(password, user.password)) throw new CertError(401, "Invalid username or password");
+        if (user == null || !bcrypt.compareSync(password, user.password)) throw new CertError(401, "Invalid username or password");
 
         return user.role ?? UserRole.USER;
     }
@@ -35,6 +35,12 @@ export class UserStore {
         if (UserStore._userDb == null) throw new CertError(500, "UserStore not initialized");
 
         return UserStore._userDb.find();
+    }
+
+    public static getUsersByRole(role: UserRole): UserRow[] {
+        if (UserStore._userDb == null) throw new CertError(500, "UserStore not initialized");
+
+        return UserStore._userDb.find({ role: role });
     }
 
     public static addUser(username: string, password: string, role: UserRole): void {
@@ -61,9 +67,20 @@ export class UserStore {
 
         let user = UserStore._userDb.findOne({ username: username });
 
-        if (!user) throw new CertError(400, `User ${username} not found`);
-
+        if (!user) throw new CertError(404, `User ${username} not found`);
         UserStore._userDb.remove(user);
+    }
+
+    public static updateRole(username: string, role: UserRole): void {
+        if (UserStore._userDb == null) throw new CertError(500, "UserStore not initialized");
+        if (!username) throw new CertError(400, "Username is required");
+
+        let user = UserStore._userDb.findOne({ username: username });
+
+        if (!user) throw new CertError(404, `User ${username} not found`);
+
+        user.role = role;
+        UserStore._userDb.update(user);
     }
 
     public static updatePassword(username: string, password: string): void {
@@ -73,10 +90,9 @@ export class UserStore {
 
         let user = UserStore._userDb.findOne({ username: username });
 
-        if (!user) throw new CertError(400, `User ${username} not found`);
+        if (!user) throw new CertError(404, `User ${username} not found`);
 
         user.password = bcrypt.hashSync(password, 10);
-
         UserStore._userDb.update(user);
     }
 }

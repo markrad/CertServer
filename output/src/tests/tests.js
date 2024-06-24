@@ -23,7 +23,6 @@ const node_forge_1 = require("node-forge");
 const stream_1 = require("stream");
 const node_readline_1 = __importDefault(require("node:readline"));
 const node_process_1 = require("node:process");
-const crypto_1 = __importDefault(require("crypto"));
 const ws_1 = __importDefault(require("ws"));
 // import * as wtfnode from 'wtfnode';
 const eventWaiter_1 = require("../utility/eventWaiter");
@@ -37,16 +36,17 @@ let useAuth = false;
 let encryptKeys = false;
 const host = 'localhost:9997';
 let url = `http://${host}`;
-let hashSecret = crypto_1.default.randomBytes(32).toString('hex');
-let keyEncryptionKey = crypto_1.default.randomBytes(32).toString('hex');
 let bearerToken = '';
+let defaultUser = 'admin';
+let defaultPassword = 'changeme';
 let config = {
     certServer: {
         root: testPath,
         port: 9997,
         certificate: '',
         key: '',
-        hashSecret: null,
+        encryptKeys: false,
+        useAuthentication: false,
         subject: {
             C: 'US',
             ST: 'TestState',
@@ -206,17 +206,11 @@ function setup() {
                 }
             }
             if (process.env.USE_AUTH == '1') {
-                if (!process.env.AUTH_USERID || !process.env.AUTH_PASSWORD)
-                    console.log('Authentication user or password not found - Authentication will not be used');
-                else {
-                    let db = path_1.default.join(testPath, '/db/certs.db');
-                    (0, child_process_1.execSync)(`node ${path_1.default.join(__dirname, '../tools/users.js')} ${db} add --user ${process.env.AUTH_USERID} --password ${process.env.AUTH_PASSWORD}`);
-                    config.certServer.hashSecret = hashSecret;
-                    useAuth = true;
-                }
+                config.certServer.useAuthentication = true;
+                useAuth = true;
             }
             if (process.env.ENCRYPT_KEYS == '1') {
-                config.certServer.keySecret = keyEncryptionKey;
+                config.certServer.encryptKeys = true;
                 encryptKeys = true;
             }
             yield (0, promises_1.writeFile)(testConfig, (0, js_yaml_1.dump)(config));
@@ -238,7 +232,7 @@ function createWebserver() {
             console.log(data.toString().trimEnd()); });
         yield new Promise((resolve) => setTimeout(() => resolve(), 2000));
         if (useAuth) {
-            res = yield httpRequest('post', `${url}/api/login`, null, JSON.stringify({ userId: process.env.AUTH_USERID, password: process.env.AUTH_PASSWORD }));
+            res = yield httpRequest('post', `${url}/api/login`, null, JSON.stringify({ userId: defaultUser, password: defaultPassword }));
             node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
             (0, node_assert_1.default)(res.body.token, 'No token returned from server');
             bearerToken = res.body.token;

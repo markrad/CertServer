@@ -435,3 +435,12 @@ button.button2-red:hover {
     margin: 0px 0px 10px 10px;
     /* padding-right: 10px; */
 }
+
+#logged-in-user {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: medium;
+    width: 50%;
+    display: inline-block;
+    /* float: right; */
+    text-align: right;
+}

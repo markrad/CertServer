@@ -15,6 +15,7 @@ import { OperationResult, ResultType } from "../webservertypes/OperationResult";
 import { CertificateUtil } from "./certificateUtil";
 import { CertificateStores } from "./certificateStores";
 import { KeyEncryption } from "./keyEncryption";
+import { DbStores } from "./dbStores";
 
 let logger = log4js.getLogger();
 
@@ -45,7 +46,7 @@ export class KeyUtil implements PrivateKeyRow, LokiObj {
         }
         else {
             k = pki.privateKeyFromPem(pemString);
-            if (KeyStores.keySecret) {
+            if (DbStores.getKeyEncryptionState()) {
                 pemString = pki.encryptRsaPrivateKey(k, KeyStores.keySecret);
                 encrypted = KeyEncryption.SYSTEM;
             }

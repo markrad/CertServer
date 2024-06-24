@@ -40,6 +40,7 @@ const fs_1 = __importDefault(require("fs"));
 const log4js = __importStar(require("log4js"));
 const lokijs_1 = __importStar(require("lokijs"));
 const minimist_1 = __importDefault(require("minimist"));
+const UserRole_1 = require("../database/UserRole");
 const logger = log4js.getLogger('users');
 logger.level = log4js.levels.DEBUG;
 function main(args) {
@@ -61,6 +62,7 @@ function main(args) {
                     users.insert({
                         username: options.user,
                         password: bcrypt_1.default.hashSync(options.password, 10),
+                        role: UserRole_1.UserRole.USER,
                         lastSignedIn: null,
                         tokenExpiration: null
                     });

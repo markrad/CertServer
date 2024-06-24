@@ -82,10 +82,15 @@ block layout-content
           input.button2#generateLeafButton.form-submit-button(type="submit" title="submit", value="Generate")
   // Main view          
   div.View
-    span 
+    div 
      h1.Banner 
       | Local Certificate Manager
+      span#auth.hidden #{authRequired}
       span.sub #{version}
+      span#logged-in-user 
+        | User: 
+        span#userName #{userName}
+        span#userRole #{userRole}
     button(type='button' class='button1' onclick='togglePane($(this), \'#uploadCertForm\')') 
       span.button1Text Upload pem Files
       span.button1-arrow >

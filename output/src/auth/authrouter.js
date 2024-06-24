@@ -39,29 +39,44 @@ const log4js = __importStar(require("log4js"));
 const userStore_1 = require("../database/userStore");
 const CertError_1 = require("../webservertypes/CertError");
 const CertMultiError_1 = require("../webservertypes/CertMultiError");
+const UserRole_1 = require("../database/UserRole");
+const dbStores_1 = require("../database/dbStores");
 const logger = log4js.getLogger('CertServer');
 const tokenLife = '5m';
+const defaultUser = 'admin';
+const defaultPassword = 'changeme';
 /**
  * @classdesc Represents a router for handling authentication-related routes.
  */
 class AuthRouter {
     /**
      * @constructor
-     * @param hashSecret - The secret key used to hash the JWT token. If not provided, the router will not require authentication.
+     * @param authRequired - Will be true if authentication is required, false otherwise.
      */
-    constructor(hashSecret) {
+    constructor(authRequired) {
         this._authRouter = (0, express_1.Router)();
+        this._authenticationState = dbStores_1.DbStores.getAuthenticationState();
+        this._passwordSecret = dbStores_1.DbStores.getPasswordSecret();
         this._authPtr = this._noAuth;
         this._checkAuthPtr = this._noAuth;
-        this._hashSecret = hashSecret;
-        if (this._hashSecret) {
+        this._authRequired = false;
+        this._authRequired = authRequired;
+        if (this._authenticationState) {
             this._authPtr = this._auth;
             this._checkAuthPtr = this._checkAuth;
+            if (userStore_1.UserStore.getUsersByRole(UserRole_1.UserRole.ADMIN).length == 0) {
+                logger.warn('No admin users found - adding default admin user');
+                userStore_1.UserStore.addUser(defaultUser, defaultPassword, UserRole_1.UserRole.ADMIN);
+            }
         }
         this._authRouter.get('/signin', (_request, response) => {
+            if (!this._authRequired) {
+                return response.redirect('/');
+            }
             response.render('signin', {
                 title: 'Sign In',
                 version: 'v' + require('../../../package.json').version,
+                authRequired: `${authRequired ? '1' : '0'}`,
             });
         });
         // FUTURE: Add a signout route?
@@ -70,7 +85,7 @@ class AuthRouter {
                 const { userId, password } = request.body;
                 logger.debug(`Login request - User: ${userId}`);
                 let role = userStore_1.UserStore.authenticate(userId, password);
-                let { token, expiresAt } = yield this.generateToken({ userId: userId, role: role }, this._hashSecret, tokenLife);
+                let { token, expiresAt } = yield this.generateToken({ userId: userId, role: role }, this._passwordSecret, tokenLife);
                 request.session.userId = userId;
                 request.session.token = token;
                 request.session.lastSignedIn = new Date();
@@ -86,10 +101,13 @@ class AuthRouter {
         }));
         this._authRouter.post('/tokenrefresh', this.auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
             try {
+                if (!this._authenticationState) {
+                    throw new CertError_1.CertError(401, 'Authentication is not enabled');
+                }
                 if (!request.session.token) {
                     throw new CertError_1.CertError(401, 'You must be logged in to refresh a token');
                 }
-                let { token, expiresAt } = yield this.generateToken(request.session.userId, this._hashSecret, tokenLife);
+                let { token, expiresAt } = yield this.generateToken(request.session.userId, this._passwordSecret, tokenLife);
                 request.session.token = token;
                 request.session.tokenExpiration = expiresAt;
                 logger.debug('Token refresh successful');
@@ -103,16 +121,19 @@ class AuthRouter {
         }));
         this._authRouter.post('/token', this.auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
             try {
+                if (!this._authenticationState) {
+                    throw new CertError_1.CertError(401, 'Authentication is not enabled');
+                }
                 // Returns a shortlived token to be used for a WebSockets connection
                 if (!request.session.token) {
                     throw new CertError_1.CertError(401, 'You must be logged in to get a temporary token');
                 }
-                let decoded = yield this.verifyToken(request.session.token, this._hashSecret);
+                let decoded = yield this.verifyToken(request.session.token, this._passwordSecret);
                 logger.debug(decoded);
                 if (decoded.userId != request.session.userId) {
                     throw new CertError_1.CertError(401, 'You can only get a token for your own session');
                 }
-                let token = yield this.generateToken(decoded.userId, this._hashSecret, 5);
+                let token = yield this.generateToken(decoded.userId, this._passwordSecret, 5);
                 logger.debug('Temporary token creation successful');
                 return response.status(200).json({ success: true, token: token.token });
             }
@@ -123,7 +144,19 @@ class AuthRouter {
             }
         }));
         this._authRouter.get('/authrequired', (_request, response) => {
-            response.status(200).json({ authRequired: this._hashSecret != null });
+            response.status(200).json({ authRequired: this._authenticationState });
+        });
+        this._authRouter.get('/getUsers', this.auth, (_request, response) => {
+            try {
+                let users = userStore_1.UserStore.getAllUsers();
+                logger.debug('Get users successful');
+                return response.status(200).json(users);
+            }
+            catch (err) {
+                logger.error(err.message);
+                let e = CertMultiError_1.CertMultiError.getCertError(err);
+                return response.status(e.status).json(e.getResponse());
+            }
         });
     }
     /**
@@ -141,7 +174,7 @@ class AuthRouter {
      */
     socketUpgrade(request, socket) {
         let token = null;
-        if (this._hashSecret) {
+        if (this._authenticationState) {
             if (request.url.startsWith('/?token=')) {
                 token = request.url.split('=')[1];
             }
@@ -153,7 +186,7 @@ class AuthRouter {
                 socket.end();
                 throw new CertError_1.CertError(401, 'No token provided');
             }
-            let decoded = (0, jsonwebtoken_1.verify)(token, this._hashSecret);
+            let decoded = (0, jsonwebtoken_1.verify)(token, this._passwordSecret);
             logger.debug(decoded);
             if (!userStore_1.UserStore.getUser(decoded.userId)) {
                 socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
@@ -197,11 +230,11 @@ class AuthRouter {
      */
     _checkAuth(request, response, next) {
         try {
-            if (this._hashSecret) {
+            if (this._authenticationState) {
                 if (request.session.userId == '' || !request.session.token) {
                     return response.redirect('/signin');
                 }
-                let decoded = (0, jsonwebtoken_1.verify)(request.session.token, this._hashSecret);
+                let decoded = (0, jsonwebtoken_1.verify)(request.session.token, this._passwordSecret);
                 logger.debug(decoded);
                 if (!userStore_1.UserStore.getUser(decoded.userId)) {
                     throw new CertError_1.CertError(401, `User ${decoded.userId} not found`);
@@ -228,7 +261,7 @@ class AuthRouter {
      */
     _auth(request, response, next) {
         try {
-            if (this._hashSecret) {
+            if (this._passwordSecret) {
                 let token = null;
                 if (request.headers.authorization) {
                     token = request.headers.authorization.split(' ')[1];
@@ -239,7 +272,7 @@ class AuthRouter {
                 else {
                     throw new CertError_1.CertError(401, 'No token provided');
                 }
-                let decoded = (0, jsonwebtoken_1.verify)(token, this._hashSecret);
+                let decoded = (0, jsonwebtoken_1.verify)(token, this._passwordSecret);
                 logger.debug(decoded);
                 if (!userStore_1.UserStore.getUser(decoded.userId)) {
                     throw new CertError_1.CertError(401, `User ${decoded.userId} not found`);

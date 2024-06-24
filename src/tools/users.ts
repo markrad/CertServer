@@ -5,6 +5,7 @@ import loki, { Collection, LokiFsAdapter } from 'lokijs'
 
 import minimist from 'minimist';
 import { UserRow } from '../database/UserRow';
+import { UserRole } from '../database/UserRole';
 
 const logger = log4js.getLogger('users');
 logger.level = log4js.levels.DEBUG;
@@ -34,6 +35,7 @@ async function main(args: string[]) {
                 users.insert({
                     username: options.user,
                     password: bcrypt.hashSync(options.password, 10),
+                    role: UserRole.USER,
                     lastSignedIn: null,
                     tokenExpiration: null
                 });

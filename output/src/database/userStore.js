@@ -22,7 +22,7 @@ class UserStore {
         if (!password)
             throw new CertError_1.CertError(400, "Password is required");
         let user = UserStore._userDb.findOne({ username: username });
-        if (user != null || !bcrypt_1.default.compareSync(password, user.password))
+        if (user == null || !bcrypt_1.default.compareSync(password, user.password))
             throw new CertError_1.CertError(401, "Invalid username or password");
         return (_a = user.role) !== null && _a !== void 0 ? _a : UserRole_1.UserRole.USER;
     }
@@ -37,6 +37,11 @@ class UserStore {
         if (UserStore._userDb == null)
             throw new CertError_1.CertError(500, "UserStore not initialized");
         return UserStore._userDb.find();
+    }
+    static getUsersByRole(role) {
+        if (UserStore._userDb == null)
+            throw new CertError_1.CertError(500, "UserStore not initialized");
+        return UserStore._userDb.find({ role: role });
     }
     static addUser(username, password, role) {
         if (UserStore._userDb == null)
@@ -63,8 +68,19 @@ class UserStore {
             throw new CertError_1.CertError(400, "Username is required");
         let user = UserStore._userDb.findOne({ username: username });
         if (!user)
-            throw new CertError_1.CertError(400, `User ${username} not found`);
+            throw new CertError_1.CertError(404, `User ${username} not found`);
         UserStore._userDb.remove(user);
+    }
+    static updateRole(username, role) {
+        if (UserStore._userDb == null)
+            throw new CertError_1.CertError(500, "UserStore not initialized");
+        if (!username)
+            throw new CertError_1.CertError(400, "Username is required");
+        let user = UserStore._userDb.findOne({ username: username });
+        if (!user)
+            throw new CertError_1.CertError(404, `User ${username} not found`);
+        user.role = role;
+        UserStore._userDb.update(user);
     }
     static updatePassword(username, password) {
         if (UserStore._userDb == null)
@@ -75,7 +91,7 @@ class UserStore {
             throw new CertError_1.CertError(400, "Password is required");
         let user = UserStore._userDb.findOne({ username: username });
         if (!user)
-            throw new CertError_1.CertError(400, `User ${username} not found`);
+            throw new CertError_1.CertError(404, `User ${username} not found`);
         user.password = bcrypt_1.default.hashSync(password, 10);
         UserStore._userDb.update(user);
     }

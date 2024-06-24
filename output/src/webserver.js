@@ -112,8 +112,8 @@ class WebServer {
         this._ws = new ws_1.default.Server({ noServer: true });
         this._certificate = null;
         this._key = null;
-        this._hashSecret = null;
-        this._keySecret = null;
+        this._useAuthentication = false;
+        this._encryptKeys = false;
         this._version = 'v' + require('../../package.json').version;
         this._authRouter = null;
         this._currentVersion = 0;
@@ -127,18 +127,17 @@ class WebServer {
             this._certificate = fs_1.default.readFileSync(config.certServer.certificate, { encoding: 'utf8' });
             this._key = fs_1.default.readFileSync(config.certServer.key, { encoding: 'utf8' });
         }
-        if (config.certServer.hashSecret) {
+        if (config.certServer.useAuthentication) {
             if (!config.certServer.certificate) {
-                throw new Error('Hash secret requires TLS encryption to be enabled');
+                throw new Error('Authentication requires TLS encryption to be enabled');
             }
-            this._hashSecret = config.certServer.hashSecret;
+            this._useAuthentication = config.certServer.useAuthentication;
         }
-        this._authRouter = new authrouter_1.AuthRouter(this._hashSecret);
-        if (config.certServer.keySecret) {
+        if (config.certServer.encryptKeys) {
             if (!config.certServer.certificate) {
-                throw new Error('Key secret requires TLS encryption to be enabled');
+                throw new Error('Key encryption requires TLS encryption to be enabled');
             }
-            this._keySecret = config.certServer.keySecret;
+            this._encryptKeys = config.certServer.encryptKeys;
         }
         if (config.certServer.subject.C && config.certServer.subject.C.length != 2) {
             throw new Error(`Invalid country code ${config.certServer.subject.C} - must be two characters`);
@@ -168,8 +167,8 @@ class WebServer {
             logger.info(`CertServer starting - ${this._version}`);
             logger.info(`Data path: ${this._dataPath}`);
             logger.info(`TLS enabled: ${this._certificate != null}`);
-            logger.info(`Authentication enabled: ${this._hashSecret != null}`);
-            logger.info(`Key encryption enabled: ${this._keySecret != null}`);
+            logger.info(`Authentication enabled: ${this._useAuthentication != null}`);
+            logger.info(`Key encryption enabled: ${this._encryptKeys != null}`);
             let getCollections = function () {
                 if (null == (certificates = db.getCollection('certificates'))) {
                     certificates = db.addCollection('certificates', {});
@@ -203,10 +202,11 @@ class WebServer {
                 yield ew.EventWait();
                 this._db = db;
                 certificateStores_1.CertificateStores.init(certificates, path_1.default.join(this._dataPath, 'certificates'));
-                keyStores_1.KeyStores.init(privateKeys, path_1.default.join(this._dataPath, 'privatekeys'), this._keySecret);
+                keyStores_1.KeyStores.init(privateKeys, path_1.default.join(this._dataPath, 'privatekeys'));
                 dbStores_1.DbStores.init(dbVersion);
                 userStore_1.UserStore.init(userStore);
                 yield this._dbInit();
+                this._authRouter = new authrouter_1.AuthRouter(this._useAuthentication);
             }
             catch (err) {
                 logger.fatal('Failed to initialize the database: ' + err.message);
@@ -278,6 +278,9 @@ class WebServer {
                     O: this._config.certServer.subject.O,
                     OU: this._config.certServer.subject.OU,
                     version: this._version,
+                    authRequired: `${this._useAuthentication ? '1' : '0'}`,
+                    userName: this._useAuthentication ? _request.session.userId : 'None',
+                    userRole: this._useAuthentication ? _request.session.role : '',
                 });
             });
             this._app.get('/api/helper', (request, response) => __awaiter(this, void 0, void 0, function* () {
@@ -306,7 +309,7 @@ class WebServer {
                         readable = stream_1.Readable.from([
                             `export CERTSERVER_HOST=${hostname}\n`,
                             `export REQUEST_PATH=${request.path}\n`,
-                            `export AUTH_REQUIRED=${Number(this._hashSecret != null).toString()}\n`,
+                            `export AUTH_REQUIRED=${this._useAuthentication}\n`,
                         ].concat(((yield (0, promises_1.readFile)('src/files/linuxhelperscript.sh', { encoding: 'utf8' })).split('\n').map((l) => l + '\n'))));
                     }
                     else if (os == userAgentOS_1.userAgentOS.WINDOWS) {
@@ -314,7 +317,7 @@ class WebServer {
                         readable = stream_1.Readable.from([
                             `Set-Item "env:CERTSERVER_HOST" -Value "${hostname}"\n`,
                             `Set-Item "env:REQUEST_PATH" -Value "${request.path}"\n`,
-                            `Set-Item "env:AUTH_REQUIRED" -Value "${Number(this._hashSecret != null).toString()}"\n`,
+                            `Set-Item "env:AUTH_REQUIRED" -Value "${this._useAuthentication}"\n`,
                         ].concat(((yield (0, promises_1.readFile)('src/files/windowshelperscript.ps1', { encoding: 'utf8' })).split('\n').map((l) => l + '\n'))));
                     }
                     else {
@@ -690,7 +693,7 @@ class WebServer {
                     }
                     else if (version.length == 0) {
                         this._currentVersion = WebServer._defaultDBVersion;
-                        dbStores_1.DbStores.updateVersion(this._currentVersion);
+                        dbStores_1.DbStores.initialize(this._currentVersion, this._useAuthentication, this._encryptKeys);
                     }
                     else {
                         this._currentVersion = version[0].version;
@@ -754,7 +757,7 @@ class WebServer {
                         let key = keyStores_1.KeyStores.findOne({ $loki: keyUtil_1.KeyUtil.getIdFromFileName(file) });
                         if (!key) {
                             try {
-                                adding.push(this._tryAddKey({ filename: path_1.default.join(this._privatekeysPath, file), password: this._keySecret }));
+                                adding.push(this._tryAddKey({ filename: path_1.default.join(this._privatekeysPath, file) }));
                             }
                             catch (err) {
                                 logger.debug('WTF');
@@ -776,35 +779,32 @@ class WebServer {
             }));
         });
     }
+    /**
+     * Fixes up the key secret based on the key encryption state.
+     * If the key encryption state has changed, it either encrypts or decrypts all keys accordingly.
+     * @returns A Promise that resolves when the key secret fix-up is complete.
+     */
     _keySecretFixUp() {
         return __awaiter(this, void 0, void 0, function* () {
-            const currentKeySecret = dbStores_1.DbStores.getKeySecret();
-            if (this._keySecret != currentKeySecret) {
-                if (currentKeySecret == null) {
-                    logger.info('Key secret has been added - encrypting all keys');
+            const lastKeyEncryptionState = dbStores_1.DbStores.getKeyEncryptionState();
+            if (this._encryptKeys != lastKeyEncryptionState) {
+                if (!lastKeyEncryptionState) {
+                    logger.info('Key encryption has been turned on - encrypting all keys');
                     let keys = keyStores_1.KeyStores.find({ encryptedType: { $eq: keyEncryption_1.KeyEncryption.NONE } });
                     for (let k of keys) {
-                        yield k.encrypt(this._keySecret, keyEncryption_1.KeyEncryption.SYSTEM);
+                        yield k.encrypt(dbStores_1.DbStores.getKeySecret(), keyEncryption_1.KeyEncryption.SYSTEM);
                     }
                     logger.info(`Encrypted ${keys.length} keys`);
                 }
-                else if (this._keySecret == null) {
-                    logger.info('Key secret has been removed - decrypting all keys');
+                else {
+                    logger.info('Key encryption has been turned off - decrypting all keys');
                     let keys = keyStores_1.KeyStores.find({ encryptedType: { $eq: keyEncryption_1.KeyEncryption.SYSTEM } });
                     for (let k of keys) {
-                        yield k.decrypt(currentKeySecret);
+                        yield k.decrypt(dbStores_1.DbStores.getKeySecret());
                     }
                     logger.info(`Decrypted ${keys.length} keys`);
                 }
-                else {
-                    logger.info('Key secret has been changed - re-encrypting all keys');
-                    let keys = keyStores_1.KeyStores.find({ encryptedType: { $eq: keyEncryption_1.KeyEncryption.SYSTEM } });
-                    for (let k of keys) {
-                        yield k.decrypt(this._keySecret);
-                        yield k.encrypt(currentKeySecret, keyEncryption_1.KeyEncryption.SYSTEM);
-                    }
-                }
-                dbStores_1.DbStores.updateKeySecret(this._keySecret);
+                dbStores_1.DbStores.setKeyEncryptionState(this._encryptKeys);
             }
         });
     }
@@ -1111,23 +1111,40 @@ class WebServer {
     _databaseFixUp() {
         return __awaiter(this, void 0, void 0, function* () {
             // First check that the database is a version that can be operated upon by the code.
-            if (this._currentVersion < 4) {
+            if (this._currentVersion < 5) {
                 console.error(`Database version ${this._currentVersion} is not supported by the release - try installing the previous minor version`);
                 process.exit(4);
             }
             // Check that the database is an older version that needs to be modified
             logger.info('Database is a supported version for this release');
             // Add the encryption type in preperation for system encryption
-            if (this._currentVersion == 4) {
+            if (this._currentVersion == 5) {
                 logger.info(`Updating database to version ${++this._currentVersion}`);
-                let keys = keyStores_1.KeyStores.find();
+                // let keys = KeyStores.find();
+                // for (let k of keys) {
+                //     k.encryptedType = k.encrypted? KeyEncryption.USER : KeyEncryption.NONE;
+                //     k.update();
+                // }
+                // Decrpyt all keys
+                let keys = keyStores_1.KeyStores.find({ encryptedType: { $eq: keyEncryption_1.KeyEncryption.SYSTEM } });
                 for (let k of keys) {
-                    k.encryptedType = k.encrypted ? keyEncryption_1.KeyEncryption.USER : keyEncryption_1.KeyEncryption.NONE;
-                    k.update();
+                    yield k.decrypt(this._config.certServer.keySecret);
                 }
-                dbStores_1.DbStores.updateVersion(this._currentVersion);
+                dbStores_1.DbStores.dbDb.findAndRemove();
+                dbStores_1.DbStores.initialize(this._currentVersion, false, false);
                 logger.info(`Updated ${keys.length} keys`);
                 logger.info(`Database updated to version ${this._currentVersion}`);
+                logger.info('All keys have been decrypted');
+                logger.info('Please restart the server to complete the upgrade');
+                let ew = new eventWaiter_1.EventWaiter();
+                this._db.saveDatabase((err) => {
+                    if (err) {
+                        logger.error(`Failed to save database: ${err.message}`);
+                    }
+                    ew.EventSet();
+                });
+                yield ew.EventWait();
+                process.exit(0);
             }
         });
     }
@@ -1164,6 +1181,6 @@ class WebServer {
 }
 exports.WebServer = WebServer;
 WebServer.instance = null;
-WebServer._lowestDBVersion = 4; // The lowest version of the database that is supported
-WebServer._defaultDBVersion = 5; // The version of the database that will be created if it doesn't exist
+WebServer._lowestDBVersion = 5; // The lowest version of the database that is supported
+WebServer._defaultDBVersion = 6; // The version of the database that will be created if it doesn't exist
 //# sourceMappingURL=webserver.js.map

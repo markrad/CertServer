@@ -1,21 +1,18 @@
 import { pki } from "node-forge";
 import { PrivateKeyRow } from "./PrivateKeyRow";
 import { KeyUtil } from "./keyUtil";
-// import { CertificateUtil } from "./certificateUtil";
-// import { CertificateStores } from "./certificateStores";
+import { DbStores } from "./dbStores";
 
 export class KeyStores {
     private static _privateKeyDb: Collection<PrivateKeyRow> = null;
     private static _privateKeyPath: string = null;
-    private static _keySecret: string = null;
 
-    public static init(privateKeyDb: Collection<PrivateKeyRow>, privateKeyPath: string, keySecret: string) {
+    public static init(privateKeyDb: Collection<PrivateKeyRow>, privateKeyPath: string/*, keySecret: string*/) {
         if (privateKeyDb == null) throw new Error("Missing value for privateKeyDb");
         if (privateKeyPath == null) throw new Error("Missing value for privateKeyPath");
 
         KeyStores._privateKeyDb = privateKeyDb;
         KeyStores._privateKeyPath = privateKeyPath;
-        KeyStores._keySecret = keySecret? keySecret : null;
     }
 
     public static get keyDb(): Collection<PrivateKeyRow> {
@@ -29,7 +26,7 @@ export class KeyStores {
     }
 
     public static get keySecret(): string {
-        return KeyStores._keySecret;
+        return DbStores.getKeySecret();
     }
 
     public static find(query?: LokiQuery<PrivateKeyRow & LokiObj>): KeyUtil[] {
@@ -57,16 +54,4 @@ export class KeyStores {
 
         return null;
     }
-
-    // public static setCertificateKeyPair(k: KeyUtil): CertificateUtil {
-    //     let certs = CertificateStores.find({ keyId: null });
-    //     let check: CertificateUtil;
-
-    //     for (let c in certs) {
-    //         if ((check = k.isCertificateKeyPair(certs[c])))
-    //             return check;
-    //     }
-
-    //     return null;
-    // }
 }

@@ -48,6 +48,7 @@ const OperationResultItem_1 = require("../webservertypes/OperationResultItem");
 const OperationResult_1 = require("../webservertypes/OperationResult");
 const certificateStores_1 = require("./certificateStores");
 const keyEncryption_1 = require("./keyEncryption");
+const dbStores_1 = require("./dbStores");
 let logger = log4js.getLogger();
 class KeyUtil {
     /**
@@ -74,7 +75,7 @@ class KeyUtil {
             }
             else {
                 k = node_forge_1.pki.privateKeyFromPem(pemString);
-                if (keyStores_1.KeyStores.keySecret) {
+                if (dbStores_1.DbStores.getKeyEncryptionState()) {
                     pemString = node_forge_1.pki.encryptRsaPrivateKey(k, keyStores_1.KeyStores.keySecret);
                     encrypted = keyEncryption_1.KeyEncryption.SYSTEM;
                 }

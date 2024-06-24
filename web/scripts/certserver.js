@@ -923,12 +923,17 @@ $(async function() {
                         calcRefresh();
                         console.log(`${new Date()} Token refreshed`);
                     }
+                    else {
+                        sessionStorage.clear();
+                    }
                 }
             });
         }, diff * 1000);
     }
     // Check the token time to live
-    calcRefresh();
+    if ($('#auth').text == '1') {
+        calcRefresh();
+    }
 
     // Initialize date input boxes
     let datePicker;
@@ -945,7 +950,7 @@ $(async function() {
     datePicker = $('#LeafValidTo');
     datePicker.datepicker( { defaultDate: +365 } );
 
-    lineCache = new LineCache();
+    lineCache = new LineCache($('#auth').text() == '1');
 
     lineCache.setAddHandler(addHandler);
     lineCache.setUpdateHandler(updateHandler);

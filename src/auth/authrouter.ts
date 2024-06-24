@@ -6,35 +6,49 @@ import * as log4js from 'log4js';
 import { UserStore } from '../database/userStore';
 import { CertError } from '../webservertypes/CertError';
 import { CertMultiError } from '../webservertypes/CertMultiError';
+import { UserRole } from '../database/UserRole';
+import { DbStores } from '../database/dbStores';
 
 const logger = log4js.getLogger('CertServer');
 const tokenLife: string | number = '5m';
+const defaultUser: string = 'admin';
+const defaultPassword: string = 'changeme';
 
 /**
  * @classdesc Represents a router for handling authentication-related routes.
  */
 export class AuthRouter {
     private _authRouter = Router();
-    private _hashSecret: string;
+    private _authenticationState = DbStores.getAuthenticationState();
+    private _passwordSecret: string = DbStores.getPasswordSecret();
     private _authPtr: (request: any, response: any, next: NextFunction) => void = this._noAuth;
     private _checkAuthPtr: (request: any, response: any, next: NextFunction) => void = this._noAuth;
+    private _authRequired: boolean = false;
 
     /**
      * @constructor
-     * @param hashSecret - The secret key used to hash the JWT token. If not provided, the router will not require authentication.
+     * @param authRequired - Will be true if authentication is required, false otherwise.
      */
-    constructor(hashSecret: string) {
-        this._hashSecret = hashSecret;
-
-        if (this._hashSecret) {
+    constructor(authRequired: boolean) {
+        this._authRequired = authRequired;
+        if (this._authenticationState) {
             this._authPtr = this._auth;
             this._checkAuthPtr = this._checkAuth;
+
+            if (UserStore.getUsersByRole(UserRole.ADMIN).length == 0) {
+                logger.warn('No admin users found - adding default admin user');
+                UserStore.addUser(defaultUser, defaultPassword, UserRole.ADMIN);
+            }
         }
 
         this._authRouter.get('/signin', (_request, response) => {
+            if (!this._authRequired) {
+                return response.redirect('/');
+            }
             response.render('signin', {
                 title: 'Sign In',
                 version: 'v' + require('../../../package.json').version,
+                authRequired: `${authRequired ? '1' : '0'}`,
             });
         });
         // FUTURE: Add a signout route?
@@ -43,7 +57,7 @@ export class AuthRouter {
                 const { userId, password } = request.body;
                 logger.debug(`Login request - User: ${userId}`);
                 let role =UserStore.authenticate(userId, password);
-                let { token, expiresAt } = await this.generateToken({ userId: userId, role: role }, this._hashSecret, tokenLife);
+                let { token, expiresAt } = await this.generateToken({ userId: userId, role: role }, this._passwordSecret, tokenLife);
                 request.session.userId = userId;
                 request.session.token = token;
                 request.session.lastSignedIn = new Date();
@@ -59,10 +73,13 @@ export class AuthRouter {
         });
         this._authRouter.post('/tokenrefresh', this.auth, async (request: any, response: any) => {
             try {
+                if (!this._authenticationState) {
+                    throw new CertError(401, 'Authentication is not enabled');
+                }
                 if (!request.session.token) {
                     throw new CertError(401, 'You must be logged in to refresh a token');
                 }
-                let { token, expiresAt } = await this.generateToken(request.session.userId, this._hashSecret, tokenLife);
+                let { token, expiresAt } = await this.generateToken(request.session.userId, this._passwordSecret, tokenLife);
                 request.session.token = token;
                 request.session.tokenExpiration = expiresAt;
                 logger.debug('Token refresh successful');
@@ -76,16 +93,19 @@ export class AuthRouter {
         });
         this._authRouter.post('/token', this.auth, async (request: any, response: any) => {
             try {
+                if (!this._authenticationState) {
+                    throw new CertError(401, 'Authentication is not enabled');
+                }
                 // Returns a shortlived token to be used for a WebSockets connection
                 if (!request.session.token) {
                     throw new CertError(401, 'You must be logged in to get a temporary token');
                 }
-                let decoded = await this.verifyToken(request.session.token, this._hashSecret);
+                let decoded = await this.verifyToken(request.session.token, this._passwordSecret);
                 logger.debug(decoded)
                 if ((decoded as JwtPayload).userId != request.session.userId) {
                     throw new CertError(401, 'You can only get a token for your own session');
                 }
-                let token = await this.generateToken((decoded as JwtPayload).userId, this._hashSecret, 5);
+                let token = await this.generateToken((decoded as JwtPayload).userId, this._passwordSecret, 5);
                 logger.debug('Temporary token creation successful');
                 return response.status(200).json({ success: true, token: token.token });
             }
@@ -96,7 +116,19 @@ export class AuthRouter {
             }
         });
         this._authRouter.get('/authrequired', (_request: any, response: any) => {
-            response.status(200).json({ authRequired: this._hashSecret != null });
+            response.status(200).json({ authRequired: this._authenticationState });
+        });
+        this._authRouter.get('/getUsers', this.auth, (_request: any, response: any) => {
+            try {
+                let users = UserStore.getAllUsers();
+                logger.debug('Get users successful');
+                return response.status(200).json(users);
+            }
+            catch (err) {
+                logger.error(err.message);
+                let e: (CertError | CertMultiError) = CertMultiError.getCertError(err);
+                return response.status(e.status).json(e.getResponse());
+            }
         });
     }
 
@@ -116,7 +148,7 @@ export class AuthRouter {
      */
     public socketUpgrade(request: http.IncomingMessage, socket: any) {
         let token: string = null;
-        if (this._hashSecret) {
+        if (this._authenticationState) {
             if (request.url.startsWith('/?token=')) {
                 token = request.url.split('=')[1];
             }
@@ -128,7 +160,7 @@ export class AuthRouter {
                 socket.end();
                 throw new CertError(401, 'No token provided');
             }
-            let decoded = verify(token, this._hashSecret);
+            let decoded = verify(token, this._passwordSecret);
             logger.debug(decoded);
             if (!UserStore.getUser((decoded as any).userId)) {
                 socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
@@ -176,11 +208,11 @@ export class AuthRouter {
      */
     private _checkAuth(request: any, response: any, next: NextFunction): void {
         try {
-            if (this._hashSecret) {
+            if (this._authenticationState) {
                 if (request.session.userId == '' || !request.session.token) {
                     return response.redirect('/signin');
                 }
-                let decoded = verify(request.session.token, this._hashSecret);
+                let decoded = verify(request.session.token, this._passwordSecret);
                 logger.debug(decoded);
                 if (!UserStore.getUser((decoded as any).userId)) {
                     throw new CertError(401, `User ${(decoded as any).userId} not found`);
@@ -208,7 +240,7 @@ export class AuthRouter {
      */
     private _auth(request: any, response: any, next: NextFunction): void {
         try {
-            if (this._hashSecret) {
+            if (this._passwordSecret) {
                 let token: string = null;
                 if (request.headers.authorization) {
                     token = request.headers.authorization.split(' ')[1];
@@ -219,7 +251,7 @@ export class AuthRouter {
                 else {
                     throw new CertError(401, 'No token provided');
                 }
-                let decoded = verify(token, this._hashSecret);
+                let decoded = verify(token, this._passwordSecret);
                 logger.debug(decoded);
                 if (!UserStore.getUser((decoded as any).userId)) {
                     throw new CertError(401, `User ${(decoded as any).userId} not found`);
