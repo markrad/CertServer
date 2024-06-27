@@ -52,7 +52,8 @@
 			"extensions": [
 				"gruntfuggly.todo-tree",
 				"maixiaojie.git-emoji",
-				"redhat-developer.vscode-yaml"
+				"redhat-developer.vscode-yaml",
+				"gitkraken.gitlens"
 			]
 		}
 	}
