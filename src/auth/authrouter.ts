@@ -199,7 +199,7 @@ export class AuthRouter {
                 if (!this._authRequired) {
                     throw new CertError(401, 'Authentication is not enabled');
                 }
-                if (request.session.role != UserRole.ADMIN) {
+                if (request.body.username != request.session.userId && request.session.role != UserRole.ADMIN) {
                     throw new CertError(401, 'You must be an admin to update a user');
                 }
                 const { userpassword, userid, username, newpassword, confirmpassword } = request.body;
