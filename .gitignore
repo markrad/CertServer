@@ -135,7 +135,7 @@ data/
 test.ts
 test.js*
 
-certs/
+/certs/
 
 .VSCodeCounter/
 config.yml
