@@ -228,7 +228,7 @@ class AuthRouter {
                 if (!this._authRequired) {
                     throw new CertError_1.CertError(401, 'Authentication is not enabled');
                 }
-                if (request.session.role != UserRole_1.UserRole.ADMIN) {
+                if (request.body.username != request.session.userId && request.session.role != UserRole_1.UserRole.ADMIN) {
                     throw new CertError_1.CertError(401, 'You must be an admin to update a user');
                 }
                 const { userpassword, userid, username, newpassword, confirmpassword } = request.body;
