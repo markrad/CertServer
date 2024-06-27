@@ -1,0 +1,19 @@
+div#addUser.hidden(title='Add User')
+    form#addUserForm(action="/api/addUser", method="post", encType="application/x-www-form-urlencoded" onsubmit="onAddUser(event)")
+        #error 
+        if error
+            p.text-danger Error!!!
+        fieldset
+            label.modal-label(for='Username') Username:
+            input(type='text' name='username' id='username' value='' class='text ui-widget-content ui-corner-all' required autofocus)
+            label.modal-label(for='Password') Password:
+            input(type='password' name='password' id='password' value='' class='text ui-widget-content ui-corner-all' required)
+            label.modal-label(for='Password') Confirm Password:
+            input(type='password' name='confirmpassword' id='confirmpassword' value='' class='text ui-widget-content ui-corner-all' required)
+            label.modal-label(for='Role') Role:
+            select#roleSelect(name='role')
+                option(value='1') User
+                option(value='0') Admin
+        div.new-form-buttons
+            input.button4#addUserReset(type="reset", value="Reset", title="Reset")
+            input.button4#addUserButton.form-submit-button(type="submit", title="submit", value="Add User")

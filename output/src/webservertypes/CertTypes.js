@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CertTypes = void 0;
 /**
- * Supported X.509 object types
+ * Supported object types
  */
 var CertTypes;
 (function (CertTypes) {
@@ -16,5 +16,7 @@ var CertTypes;
     CertTypes[CertTypes["leaf"] = 3] = "leaf";
     /** Private key */
     CertTypes[CertTypes["key"] = 4] = "key";
+    /** User account */
+    CertTypes[CertTypes["user"] = 5] = "user";
 })(CertTypes || (exports.CertTypes = CertTypes = {}));
 //# sourceMappingURL=CertTypes.js.map

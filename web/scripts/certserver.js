@@ -585,6 +585,20 @@ function newLeafDialog(id, name) {
     dialog.dialog('open');
 }
 
+function addUser(event) {
+    let dialog = $('#addUser');
+    dialog.dialog('option', 'title', 'Add User');
+    dialog.dialog('open');
+}
+
+function editUser(id, name) {
+    let dialog = $('#editUser');
+    dialog.dialog('option', 'title', `Edit User ${name}`);
+    $('#edit-userid').val(id);
+    $('#edit-username').val(sessionStorage.getItem('userId'));
+    dialog.dialog('open');
+}
+
 // Slide top panes in or out of view
 /**
  * Toggles the top forms in and out of view
@@ -722,6 +736,49 @@ function onGenerateCert(event) {
         }
     });
 }
+
+function onAddUser(event) {
+    event.preventDefault();
+    let frm = $('#addUserForm');
+    $.ajax({
+        type: frm.attr('method'),
+        url: frm.attr('action'),
+        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` },
+        data: frm.serialize(),
+        success: addUserResponse,
+        error: function(data) {
+            showMessage(data.responseJSON);
+        }
+    });
+}
+
+function addUserResponse(result) {
+    $('#addUserForm')[0].reset();
+    $('#addUser').dialog('close');
+    showMessage(result);
+}
+
+function onEditUser(event) {
+    event.preventDefault();
+    let frm = $('#editUserForm');
+    $.ajax({
+        type: frm.attr('method'),
+        url: frm.attr('action'),
+        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` },
+        data: frm.serialize(),
+        success: editUserResponse,
+        error: function(data) {
+            showMessage(data.responseJSON);
+        }
+    });
+}
+
+function editUserResponse(result) {
+    $('#editUserForm')[0].reset();
+    $('#editUser').dialog('close');
+    showMessage(result);
+}
+
 /**
  * Called when a new CA is successfully created.
  * 
@@ -888,6 +945,87 @@ function tagAdd(tagArrayId) {
     tagArray.data('highValue', `${(++highValue)}`);
 }
 
+function openUserPane(event) {
+    let header = `
+        <li class="user-line">
+            <div class="user-line-inner">
+                <span class="user-name-title user-name">User Name</span>
+                <span class="user-role-title user-role">User Role</span>
+                <span class="user-buttons"></span>
+            </div>
+        </li>    `;
+    $('.top-section').hide();
+    $('.certs-view').hide();
+    $('.keys-view').hide();
+    $('.users-view').show();
+    if (sessionStorage.getItem('role') !== '0') {
+        $('#add-user-btn').hide();
+    }
+    $.ajax({
+        type: 'GET',
+        url: '/api/getUsers',
+        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` },
+        success: (data) => {
+            let userList = $('#userList');
+            userList.empty();
+            if (data.length == 0) {
+                userList.append('<li class="empty">None</li>');
+            }
+            else {
+                userList.append(header)
+                data.forEach((user) => {
+                    userList.append(buildUserEntry(user));
+                });
+            }
+        },
+        error: (xhr, _msg, err) => {
+            showMessage(err);
+        }
+    });
+}
+
+function deleteUser(id, name) {
+    if (confirm(`This will delete user ${name}. \n\nDo you wish to continue?`)) {
+        $.ajax({
+            type: 'DELETE',
+            url: `/api/removeUser?id=${id}`,
+            headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` },
+            success: (data) => {
+                showMessage(data);
+            },
+            error: (xhr, _msg, _err) => {
+                showMessage(xhr.responseJSON);
+            }
+        });
+    }
+}
+
+function buildUserEntry(user) {
+    let userLine = `
+        <li class="user-line" id=u${user.id}>
+            <div class="user-line-inner">
+                <span class="user-name">${user.username}</span>
+                <span class="user-role">${user.role == 0? 'ADMIN' : 'USER'}</span>
+                <span class="user-buttons">
+                    <button class="button4" type="button" onclick="editUser(${user.id}, '${user.username}')">
+                        <span class="button1Text">Edit</span>
+                    </button>
+                    <button class="button4 ${user.username != sessionStorage.getItem('userId') ? '' : 'hidden'}" type="button" onclick="deleteUser(${user.id}, '${user.username}')">
+                        <span class="button1Text">Delete</span>
+                    </button>
+                </span>
+            </div>
+        </li>`;
+    return userLine;
+}
+
+function exitUserPane(event) {
+    $('.users-view').hide();
+    $('.top-section').show();
+    $('.certs-view').show();
+    $('.keys-view').show();
+}
+
 /**
  * This function is automatically called by jQuery when the webpage is loaded. It initializes stuff.
  */
@@ -931,7 +1069,7 @@ $(async function() {
         }, diff * 1000);
     }
     // Check the token time to live
-    if ($('#auth').text == '1') {
+    if ($('#auth').text() == '1') {
         calcRefresh();
     }
 
@@ -959,7 +1097,7 @@ $(async function() {
     /**
      * Applies an update from the server to the UI.
      * 
-     * @param {1 | 2 | 3 | 4} type Type of entry updated - root, intermediate, leaf, or key (1, 2, 3, 4)
+     * @param {1 | 2 | 3 | 4 | 5} type Type of entry updated - root, intermediate, leaf, key or user (1, 2, 3, 4, 5)
      * @param {{ id: number, name: string }} entry id and name of the entry - id will never change, name can
      */
     async function updateHandler(type, entry) {
@@ -969,7 +1107,10 @@ $(async function() {
         let details = $(`${idName} ${type == 4? '.key-details' : '.cert-details'}`);
         let arrow = $(`${idName}  ${type == 4 ? '.key-line-arrow' : '.cert-line-arrow'}`);
         let detailsVisible = !details.is(':hidden')
-        if (type == 4) {
+        if (type == 5) {
+            // Ignore user updates
+        }
+        else if (type == 4) {
             if (entry.name != name) {
                 deleteHandler(type, entry.id);
                 addHandler(type, entry);
@@ -997,22 +1138,49 @@ $(async function() {
      */
     function addHandler(type, entry) {
         console.log('Add: ' + JSON.stringify(entry));
-        let newEntry = type == 4 ? buildKeyEntry(entry) : buildCertEntry(entry);
-        let listChildren = $(`#${typeLookup[type]}List li`);
-        if (listChildren.length == 1 && listChildren.first().attr('class') == 'empty') {
-            listChildren.last().after(newEntry);
-            listChildren.first().remove();
+        if (type == 5) {
+            if ($('.users-view').is(':visible')) {
+                let userList = $('#userList');
+                let userLine = buildUserEntry(entry);
+                if (userList.children().length == 1 && userList.children().first().attr('class') == 'empty') {
+                    // There should never be an occasion without any users in the list but just in case
+                    userList.children().last().after(userLine);
+                    userList.children().first().remove();
+                }
+                else {
+                    if (entry.username.localeCompare(userList.children().last().find('.user-name').text()) == 1) {
+                        userList.children().last().after(userLine);
+                    }
+                    else {
+                        for (let i = 1; i < userList.children().length; i++) {
+                            if (entry.username.localeCompare($(userList.children()[i]).find('.user-name').text()) != 1) {
+                                $(userList.children()[i]).before(userLine);
+                                break;
+                            }
+                        }
+                    }
+
+                }
+            }
         }
         else {
-            if (entry.name.localeCompare(listChildren.last().find('span.cert-line-name').text()) == 1) {
+            let newEntry = type == 4 ? buildKeyEntry(entry) : buildCertEntry(entry);
+            let listChildren = $(`#${typeLookup[type]}List li`);
+            if (listChildren.length == 1 && listChildren.first().attr('class') == 'empty') {
                 listChildren.last().after(newEntry);
+                listChildren.first().remove();
             }
             else {
-                for (let i = 0; i < listChildren.length; i++) {
-                    console.log(`>> ${entry.name} ${$(listChildren[i]).find('span.cert-line-name').text() }`)
-                    if (entry.name.localeCompare($(listChildren[i]).find('span.cert-line-name').text()) != 1) {
-                        $(listChildren[i]).before(newEntry);
-                        break;
+                if (entry.name.localeCompare(listChildren.last().find('span.cert-line-name').text()) == 1) {
+                    listChildren.last().after(newEntry);
+                }
+                else {
+                    for (let i = 0; i < listChildren.length; i++) {
+                        console.log(`>> ${entry.name} ${$(listChildren[i]).find('span.cert-line-name').text() }`)
+                        if (entry.name.localeCompare($(listChildren[i]).find('span.cert-line-name').text()) != 1) {
+                            $(listChildren[i]).before(newEntry);
+                            break;
+                        }
                     }
                 }
             }
@@ -1026,10 +1194,11 @@ $(async function() {
      * @param {*} id id of deleted entry
      */
     function deleteHandler(type, id) {
-        console.log('Delete: ' + id);
-        let entry = $(`#${type == 4 ? 'k' : 'c'}${id}`);
+        console.log(`Delete type ${type}: ${id}`);
+        let idType = type == 4 ? 'k' : type == 5? 'u' : 'c';
+        let entry = $(`#${idType}${id}`);
         let list = entry.closest('ul');
-        $(`#${type == 4 ? 'k' : 'c'}${id}`).remove();
+        $(`#${idType}${id}`).remove();
         if (list.children().length == 0) {
             list.append('<li class="empty">None</li>');
         }
@@ -1098,5 +1267,15 @@ $(async function() {
         autoOpen: false,
         modal: true,
         width: 450,
+    });
+
+    $('#addUser').dialog({
+        autoOpen: false,
+        modal: true,
+    });
+
+    $('#editUser').dialog({
+        autoOpen: false,
+        modal: true,
     });
 });

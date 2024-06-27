@@ -8,6 +8,7 @@ import { CertError } from '../webservertypes/CertError';
 import { CertMultiError } from '../webservertypes/CertMultiError';
 import { UserRole } from '../database/UserRole';
 import { DbStores } from '../database/dbStores';
+import { WSManager } from '../wsmanger/wsmanager';
 
 const logger = log4js.getLogger('CertServer');
 const tokenLife: string | number = '5m';
@@ -19,7 +20,6 @@ const defaultPassword: string = 'changeme';
  */
 export class AuthRouter {
     private _authRouter = Router();
-    private _authenticationState = DbStores.getAuthenticationState();
     private _passwordSecret: string = DbStores.getPasswordSecret();
     private _authPtr: (request: any, response: any, next: NextFunction) => void = this._noAuth;
     private _checkAuthPtr: (request: any, response: any, next: NextFunction) => void = this._noAuth;
@@ -31,7 +31,7 @@ export class AuthRouter {
      */
     constructor(authRequired: boolean) {
         this._authRequired = authRequired;
-        if (this._authenticationState) {
+        if (this._authRequired) {
             this._authPtr = this._auth;
             this._checkAuthPtr = this._checkAuth;
 
@@ -40,7 +40,6 @@ export class AuthRouter {
                 UserStore.addUser(defaultUser, defaultPassword, UserRole.ADMIN);
             }
         }
-
         this._authRouter.get('/signin', (_request, response) => {
             if (!this._authRequired) {
                 return response.redirect('/');
@@ -51,19 +50,27 @@ export class AuthRouter {
                 authRequired: `${authRequired ? '1' : '0'}`,
             });
         });
-        // FUTURE: Add a signout route?
+        this._authRouter.get('/signout', (request: any, response) => {
+            request.session.userId = '';
+            request.session.role = '';
+            request.session.token = '';
+            request.session.lastSignedIn = '';
+            request.session.tokenExpiration = '';
+            response.redirect('/signin');
+        });
         this._authRouter.post('/login', async (request: any, response) => {
             try {
                 const { userId, password } = request.body;
                 logger.debug(`Login request - User: ${userId}`);
-                let role =UserStore.authenticate(userId, password);
+                let role = UserStore.authenticate(userId, password);
                 let { token, expiresAt } = await this.generateToken({ userId: userId, role: role }, this._passwordSecret, tokenLife);
                 request.session.userId = userId;
+                request.session.role = role;
                 request.session.token = token;
                 request.session.lastSignedIn = new Date();
                 request.session.tokenExpiration = expiresAt;
                 logger.debug('Login successful');
-                return response.status(200).json({ success: true, token: token, userId: userId, expiresAt: expiresAt });
+                return response.status(200).json({ success: true, token: token, userId: userId, role: role, expiresAt: expiresAt });
             }
             catch (err) {
                 logger.error(err.message);
@@ -73,13 +80,13 @@ export class AuthRouter {
         });
         this._authRouter.post('/tokenrefresh', this.auth, async (request: any, response: any) => {
             try {
-                if (!this._authenticationState) {
+                if (!this._authRequired) {
                     throw new CertError(401, 'Authentication is not enabled');
                 }
                 if (!request.session.token) {
                     throw new CertError(401, 'You must be logged in to refresh a token');
                 }
-                let { token, expiresAt } = await this.generateToken(request.session.userId, this._passwordSecret, tokenLife);
+                let { token, expiresAt } = await this.generateToken({ userId: request.session.userId, role: request.session.role }, this._passwordSecret, tokenLife);
                 request.session.token = token;
                 request.session.tokenExpiration = expiresAt;
                 logger.debug('Token refresh successful');
@@ -93,7 +100,7 @@ export class AuthRouter {
         });
         this._authRouter.post('/token', this.auth, async (request: any, response: any) => {
             try {
-                if (!this._authenticationState) {
+                if (!this._authRequired) {
                     throw new CertError(401, 'Authentication is not enabled');
                 }
                 // Returns a shortlived token to be used for a WebSockets connection
@@ -105,7 +112,8 @@ export class AuthRouter {
                 if ((decoded as JwtPayload).userId != request.session.userId) {
                     throw new CertError(401, 'You can only get a token for your own session');
                 }
-                let token = await this.generateToken((decoded as JwtPayload).userId, this._passwordSecret, 5);
+                let { userId, role } = decoded as any;
+                let token = await this.generateToken({ userId: userId, role: role }, this._passwordSecret, 5);
                 logger.debug('Temporary token creation successful');
                 return response.status(200).json({ success: true, token: token.token });
             }
@@ -116,13 +124,113 @@ export class AuthRouter {
             }
         });
         this._authRouter.get('/authrequired', (_request: any, response: any) => {
-            response.status(200).json({ authRequired: this._authenticationState });
+            response.status(200).json({ authRequired: this._authRequired });
         });
-        this._authRouter.get('/getUsers', this.auth, (_request: any, response: any) => {
+        this._authRouter.get('/getUsers', this.auth, (request: any, response: any) => {
             try {
+                if (!this._authRequired) { 
+                    throw new CertError(401, 'Authentication is not enabled');
+                }
                 let users = UserStore.getAllUsers();
+                if (request.session.role != UserRole.ADMIN) {
+                    users = users.filter((u) => u.username == request.session.userId);
+                }
+                if (users.length == 0) {
+                    throw new CertError(500, 'No users found - internal error');
+                }
                 logger.debug('Get users successful');
-                return response.status(200).json(users);
+                // TODO: fix up database so all users have a role
+                return response.status(200).json(users
+                    .map((u) => { return { username: u.username, role: u.role === undefined? UserRole.USER : u.role, id: u.$loki } })
+                    .sort((a, b) => a.username.localeCompare(b.username)));
+            }
+            catch (err) {
+                logger.error(err.message);
+                let e: (CertError | CertMultiError) = CertMultiError.getCertError(err);
+                return response.status(e.status).json(e.getResponse());
+            }
+        });
+        this._authRouter.get('/getUser', this.auth, (request: any, response: any) => {
+            try {
+                if (!this._authRequired) {
+                    throw new CertError(401, 'Authentication is not enabled');
+                }
+                let user = UserStore.getUser(Number(request.query.id));
+                if (!user) {
+                    throw new CertError(404, 'User not found');
+                }
+                logger.debug('Get user successful');
+                return response.status(200).json({ username: user.username, role: user.role, id: user.$loki });
+            }
+            catch (err) {
+                logger.error(err.message);
+                let e: (CertError | CertMultiError) = CertMultiError.getCertError(err);
+                return response.status(e.status).json(e.getResponse());
+            }
+        });
+        this._authRouter.post('/addUser', this.auth, (request: any, response: any) => {
+            try {
+                if (!this._authRequired) {
+                    throw new CertError(401, 'Authentication is not enabled');
+                }
+                if (request.session.role != UserRole.ADMIN) {
+                    throw new CertError(401, 'You must be an admin to add a user');
+                }
+                const { username, password, confirmpassword, role } = request.body;
+                if (password != confirmpassword) {
+                    throw new CertError(400, 'Passwords do not match');
+                }
+                if (UserStore.getUser(username)) {
+                    throw new CertError(400, `User ${username} already exists`);
+                }
+                let result = UserStore.addUser(username, password, role == '0'? UserRole.ADMIN : UserRole.USER);
+                logger.debug(`User ${username} added successfully`);
+                WSManager.broadcast(result);
+                return response.status(200).json(result.getResponse());
+            }
+            catch (err) {
+                logger.error(err.message);
+                let e: (CertError | CertMultiError) = CertMultiError.getCertError(err);
+                return response.status(e.status).json(e.getResponse());
+            }
+        });
+        this._authRouter.post('/updateUser', this.auth, (request: any, response: any) => {
+            try {
+                if (!this._authRequired) {
+                    throw new CertError(401, 'Authentication is not enabled');
+                }
+                if (request.session.role != UserRole.ADMIN) {
+                    throw new CertError(401, 'You must be an admin to update a user');
+                }
+                const { userpassword, userid, username, newpassword, confirmpassword } = request.body;
+                if (newpassword != confirmpassword) {
+                    throw new CertError(400, 'Passwords do not match');
+                }
+                UserStore.authenticate(username, userpassword);
+                let result = UserStore.updatePassword(Number(userid), newpassword);
+                logger.debug(`User ${result.name} updated successfully`);
+                WSManager.broadcast(result);
+                return response.status(200).json(result.getResponse());
+            }
+            catch (err) {
+                logger.error(err.message);
+                let e: (CertError | CertMultiError) = CertMultiError.getCertError(err);
+                return response.status(e.status).json(e.getResponse());
+            }
+        });
+        this._authRouter.delete('/removeUser', this.auth, (request: any, response: any) => {
+            try {
+                if (!this._authRequired) {
+                    throw new CertError(401, 'Authentication is not enabled');
+                }
+                if (request.session.role != UserRole.ADMIN) {
+                    throw new CertError(401, 'You must be an admin to remove a user');
+                }
+                const userId = Number(request.query.id);
+                let result = UserStore.removeUser(userId);
+                logger.debug(`User ${userId} removed successfully`);
+                WSManager.broadcast(result);
+                return response.status(200).json(result.getResponse());
             }
             catch (err) {
                 logger.error(err.message);
@@ -148,7 +256,7 @@ export class AuthRouter {
      */
     public socketUpgrade(request: http.IncomingMessage, socket: any) {
         let token: string = null;
-        if (this._authenticationState) {
+        if (this._authRequired) {
             if (request.url.startsWith('/?token=')) {
                 token = request.url.split('=')[1];
             }
@@ -208,7 +316,7 @@ export class AuthRouter {
      */
     private _checkAuth(request: any, response: any, next: NextFunction): void {
         try {
-            if (this._authenticationState) {
+            if (this._authRequired) {
                 if (request.session.userId == '' || !request.session.token) {
                     return response.redirect('/signin');
                 }

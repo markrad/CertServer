@@ -31,7 +31,6 @@ import session from 'express-session'
 // }
 
 
-import WsServer from 'ws';
 import { Readable } from 'stream';
 import * as log4js from 'log4js';
 
@@ -63,6 +62,7 @@ import { UserRow } from './database/UserRow';
 import { KeyEncryption } from './database/keyEncryption';
 
 import { AuthRouter } from './auth/authrouter';
+import { WSManager } from './wsmanger/wsmanager';
 
 const logger = log4js.getLogger('CertServer');
 logger.level = "debug";
@@ -88,7 +88,6 @@ export class WebServer {
     private _privatekeysPath: string;
     private _dbPath: string;
     private _app: Express.Application = Express();
-    private _ws = new WsServer.Server({ noServer: true });
     private _db: loki;
     private _certificate: string = null;
     private _key: string = null;
@@ -215,8 +214,9 @@ export class WebServer {
             UserStore.init(userStore);
 
             await this._dbInit();
-            this._authRouter = new AuthRouter(this._useAuthentication);
 
+            DbStores.setAuthenticationState(this._useAuthentication);
+            this._authRouter = new AuthRouter(this._useAuthentication);
         }
         catch (err) {
             logger.fatal('Failed to initialize the database: ' + err.message);
@@ -240,8 +240,6 @@ export class WebServer {
             resave: false,
             saveUninitialized: false
         }));
-        this._app.use('/', this._authRouter.router);
-        this._app.use('/api', this._authRouter.router);
         this._app.use((request: any, response: any, next: NextFunction) => {
             if (!request.session.userId) {
                 request.session.userId = '';
@@ -278,6 +276,8 @@ export class WebServer {
                 response.status(err.status ?? 500).json({ error: err.message });
             }
         });
+        this._app.use('/', this._authRouter.router);
+        this._app.use('/api', this._authRouter.router);
         this._app.get('/', this._authRouter.checkAuth, (_request, response) => {
             response.render('index', { 
                 title: 'Certificates Management Home',
@@ -289,7 +289,7 @@ export class WebServer {
                 version: this._version,
                 authRequired: `${this._useAuthentication? '1' : '0'}`,
                 userName: this._useAuthentication? (_request.session as any).userId : 'None',
-                userRole: this._useAuthentication? (_request.session as any).role : '',
+                userRole: this._useAuthentication? (_request.session as any).role == '0'? 'admin' : 'user' : '',
             });
         });
         this._app.get('/api/helper', async (request, response) => {
@@ -373,7 +373,7 @@ export class WebServer {
                 let keyResult = await this._tryAddKey({ pemString: keyPem });
                 certResult.merge(keyResult);
                 certResult.name = `${certResult.name}/${keyResult.name}`;
-                this._broadcast(certResult);
+                WSManager.broadcast(certResult);
                 let certId = certResult.added[0].id;
                 let keyId = keyResult.added[0].id;
                 return response.status(200)
@@ -484,7 +484,7 @@ export class WebServer {
             try {
                 let c = this._resolveCertificateQuery(request.query as QueryType);
                 let result: OperationResult = await this._tryDeleteCert(c);
-                this._broadcast(result);
+                WSManager.broadcast(result);
                 return response.status(200).json(result.getResponse());
             }
             catch (err) {
@@ -505,7 +505,7 @@ export class WebServer {
                     c.updateTags(cleanedTags);
                 });
                 result.pushMessage('Certificate tags updated', ResultType.Success);
-                this._broadcast(result);
+                WSManager.broadcast(result);
                 return response.status(200).json(result.getResponse());
             }
             catch (err) {
@@ -527,7 +527,7 @@ export class WebServer {
             try {
                 let k = this._resolveKeyQuery(request.query as QueryType);
                 let result: OperationResult = await this._tryDeleteKey(k);
-                this._broadcast(result);
+                WSManager.broadcast(result);
                 return response.status(200).json(result.getResponse());
             }
             catch (err) {
@@ -571,7 +571,7 @@ export class WebServer {
                 }
 
                 if (result.added.length + result.updated.length + result.deleted.length > 0) {
-                    this._broadcast(result);
+                    WSManager.broadcast(result);
                 }
                 return response.status(200).json(result.getResponse());
             }
@@ -591,7 +591,7 @@ export class WebServer {
                 }
 
                 let result: OperationResult = await this._processMultiFile(request.body);
-                this._broadcast(result);
+                WSManager.broadcast(result);
                 return response.status(200).json(result.getResponse()); 
             }
             catch (err) {
@@ -612,7 +612,7 @@ export class WebServer {
                 }
 
                 let result: OperationResult = await this._tryAddKey({ pemString: request.body, password: request.query.password as string });
-                this._broadcast(result);
+                WSManager.broadcast(result);
                 return response.status(200).json(result.getResponse());
             }
             catch (err) {
@@ -691,11 +691,7 @@ export class WebServer {
 
         server.on('upgrade', async (request, socket, head) => {
             try {
-                this._authRouter.socketUpgrade(request, socket);
-                this._ws.handleUpgrade(request, socket, head, (ws) => {
-                    ws.send('Connected');
-                    logger.debug('WebSocket client connected');
-                });
+                WSManager.upgrade(request, socket, head);
             }
             catch (err) {
                 logger.error('Upgrade failed: ' + err.message);
@@ -1055,27 +1051,6 @@ export class WebServer {
             catch (err) {
                 reject(err);
             }
-        });
-    }
-
-    /**
-     * Broadcasts the updates to the certificates and keys to all of the web clients
-     * 
-     * @param data the collection of operation results
-     */
-    private _broadcast(data: OperationResult): void {
-        let msg = JSON.stringify(data.normalize());
-        logger.debug('Updates: ' + msg);
-
-        this._ws.clients.forEach((client) => {
-            client.send(msg, (err) => {
-                if (err) {
-                    logger.error(`Failed to send to client`);
-                }
-                else {
-                    logger.debug('Sent update to client');
-                }
-            });
         });
     }
 

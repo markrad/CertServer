@@ -66,7 +66,6 @@ const express_session_1 = __importDefault(require("express-session"));
 // interface Request {
 //     session: Session;
 // }
-const ws_1 = __importDefault(require("ws"));
 const stream_1 = require("stream");
 const log4js = __importStar(require("log4js"));
 const eventWaiter_1 = require("./utility/eventWaiter");
@@ -86,6 +85,7 @@ const dbName_1 = require("./database/dbName");
 const userStore_1 = require("./database/userStore");
 const keyEncryption_1 = require("./database/keyEncryption");
 const authrouter_1 = require("./auth/authrouter");
+const wsmanager_1 = require("./wsmanger/wsmanager");
 const logger = log4js.getLogger('CertServer');
 logger.level = "debug";
 /**
@@ -109,7 +109,6 @@ class WebServer {
      */
     constructor(config) {
         this._app = (0, express_1.default)();
-        this._ws = new ws_1.default.Server({ noServer: true });
         this._certificate = null;
         this._key = null;
         this._useAuthentication = false;
@@ -206,6 +205,7 @@ class WebServer {
                 dbStores_1.DbStores.init(dbVersion);
                 userStore_1.UserStore.init(userStore);
                 yield this._dbInit();
+                dbStores_1.DbStores.setAuthenticationState(this._useAuthentication);
                 this._authRouter = new authrouter_1.AuthRouter(this._useAuthentication);
             }
             catch (err) {
@@ -230,8 +230,6 @@ class WebServer {
                 resave: false,
                 saveUninitialized: false
             }));
-            this._app.use('/', this._authRouter.router);
-            this._app.use('/api', this._authRouter.router);
             this._app.use((request, response, next) => {
                 var _a;
                 if (!request.session.userId) {
@@ -269,6 +267,8 @@ class WebServer {
                     response.status((_a = err.status) !== null && _a !== void 0 ? _a : 500).json({ error: err.message });
                 }
             });
+            this._app.use('/', this._authRouter.router);
+            this._app.use('/api', this._authRouter.router);
             this._app.get('/', this._authRouter.checkAuth, (_request, response) => {
                 response.render('index', {
                     title: 'Certificates Management Home',
@@ -280,7 +280,7 @@ class WebServer {
                     version: this._version,
                     authRequired: `${this._useAuthentication ? '1' : '0'}`,
                     userName: this._useAuthentication ? _request.session.userId : 'None',
-                    userRole: this._useAuthentication ? _request.session.role : '',
+                    userRole: this._useAuthentication ? _request.session.role == '0' ? 'admin' : 'user' : '',
                 });
             });
             this._app.get('/api/helper', (request, response) => __awaiter(this, void 0, void 0, function* () {
@@ -359,7 +359,7 @@ class WebServer {
                     let keyResult = yield this._tryAddKey({ pemString: keyPem });
                     certResult.merge(keyResult);
                     certResult.name = `${certResult.name}/${keyResult.name}`;
-                    this._broadcast(certResult);
+                    wsmanager_1.WSManager.broadcast(certResult);
                     let certId = certResult.added[0].id;
                     let keyId = keyResult.added[0].id;
                     return response.status(200)
@@ -469,7 +469,7 @@ class WebServer {
                 try {
                     let c = this._resolveCertificateQuery(request.query);
                     let result = yield this._tryDeleteCert(c);
-                    this._broadcast(result);
+                    wsmanager_1.WSManager.broadcast(result);
                     return response.status(200).json(result.getResponse());
                 }
                 catch (err) {
@@ -493,7 +493,7 @@ class WebServer {
                         c.updateTags(cleanedTags);
                     });
                     result.pushMessage('Certificate tags updated', OperationResult_1.ResultType.Success);
-                    this._broadcast(result);
+                    wsmanager_1.WSManager.broadcast(result);
                     return response.status(200).json(result.getResponse());
                 }
                 catch (err) {
@@ -515,7 +515,7 @@ class WebServer {
                 try {
                     let k = this._resolveKeyQuery(request.query);
                     let result = yield this._tryDeleteKey(k);
-                    this._broadcast(result);
+                    wsmanager_1.WSManager.broadcast(result);
                     return response.status(200).json(result.getResponse());
                 }
                 catch (err) {
@@ -555,7 +555,7 @@ class WebServer {
                         result.merge(yield this._processMultiFile(f.data.toString()));
                     }
                     if (result.added.length + result.updated.length + result.deleted.length > 0) {
-                        this._broadcast(result);
+                        wsmanager_1.WSManager.broadcast(result);
                     }
                     return response.status(200).json(result.getResponse());
                 }
@@ -574,7 +574,7 @@ class WebServer {
                         return response.status(400).json(new OperationResult_1.OperationResult('').pushMessage('Pem must be in standard 64 byte line length format - try --data-binary with curl', OperationResult_1.ResultType.Failed).getResponse());
                     }
                     let result = yield this._processMultiFile(request.body);
-                    this._broadcast(result);
+                    wsmanager_1.WSManager.broadcast(result);
                     return response.status(200).json(result.getResponse());
                 }
                 catch (err) {
@@ -594,7 +594,7 @@ class WebServer {
                         return response.status(400).json(new OperationResult_1.OperationResult('').pushMessage('No password provided', OperationResult_1.ResultType.Failed).getResponse());
                     }
                     let result = yield this._tryAddKey({ pemString: request.body, password: request.query.password });
-                    this._broadcast(result);
+                    wsmanager_1.WSManager.broadcast(result);
                     return response.status(200).json(result.getResponse());
                 }
                 catch (err) {
@@ -670,11 +670,7 @@ class WebServer {
             });
             server.on('upgrade', (request, socket, head) => __awaiter(this, void 0, void 0, function* () {
                 try {
-                    this._authRouter.socketUpgrade(request, socket);
-                    this._ws.handleUpgrade(request, socket, head, (ws) => {
-                        ws.send('Connected');
-                        logger.debug('WebSocket client connected');
-                    });
+                    wsmanager_1.WSManager.upgrade(request, socket, head);
                 }
                 catch (err) {
                     logger.error('Upgrade failed: ' + err.message);
@@ -1013,25 +1009,6 @@ class WebServer {
                 reject(err);
             }
         }));
-    }
-    /**
-     * Broadcasts the updates to the certificates and keys to all of the web clients
-     *
-     * @param data the collection of operation results
-     */
-    _broadcast(data) {
-        let msg = JSON.stringify(data.normalize());
-        logger.debug('Updates: ' + msg);
-        this._ws.clients.forEach((client) => {
-            client.send(msg, (err) => {
-                if (err) {
-                    logger.error(`Failed to send to client`);
-                }
-                else {
-                    logger.debug('Sent update to client');
-                }
-            });
-        });
     }
     /**
      * Returns the certificate row that is identified by either the id or name. This accepts the body from the web client as input.

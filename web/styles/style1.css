@@ -23,6 +23,14 @@ div.keys-view {
     margin-bottom: 5px;
 }
 
+div.users-view {
+    border: 1px black solid;
+    padding-left: 5px;
+    padding-bottom: 5px;
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+
 div.view-content {
     border: 3px;
 }
@@ -304,6 +312,29 @@ button.button2-red:hover {
     margin: 8px 8px;
 }
 
+.button4 {
+    background-color: rgb(34, 116, 34);
+    border: none;
+    /* padding-left: 8px; */
+    text-align: center;
+    display: inline-block;
+    font-size: 12px;
+    font-weight: normal;
+    margin: 0px 4px;
+    padding: 6px 4px;
+    transition-duration: 0.4s;
+    cursor: pointer;
+    color: whitesmoke;
+    border-radius: 6px;
+    /* width: 100pt; */
+    font-family: Arial, Helvetica, sans-serif;
+    text-decoration: none;
+}
+
+.button4:hover {
+    background-color: rgb(64, 167, 64);
+}
+
 #tagChooserValue {
     width: calc(100% - 130px);
 }
@@ -436,6 +467,19 @@ button.button2-red:hover {
     /* padding-right: 10px; */
 }
 
+.user-line-inner {
+    margin: 5px 0px;
+    /* background-color: rgb(231, 252, 231);
+    cursor: pointer;
+    width: 100%; */
+}
+
+.user-line-inner:hover {
+    background-color: rgb(231, 252, 231);
+    cursor: pointer;
+    /* width: 100%; */
+}
+
 #logged-in-user {
     font-family: 'Courier New', Courier, monospace;
     font-size: medium;
@@ -443,4 +487,39 @@ button.button2-red:hover {
     display: inline-block;
     /* float: right; */
     text-align: right;
+}
+
+#user-role {
+    font-style: italic;
+    margin-left: 10px;
+}
+
+span.user-name-title {
+    font-weight: bold;
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    font-size: small;
+    color: darkblue;
+}
+
+span.user-role-title {
+    font-weight: bold;
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    font-size: small;
+    color: darkblue;
+}
+
+.user-name {
+    flex: 40%;
+}
+
+.user-role {
+    flex: 40%;
+}
+
+.user-buttons {
+    flex: 20%;
+}
+
+.user-line-inner {
+    display: flex;
 }

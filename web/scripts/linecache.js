@@ -225,24 +225,33 @@ class LineCache {
      * 
      * @param {{ 
      *      name: string,
-     *      added: { type: 1 | 2 | 3 | 4, id: number}[],
-     *      updated: { type: 1 | 2 | 3 | 4, id: number}[],
-     *      deleted: { type: 1 | 2 | 3 | 4, id: number}[]
+     *      added: { type: 1 | 2 | 3 | 4 | 5, id: number}[],
+     *      updated: { type: 1 | 2 | 3 | 4 | 5, id: number}[],
+     *      deleted: { type: 1 | 2 | 3 | 4 | 5, id: number}[]
      * }} opResult the results of changes to the database
      */
     _processUpdates(opResult) {
         console.log('certcache received: ' + JSON.stringify(opResult));
         opResult.added.forEach(async (res) => {
             let entry;
-            if (res.type == 4) {
-                entry = await this._getFromServer(`/api/keyname?id=${res.id}`);
-                entry['tags'] = [];
-                this._keys.set(res.id, entry);
-            }
-            else {
-                entry = await this._getFromServer(`/api/certname?id=${res.id}`);
-                entry['tags'] = [];
-                this._certs.set(res.id, entry);
+            switch (res.type) {
+                case 1:
+                case 2:
+                case 3:
+                    entry = await this._getFromServer(`/api/certname?id=${res.id}`);
+                    entry['tags'] = [];
+                    this._certs.set(res.id, entry);
+                    break;
+                case 4:
+                    entry = await this._getFromServer(`/api/keyname?id=${res.id}`);
+                    entry['tags'] = [];
+                    this._keys.set(res.id, entry);
+                    break;
+                case 5:
+                    entry = await this._getFromServer(`/api/getuser?id=${res.id}`);
+                default:
+                    // Ignore unhandled types
+                    break;
             }
             for (let f in this._onAdd) {
                 this._onAdd[f](res.type, entry);
@@ -250,25 +259,42 @@ class LineCache {
         });
         opResult.updated.forEach(async (res) => {
             let entry;
-            if (res.type == 4) {
-                entry = await this._getFromServer(`/api/keyname?id=${res.id}`);
-                entry['tags'] = [];
-                this._keys.set(res.id, entry);
-            }
-            else {
-                entry = await this._getFromServer(`/api/certname?id=${res.id}`);
-                this._certs.set(res.id, entry);
+            switch (res.type) {
+                case 1:
+                case 2:
+                case 3:
+                    entry = await this._getFromServer(`/api/certname?id=${res.id}`);
+                    entry['tags'] = [];
+                    this._certs.set(res.id, entry);
+                    break;
+                case 4:
+                    entry = await this._getFromServer(`/api/keyname?id=${res.id}`);
+                    entry['tags'] = [];
+                    this._keys.set(res.id, entry);
+                    break;
+                case 5:
+                    entry = await this._getFromServer(`/api/getuser?id=${res.id}`);
+                default:
+                    // Ignore unhandled types
+                    break;
             }
             for (let f in this._onUpdate) {
                 this._onUpdate[f](res.type, entry);
             }
         });
         opResult.deleted.forEach(async (res) => {
-            if (res.type == 4) {
-                this._keys.delete(res.id);
-            }
-            else {
-                this._certs.delete(res.id);
+            switch (res.type) {
+                case 1:
+                case 2:
+                case 3:
+                    this._certs.delete(res.id);
+                    break;
+                case 4:
+                    this._keys.delete(res.id);
+                    break;
+                default:
+                    // Ignore unhandled types
+                    break;
             }
             for (let f in this._onDelete) {
                 this._onDelete[f](res.type, res.id);

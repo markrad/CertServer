@@ -47,6 +47,8 @@ block layout-content
         div.new-form-buttons
           input.button2#generateIntermediateReset(type="reset", value="Reset" title="Reset", onClick="resetIntermediateForm")
           input.button2#generateIntermediateButton.form-submit-button(type="submit" title="submit", value="Generate")
+  include dialogs/user/adduser.pug
+  include dialogs/user/updateuser.pug
   div#newLeaf(title='** Title **')
     form#newLeafForm(action="/createLeafCert", method="post", encType="application/x-www-form-urlencoded" onsubmit="onCreateLeafCert(event)")
       fieldset
@@ -89,75 +91,79 @@ block layout-content
       span.sub #{version}
       span#logged-in-user 
         | User: 
-        span#userName #{userName}
-        span#userRole #{userRole}
-    button(type='button' class='button1' onclick='togglePane($(this), \'#uploadCertForm\')') 
-      span.button1Text Upload pem Files
-      span.button1-arrow >
-    button(type='button' class='button1' onclick='togglePane($(this), \'#generateCertForm\')')
-      span.button1Text Generate New CA
-      span.button1-arrow >
-    button(type='button' class='button2 button3'  onclick='togglePane($(this), \'#tagChooser\')')
-      span.button1Text Tags Filter
-      span.button1-arrow >
-    form#uploadCertForm(method="post", encType="multipart/form-data" class='slide-form top-slide') 
-      .Upload
-        | Upload certificates and keys:
-        span.UploadInput
-          input#certUpload(type="file", multiple, name="certFile", accept=".pem,.crt", title="Upload file")
-        div#UploadDrop(ondragover="dragOverHandler(event);" ondrop="dropHandler(event)") Or drop files here
+        span#user-name #{userName}:
+        span#user-role #{userRole}
+        button(type='button' class='button4' onclick='openUserPane(event)') 
+          span.button1Text Edit User
+        a(href='/signout' class='button4') Sign Out
+    .top-section
+      button(type='button' class='button1' onclick='togglePane($(this), \'#uploadCertForm\')') 
+        span.button1Text Upload pem Files
+        span.button1-arrow >
+      button(type='button' class='button1' onclick='togglePane($(this), \'#generateCertForm\')')
+        span.button1Text Generate New CA
+        span.button1-arrow >
+      button(type='button' class='button2 button3'  onclick='togglePane($(this), \'#tagChooser\')')
+        span.button1Text Tags Filter
+        span.button1-arrow >
+      form#uploadCertForm(method="post", encType="multipart/form-data" class='slide-form top-slide') 
+        .Upload
+          | Upload certificates and keys:
+          span.UploadInput
+            input#certUpload(type="file", multiple, name="certFile", accept=".pem,.crt", title="Upload file")
+          div#UploadDrop(ondragover="dragOverHandler(event);" ondrop="dropHandler(event)") Or drop files here
+          div.form-buttons
+            input#fileCertReset(type="reset")
+            button#uploadCertButton.form-submit-button(type="button", onClick="uploadPem()" title="submit", value="Upload") Upload
+      form#generateCertForm(action="/createCACert" method="post" class='slide-form top-slide' encType="application/x-www-form-urlencoded" onsubmit="onGenerateCert(event)") This will generate a private key and self-signed root CA pair
+        .Country 
+          span.subject-title
+            | Country:
+          span.subject-value 
+            input(type="text", name="country" value=C title="country")
+        .State
+          span.subject-title
+            | State:
+          span.subject-value 
+            input(type="text", name="state" value=ST)
+        .Location
+          span.subject-title
+            | Location:
+          span.subject-value 
+            input(type="text", name="location" value=L)
+        .Organization 
+          span.subject-title
+            | Organization 
+          span.subject-value 
+            input(type="text", name="organization" value=O)
+        .Unit 
+          span.subject-title
+            | Unit: 
+          span.subject-value 
+            input(type="text", name="unit" value=OU)
+        .CommonName 
+          span.subject-title
+            | Common Name: 
+          span.subject-value 
+            input(type="text", name="commonName" title="Common Name")
+        .StartDate 
+          span.subject-title 
+            | Valid from:
+          span.subject-value 
+            input#CAValidFrom(type="text", name="validFrom")
+        .EndDate 
+          span.subject-title 
+            | Valid to:
+          span.subject-value 
+            input#CAValidTo(type="text", name="validTo")
         div.form-buttons
-          input#fileCertReset(type="reset")
-          button#uploadCertButton.form-submit-button(type="button", onClick="uploadPem()" title="submit", value="Upload") Upload
-    form#generateCertForm(action="/createCACert" method="post" class='slide-form top-slide' encType="application/x-www-form-urlencoded" onsubmit="onGenerateCert(event)") This will generate a private key and self-signed root CA pair
-      .Country 
-        span.subject-title
-          | Country:
-        span.subject-value 
-          input(type="text", name="country" value=C title="country")
-      .State
-        span.subject-title
-          | State:
-        span.subject-value 
-          input(type="text", name="state" value=ST)
-      .Location
-        span.subject-title
-          | Location:
-        span.subject-value 
-          input(type="text", name="location" value=L)
-      .Organization 
-        span.subject-title
-          | Organization 
-        span.subject-value 
-          input(type="text", name="organization" value=O)
-      .Unit 
-        span.subject-title
-          | Unit: 
-        span.subject-value 
-          input(type="text", name="unit" value=OU)
-      .CommonName 
-        span.subject-title
-          | Common Name: 
-        span.subject-value 
-          input(type="text", name="commonName" title="Common Name")
-      .StartDate 
-        span.subject-title 
-          | Valid from:
-        span.subject-value 
-          input#CAValidFrom(type="text", name="validFrom")
-      .EndDate 
-        span.subject-title 
-          | Valid to:
-        span.subject-value 
-          input#CAValidTo(type="text", name="validTo")
-      div.form-buttons
-        input.button2#generateCAReset(type="reset", value="Reset" title="Reset")
-        input.button2#generateCAButton.form-submit-button(type="submit" title="submit", value="Generate")
-    form#tagChooser(class='slide-form top-slide' onsubmit='tagChooserSubmit()')
-      span.tagChooserValue 
-        input#tagChooserValue(type='text' name='tagChooserInput' title='Tag Chooser Input' oninput='searchTags()')
-        label#tagCaseLabel(for='Case Sensitivity') Ignore Case: 
-        input#tagCaseLabelCBox(type='checkbox' checked onclick='searchTags()')
+          input.button2#generateCAReset(type="reset", value="Reset" title="Reset")
+          input.button2#generateCAButton.form-submit-button(type="submit" title="submit", value="Generate")
+      form#tagChooser(class='slide-form top-slide' onsubmit='tagChooserSubmit()')
+        span.tagChooserValue 
+          input#tagChooserValue(type='text' name='tagChooserInput' title='Tag Chooser Input' oninput='searchTags()')
+          label#tagCaseLabel(for='Case Sensitivity') Ignore Case: 
+          input#tagCaseLabelCBox(type='checkbox' checked onclick='searchTags()')
     .certs-view
       .view-pane
         h3#view-title Root Certificates
@@ -178,3 +184,14 @@ block layout-content
         h3 Private Keys 
         .view-content
           ul#keyList.view-table
+    .users-view.hidden
+      .view-pane
+        h3#view-title Users
+        .view-content
+          div                    
+            button#add-user-btn(type='button' class='button4' onclick='addUser(event)') 
+              span.button1Text Add User
+          ul#userList.view-table
+          div
+            button(type='button' class='button4' onclick='exitUserPane()') 
+              span.button1Text Exit User Pane

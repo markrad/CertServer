@@ -71,6 +71,16 @@ class DbStores {
         }
         return row.authenticationState;
     }
+    static setAuthenticationState(state) {
+        const row = DbStores.dbDb.findOne({});
+        if (row == null) {
+            throw new Error("DBVersionRow not found - database not initialized");
+        }
+        else {
+            row.authenticationState = state;
+            DbStores.dbDb.update(row);
+        }
+    }
     static getKeyEncryptionState() {
         const row = DbStores.dbDb.findOne({});
         if (row == null) {

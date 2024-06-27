@@ -15,6 +15,8 @@ function onSignIn(event) {
             if (data.success == true) {
                 sessionStorage.setItem('token', data.token);
                 sessionStorage.setItem('expiresAt', data.expiresAt);
+                sessionStorage.setItem('userId', data.userId);
+                sessionStorage.setItem('role', data.role);
                 window.location.href = '/';
             } else {
                 alert('Sign in failed: No reason was provided');

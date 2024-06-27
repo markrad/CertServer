@@ -1,6 +1,6 @@
 
 /**
- * Supported X.509 object types
+ * Supported object types
  */
 export enum CertTypes {
     // TODO - deprecate this. Will require massive database update to achieve.
@@ -12,5 +12,7 @@ export enum CertTypes {
     /** Leaf certificate that cannot sign other certificates */
     leaf,
     /** Private key */
-    key
+    key,
+    /** User account */
+    user,
 }
