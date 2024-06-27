@@ -136,6 +136,7 @@ test.ts
 test.js*
 
 /certs/
+devicesamples/*/certs/
 
 .VSCodeCounter/
 config.yml
