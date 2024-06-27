@@ -1,6 +1,6 @@
 {
   "name": "cert-server",
-  "version": "1.12.3",
+  "version": "1.12.4",
   "description": "Manages creation and storage of certificates for local use",
   "main": "index.js",
   "scripts": {
