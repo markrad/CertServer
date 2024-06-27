@@ -262,7 +262,8 @@ export class WebServer {
                 '/keyDetails':              '/api/keyDetails',
                 '//api/getCertPem':         '/api/getCertificatePem',
                 '/api/uploadKey':           '/api/uploadPem',
-                '/login':                   '/api/login'
+                '/login':                   '/api/login',
+                'authrequired':             '/api/authrequired',
             };
             try {
                 if (request.path in redirects) {
@@ -277,7 +278,7 @@ export class WebServer {
             }
         });
         this._app.use('/', this._authRouter.router);
-        this._app.use('/api', this._authRouter.router);
+        this._app.use('/api', this._authRouter.routerAPI);
         this._app.get('/', this._authRouter.checkAuth, (_request, response) => {
             response.render('index', { 
                 title: 'Certificates Management Home',
