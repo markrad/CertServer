@@ -1,0 +1,44 @@
+form#generateCertForm(action="/createCACert" method="post" class='slide-form top-slide' encType="application/x-www-form-urlencoded" onsubmit="onGenerateCert(event)") This will generate a private key and self-signed root CA pair
+  .Country 
+    span.subject-title
+      | Country:
+    span.subject-value 
+      input(type="text", name="country" value=C title="country")
+  .State
+    span.subject-title
+      | State:
+    span.subject-value 
+      input(type="text", name="state" value=ST)
+  .Location
+    span.subject-title
+      | Location:
+    span.subject-value 
+      input(type="text", name="location" value=L)
+  .Organization 
+    span.subject-title
+      | Organization 
+    span.subject-value 
+      input(type="text", name="organization" value=O)
+  .Unit 
+    span.subject-title
+      | Unit: 
+    span.subject-value 
+      input(type="text", name="unit" value=OU)
+  .CommonName 
+    span.subject-title
+      | Common Name: 
+    span.subject-value 
+      input(type="text", name="commonName" title="Common Name")
+  .StartDate 
+    span.subject-title 
+      | Valid from:
+    span.subject-value 
+      input#CAValidFrom(type="text", name="validFrom")
+  .EndDate 
+    span.subject-title 
+      | Valid to:
+    span.subject-value 
+      input#CAValidTo(type="text", name="validTo")
+  div.form-buttons
+    input.button2#generateCAReset(type="reset", value="Reset" title="Reset")
+    input.button2#generateCAButton.form-submit-button(type="submit" title="submit", value="Generate")

@@ -1,0 +1,5 @@
+form#tagChooser(class='slide-form top-slide' onsubmit='tagChooserSubmit()')
+  span.tagChooserValue 
+    input#tagChooserValue(type='text' name='tagChooserInput' title='Tag Chooser Input' oninput='searchTags()')
+    label#tagCaseLabel(for='Case Sensitivity') Ignore Case: 
+    input#tagCaseLabelCBox(type='checkbox' checked onclick='searchTags()')

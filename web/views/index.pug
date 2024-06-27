@@ -2,86 +2,12 @@ extends layout
 
 block layout-content
   script(type="text/javascript").
-  
-  div#messageDialog.hidden
-    div#messageDialogMessage
-  div#tagsEdit(title='Edit Tags')
-    form#tagsEditForm(action="/updateCertTag", method="post", encType="application/x-www-form-urlencoded")
-      fieldset 
-        div Tags:
-        div#tagArray
-        input#certificateId(type='text' name='toTag' value='' class='hidden')
-        div#tag-form-buttons
-          input.button3#tagReset(type="button" title="reset", onclick="resetTagForm()", value="Cancel")
-          input.button3#tagSubmit.form-submit-button(type="submit" title="submit", value="OK")
-  div#newIntermediate(title='** Title **')
-    form#newIntermediateForm(action="/createIntermediateCert", method="post", encType="application/x-www-form-urlencoded" onsubmit="onCreateIntermediateCert(event)")
-      fieldset
-        label.modal-label(for="Password") Password (if key is encrypted):
-        input(type='password' name='password' id='intPassword' value='' class='text ui-widget-content ui-corner-all')
-        label.modal-label(for='Country') Country: 
-        input(type='text' name='country' id='intermediateC' value=C class='text ui-widget-content ui-corner-all')
-        label.modal-label(for='State' styles { float: left; }) State:
-        input(type='text' name='state' id='intermediateST' value=ST class='text ui-widget-content ui-corner-all')
-        label.modal-label(for='Location') Location:
-        input(type='text' name='location' id='intermediateL' value=L class='text ui-widget-content ui-corner-all')
-        label.modal-label(for='Organization') Organization:
-        input(type='text' name='organization' id='intermediateO' value=O class='text ui-widget-content ui-corner-all')
-        label.modal-label(for='Unit') Unit:
-        input(type='text' name='unit' id='intermediateOU' value=OU class='text ui-widget-content ui-corner-all')
-        label.modal-label(for='Common Name') Common Name:
-        input(type='text' name='commonName' id='intermediateCN' value='' class='text ui-widget-content ui-corner-all')
-        label.modal-label(for='SANs') SANs
-        div#IntermediateSANList
-        div#IntermediateSANInput
-          select.san-type(title='SAN Type')
-            option DNS 
-            option IP
-          input.san-value(type='text')
-          input.san-enter(name='SanEnter' type='button' value='✔' onClick='AddIntermediateSAN()')
-        label.modal-label(for='Valid From') Valid from:
-        input#IntermediateValidFrom(type='text' name='validFrom')
-        label.modal-label(for='Valid To') Valid to:
-        input#IntermediateValidTo(type='text' name='validTo')
-        input#intermediateSigner(type='text' name='signer' value='' class='hidden')
-        div.new-form-buttons
-          input.button2#generateIntermediateReset(type="reset", value="Reset" title="Reset", onClick="resetIntermediateForm")
-          input.button2#generateIntermediateButton.form-submit-button(type="submit" title="submit", value="Generate")
+  include dialogs/message/messagedialog.pug
+  include dialogs/tags/edittags.pug
+  include dialogs/certs/newintermediatecert.pug
+  include dialogs/certs/newleafcert.pug
   include dialogs/user/adduser.pug
   include dialogs/user/updateuser.pug
-  div#newLeaf(title='** Title **')
-    form#newLeafForm(action="/createLeafCert", method="post", encType="application/x-www-form-urlencoded" onsubmit="onCreateLeafCert(event)")
-      fieldset
-        label.modal-label(for="Password") Password (if key is encrypted):
-        input(type='password' name='password' id='leafPassword' value='' class='text ui-widget-content ui-corner-all')
-        label.modal-label(for='Country') Country: 
-        input(type='text' name='country' id='leafC' value=C class='text ui-widget-content ui-corner-all')
-        label.modal-label(for='State' styles { float: left; }) State:
-        input(type='text' name='state' title='State' id='leafST' value=ST class='text ui-widget-content ui-corner-all')
-        label.modal-label(for='Location') Location:
-        input(type='text' name='location' id='leafL' value=L class='text ui-widget-content ui-corner-all')
-        label.modal-label(for='Organization') Organization:
-        input(type='text' name='organization' id='leafO' value=O class='text ui-widget-content ui-corner-all')
-        label.modal-label(for='Unit') Unit:
-        input(type='text' name='unit' id='leafOU' value=OU class='text ui-widget-content ui-corner-all')
-        label.modal-label(for='Common Name') Common Name:
-        input(type='text' name='commonName' id='leafCN' value='' class='text ui-widget-content ui-corner-all')
-        label.modal-label(for='SANs') SANs
-        div#LeafSANList
-        div#LeafSANInput
-          select.san-type(title='SAN Type')
-            option DNS 
-            option IP
-          input.san-value(type='text')
-          input.san-enter(name='SanEnter' type='button' value='✔' onClick='AddLeafSAN()')
-        label.modal-label(for='Valid From') Valid from:
-        input#LeafValidFrom(type='text' name='validFrom')
-        label.modal-label(for='Valid To') Valid to:
-        input#LeafValidTo(type='text' name='validTo')
-        input#leafSigner(type='text' name='signer' value='' class='hidden')
-        div.new-form-buttons
-          input.button2#generateLeafReset(type="button", value="Reset" title="Reset" onClick="resetLeafForm()")
-          input.button2#generateLeafButton.form-submit-button(type="submit" title="submit", value="Generate")
   // Main view          
   div.View
     div 
@@ -106,64 +32,9 @@ block layout-content
       button(type='button' class='button2 button3'  onclick='togglePane($(this), \'#tagChooser\')')
         span.button1Text Tags Filter
         span.button1-arrow >
-      form#uploadCertForm(method="post", encType="multipart/form-data" class='slide-form top-slide') 
-        .Upload
-          | Upload certificates and keys:
-          span.UploadInput
-            input#certUpload(type="file", multiple, name="certFile", accept=".pem,.crt", title="Upload file")
-          div#UploadDrop(ondragover="dragOverHandler(event);" ondrop="dropHandler(event)") Or drop files here
-          div.form-buttons
-            input#fileCertReset(type="reset")
-            button#uploadCertButton.form-submit-button(type="button", onClick="uploadPem()" title="submit", value="Upload") Upload
-      form#generateCertForm(action="/createCACert" method="post" class='slide-form top-slide' encType="application/x-www-form-urlencoded" onsubmit="onGenerateCert(event)") This will generate a private key and self-signed root CA pair
-        .Country 
-          span.subject-title
-            | Country:
-          span.subject-value 
-            input(type="text", name="country" value=C title="country")
-        .State
-          span.subject-title
-            | State:
-          span.subject-value 
-            input(type="text", name="state" value=ST)
-        .Location
-          span.subject-title
-            | Location:
-          span.subject-value 
-            input(type="text", name="location" value=L)
-        .Organization 
-          span.subject-title
-            | Organization 
-          span.subject-value 
-            input(type="text", name="organization" value=O)
-        .Unit 
-          span.subject-title
-            | Unit: 
-          span.subject-value 
-            input(type="text", name="unit" value=OU)
-        .CommonName 
-          span.subject-title
-            | Common Name: 
-          span.subject-value 
-            input(type="text", name="commonName" title="Common Name")
-        .StartDate 
-          span.subject-title 
-            | Valid from:
-          span.subject-value 
-            input#CAValidFrom(type="text", name="validFrom")
-        .EndDate 
-          span.subject-title 
-            | Valid to:
-          span.subject-value 
-            input#CAValidTo(type="text", name="validTo")
-        div.form-buttons
-          input.button2#generateCAReset(type="reset", value="Reset" title="Reset")
-          input.button2#generateCAButton.form-submit-button(type="submit" title="submit", value="Generate")
-      form#tagChooser(class='slide-form top-slide' onsubmit='tagChooserSubmit()')
-        span.tagChooserValue 
-          input#tagChooserValue(type='text' name='tagChooserInput' title='Tag Chooser Input' oninput='searchTags()')
-          label#tagCaseLabel(for='Case Sensitivity') Ignore Case: 
-          input#tagCaseLabelCBox(type='checkbox' checked onclick='searchTags()')
+      include dialogs/certs/uploadcert.pug
+      include dialogs/certs/newrootcert.pug
+      include dialogs/tags/tagfilter.pug
     .certs-view
       .view-pane
         h3#view-title Root Certificates

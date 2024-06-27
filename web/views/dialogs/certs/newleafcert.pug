@@ -1,0 +1,33 @@
+div#newLeaf(title='** Title **')
+  form#newLeafForm(action="/createLeafCert", method="post", encType="application/x-www-form-urlencoded" onsubmit="onCreateLeafCert(event)")
+    fieldset
+      label.modal-label(for="Password") Password (if key is encrypted):
+      input(type='password' name='password' id='leafPassword' value='' class='text ui-widget-content ui-corner-all')
+      label.modal-label(for='Country') Country: 
+      input(type='text' name='country' id='leafC' value=C class='text ui-widget-content ui-corner-all')
+      label.modal-label(for='State' styles { float: left; }) State:
+      input(type='text' name='state' title='State' id='leafST' value=ST class='text ui-widget-content ui-corner-all')
+      label.modal-label(for='Location') Location:
+      input(type='text' name='location' id='leafL' value=L class='text ui-widget-content ui-corner-all')
+      label.modal-label(for='Organization') Organization:
+      input(type='text' name='organization' id='leafO' value=O class='text ui-widget-content ui-corner-all')
+      label.modal-label(for='Unit') Unit:
+      input(type='text' name='unit' id='leafOU' value=OU class='text ui-widget-content ui-corner-all')
+      label.modal-label(for='Common Name') Common Name:
+      input(type='text' name='commonName' id='leafCN' value='' class='text ui-widget-content ui-corner-all')
+      label.modal-label(for='SANs') SANs
+      div#LeafSANList
+      div#LeafSANInput
+        select.san-type(title='SAN Type')
+          option DNS 
+          option IP
+        input.san-value(type='text')
+        input.san-enter(name='SanEnter' type='button' value='✔' onClick='AddLeafSAN()')
+      label.modal-label(for='Valid From') Valid from:
+      input#LeafValidFrom(type='text' name='validFrom')
+      label.modal-label(for='Valid To') Valid to:
+      input#LeafValidTo(type='text' name='validTo')
+      input#leafSigner(type='text' name='signer' value='' class='hidden')
+      div.new-form-buttons
+        input.button2#generateLeafReset(type="button", value="Reset" title="Reset" onClick="resetLeafForm()")
+        input.button2#generateLeafButton.form-submit-button(type="submit" title="submit", value="Generate")
