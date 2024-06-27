@@ -281,6 +281,7 @@ class WebServer {
                     authRequired: `${this._useAuthentication ? '1' : '0'}`,
                     userName: this._useAuthentication ? _request.session.userId : 'None',
                     userRole: this._useAuthentication ? _request.session.role == '0' ? 'admin' : 'user' : '',
+                    userEditLabel: this._useAuthentication ? _request.session.role == '0' ? 'Edit Users' : 'Change Password' : '',
                 });
             });
             this._app.get('/api/helper', (request, response) => __awaiter(this, void 0, void 0, function* () {

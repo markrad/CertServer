@@ -290,6 +290,7 @@ export class WebServer {
                 authRequired: `${this._useAuthentication? '1' : '0'}`,
                 userName: this._useAuthentication? (_request.session as any).userId : 'None',
                 userRole: this._useAuthentication? (_request.session as any).role == '0'? 'admin' : 'user' : '',
+                userEditLabel: this._useAuthentication? (_request.session as any).role == '0'? 'Edit Users' : 'Change Password' : '',
             });
         });
         this._app.get('/api/helper', async (request, response) => {
