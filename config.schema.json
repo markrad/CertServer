@@ -34,10 +34,6 @@
                     "type": "boolean",
                     "description": "Encrypt keys at rest"
                 },
-                "keySecret":{ 
-                    "type": "string",
-                    "description": "The secret used to encrypt keys at rest - this will be deprecated in the future"
-                },
                 "subject": {
                     "description": "The default subject information for created certificates.",
                     "properties": {
