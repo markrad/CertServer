@@ -82,10 +82,10 @@ class AuthRouter {
         });
         this._authRouter.get('/signout', (request, response) => {
             request.session.userId = '';
-            request.session.role = '';
+            request.session.role = null;
             request.session.token = '';
-            request.session.lastSignedIn = '';
-            request.session.tokenExpiration = '';
+            request.session.lastSignedIn = null;
+            request.session.tokenExpiration = null;
             response.redirect('/signin');
         });
         this._authRouterAPI.post('/login', (request, response) => __awaiter(this, void 0, void 0, function* () {

@@ -10,26 +10,21 @@ import loki, { Collection, LokiFsAdapter } from 'lokijs'
 import Express, { NextFunction, /*Request, /* response */ } from 'express';
 import FileUpload from 'express-fileupload';
 import serveFavicon from 'serve-favicon';
-import session from 'express-session'
-// declare global {
-//     namespace Express {
-//         interface Session {
-//             userId: string;
-//             password: string;
-//         }
-//     }
-// }
-// export interface Request extends Express.Request {
-//     session: Express.Session;
-// }
-// interface Session {
-//     userId: string;
-//     password: string;
-// }
-// interface Request {
-//     session: Session;
-// }
-
+import session, { Session, SessionData } from 'express-session'
+declare global {
+    namespace Express {
+        interface Partial<SessionData> {
+            userId: string;
+            role: UserRole;
+            token: string;
+            tokenExpiration: number;
+            lastSignedIn: Date;
+        }
+        interface Request {
+            session: Session & Partial<SessionData>;
+        }
+    }
+}
 
 import { Readable } from 'stream';
 import * as log4js from 'log4js';
@@ -63,6 +58,7 @@ import { KeyEncryption } from './database/keyEncryption';
 
 import { AuthRouter } from './auth/authrouter';
 import { WSManager } from './wsmanger/wsmanager';
+import { UserRole } from './database/UserRole';
 
 const logger = log4js.getLogger('CertServer');
 logger.level = "debug";
@@ -240,7 +236,7 @@ export class WebServer {
             resave: false,
             saveUninitialized: false
         }));
-        this._app.use((request: any, response: any, next: NextFunction) => {
+        this._app.use((request, response: any, next: NextFunction) => {
             if (!request.session.userId) {
                 request.session.userId = '';
                 request.session.lastSignedIn = null;
@@ -289,9 +285,9 @@ export class WebServer {
                 OU: this._config.certServer.subject.OU,
                 version: this._version,
                 authRequired: `${this._useAuthentication? '1' : '0'}`,
-                userName: this._useAuthentication? (_request.session as any).userId : 'None',
-                userRole: this._useAuthentication? (_request.session as any).role == '0'? 'admin' : 'user' : '',
-                userEditLabel: this._useAuthentication? (_request.session as any).role == '0'? 'Edit Users' : 'Change Password' : '',
+                userName: this._useAuthentication? _request.session.userId : 'None',
+                userRole: this._useAuthentication? _request.session.role == UserRole.ADMIN? 'admin' : 'user' : '',
+                userEditLabel: this._useAuthentication? _request.session.role == UserRole.ADMIN? 'Edit Users' : 'Change Password' : '',
             });
         });
         this._app.get('/api/helper', async (request, response) => {
@@ -555,7 +551,7 @@ export class WebServer {
          * Upload pem format files. These can be key, a certificate, or a file that
          * contains keys or certificates.
          */
-        this._app.post('/uploadPem', this._authRouter.auth, (async (request: any, response) => {
+        this._app.post('/uploadPem', this._authRouter.auth, (async (request, response) => {
             // FUTURE: Allow der and pfx files to be submitted
             if (!request.files || Object.keys(request.files).length == 0) {
                 return response.status(400).json({ error: 'No file selected' });

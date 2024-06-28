@@ -51,15 +51,15 @@ export class AuthRouter {
                 authRequired: `${authRequired ? '1' : '0'}`,
             });
         });
-        this._authRouter.get('/signout', (request: any, response) => {
+        this._authRouter.get('/signout', (request, response) => {
             request.session.userId = '';
-            request.session.role = '';
+            request.session.role = null;
             request.session.token = '';
-            request.session.lastSignedIn = '';
-            request.session.tokenExpiration = '';
+            request.session.lastSignedIn = null;
+            request.session.tokenExpiration = null;
             response.redirect('/signin');
         });
-        this._authRouterAPI.post('/login', async (request: any, response) => {
+        this._authRouterAPI.post('/login', async (request, response) => {
             try {
                 const { userId, password } = request.body;
                 logger.debug(`Login request - User: ${userId}`);
@@ -79,7 +79,7 @@ export class AuthRouter {
                 return response.status(e.status).json(e.getResponse());
             }
         });
-        this._authRouterAPI.post('/tokenrefresh', this.auth, async (request: any, response: any) => {
+        this._authRouterAPI.post('/tokenrefresh', this.auth, async (request, response) => {
             try {
                 if (!this._authRequired) {
                     throw new CertError(401, 'Authentication is not enabled');
@@ -99,7 +99,7 @@ export class AuthRouter {
                 return response.status(e.status).json(e.getResponse());
             }
         });
-        this._authRouterAPI.post('/token', this.auth, async (request: any, response: any) => {
+        this._authRouterAPI.post('/token', this.auth, async (request, response) => {
             try {
                 if (!this._authRequired) {
                     throw new CertError(401, 'Authentication is not enabled');
@@ -124,10 +124,10 @@ export class AuthRouter {
                 return response.status(e.status).json(e.getResponse());
             }
         });
-        this._authRouterAPI.get('/authrequired', (_request: any, response: any) => {
+        this._authRouterAPI.get('/authrequired', (_request, response) => {
             response.status(200).json({ authRequired: this._authRequired });
         });
-        this._authRouterAPI.get('/getUsers', this.auth, (request: any, response: any) => {
+        this._authRouterAPI.get('/getUsers', this.auth, (request, response) => {
             try {
                 if (!this._authRequired) { 
                     throw new CertError(401, 'Authentication is not enabled');
@@ -151,7 +151,7 @@ export class AuthRouter {
                 return response.status(e.status).json(e.getResponse());
             }
         });
-        this._authRouterAPI.get('/getUser', this.auth, (request: any, response: any) => {
+        this._authRouterAPI.get('/getUser', this.auth, (request, response) => {
             try {
                 if (!this._authRequired) {
                     throw new CertError(401, 'Authentication is not enabled');
@@ -169,7 +169,7 @@ export class AuthRouter {
                 return response.status(e.status).json(e.getResponse());
             }
         });
-        this._authRouterAPI.post('/addUser', this.auth, (request: any, response: any) => {
+        this._authRouterAPI.post('/addUser', this.auth, (request, response) => {
             try {
                 if (!this._authRequired) {
                     throw new CertError(401, 'Authentication is not enabled');
@@ -195,7 +195,7 @@ export class AuthRouter {
                 return response.status(e.status).json(e.getResponse());
             }
         });
-        this._authRouterAPI.post('/updateUser', this.auth, (request: any, response: any) => {
+        this._authRouterAPI.post('/updateUser', this.auth, (request, response) => {
             try {
                 if (!this._authRequired) {
                     throw new CertError(401, 'Authentication is not enabled');
@@ -219,7 +219,7 @@ export class AuthRouter {
                 return response.status(e.status).json(e.getResponse());
             }
         });
-        this._authRouterAPI.delete('/removeUser', this.auth, (request: any, response: any) => {
+        this._authRouterAPI.delete('/removeUser', this.auth, (request, response) => {
             try {
                 if (!this._authRequired) {
                     throw new CertError(401, 'Authentication is not enabled');

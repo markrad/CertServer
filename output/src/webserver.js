@@ -48,24 +48,6 @@ const express_1 = __importDefault(require("express"));
 const express_fileupload_1 = __importDefault(require("express-fileupload"));
 const serve_favicon_1 = __importDefault(require("serve-favicon"));
 const express_session_1 = __importDefault(require("express-session"));
-// declare global {
-//     namespace Express {
-//         interface Session {
-//             userId: string;
-//             password: string;
-//         }
-//     }
-// }
-// export interface Request extends Express.Request {
-//     session: Express.Session;
-// }
-// interface Session {
-//     userId: string;
-//     password: string;
-// }
-// interface Request {
-//     session: Session;
-// }
 const stream_1 = require("stream");
 const log4js = __importStar(require("log4js"));
 const eventWaiter_1 = require("./utility/eventWaiter");
@@ -86,6 +68,7 @@ const userStore_1 = require("./database/userStore");
 const keyEncryption_1 = require("./database/keyEncryption");
 const authrouter_1 = require("./auth/authrouter");
 const wsmanager_1 = require("./wsmanger/wsmanager");
+const UserRole_1 = require("./database/UserRole");
 const logger = log4js.getLogger('CertServer');
 logger.level = "debug";
 /**
@@ -281,8 +264,8 @@ class WebServer {
                     version: this._version,
                     authRequired: `${this._useAuthentication ? '1' : '0'}`,
                     userName: this._useAuthentication ? _request.session.userId : 'None',
-                    userRole: this._useAuthentication ? _request.session.role == '0' ? 'admin' : 'user' : '',
-                    userEditLabel: this._useAuthentication ? _request.session.role == '0' ? 'Edit Users' : 'Change Password' : '',
+                    userRole: this._useAuthentication ? _request.session.role == UserRole_1.UserRole.ADMIN ? 'admin' : 'user' : '',
+                    userEditLabel: this._useAuthentication ? _request.session.role == UserRole_1.UserRole.ADMIN ? 'Edit Users' : 'Change Password' : '',
                 });
             });
             this._app.get('/api/helper', (request, response) => __awaiter(this, void 0, void 0, function* () {
