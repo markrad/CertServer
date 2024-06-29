@@ -189,8 +189,8 @@ function buildCertList(target, files) {
     }
 }
 
-// Builds HTML for a certificate in the UI
 /**
+ * Builds HTML for a certificate in the UI
  * 
  * @param {{ id: string, name: string, keyId: string, tags: string[] }} file details for certificate entry line
  * @returns {string} HTML to add to the UI for this certificate
@@ -482,6 +482,7 @@ async function dropHandler(event) {
 function dragOverHandler(event) {
     event.preventDefault();
 }
+
 /**
  * Upload a new pem file to the server. This can be a certificate, a key, or a file containing multiple pem files.
  * 
@@ -505,58 +506,6 @@ async function uploadPem(x) {
             showMessage(err);
         }
     }
-}
-
-/**
- * Close the tags form
- */
-function resetTagForm() {
-    $('#tagsEdit').dialog('close');
-}
-
-/**
- * Appends a new input tag box to the end of the tags array.
- * 
- * @param {JQuery<HTMLElement} tagArray the array of existing tags
- */
-function tagsAddLast(tagArray) {
-    let lastLine = `
-        <span id="tagLast">
-            <input class="text ui-widget-content ui-corner-all tags" id="tagValueLast" type="text" name="lastTag" value="">
-            </input>
-            <input class="tag-form-button" type="button" title="tagEdit" value="✔" onclick="tagAdd('tagArray')"></input>
-        </span>`;
-    tagArray.append(lastLine);
-}
-
-/**
- * Builds the tags dialog with the existing tags in separate inputs that can be edited or deleted.
- * 
- * @param {string} id certificate id of the tags to be edited
- */
-function tagsEdit(id) {
-    let line = ({ tagValue, tagIndex }) => `
-        <span id="tag${tagIndex}">
-            <input class="text ui-widget-content ui-corner-all tags" id="tagValue${tagIndex}"type="text" name="tags" value="${tagValue}">
-            </input>
-            <input class="tag-form-button" type="button" title="tagEdit" value="✘" onclick="tagDelete('${tagIndex}')">
-        </span>`;
-
-    let entry = $('#' + id);
-    let dialog = $('#tagsEdit');
-    $('#certificateId').val(id.substring(1));
-    let tagArray = $('#tagArray');
-    tagArray.empty();
-    let tags = entry.find('.cert-info-tags-value').text().split(';');
-    if (tags[0] != '') {
-        for (let tagI in tags) {
-            let newInput = line({ tagValue: `${tags[tagI]}`, tagIndex: `${tagI.toString().padStart(3, '0')}` });
-            tagArray.append(newInput);
-        }
-    }
-    tagsAddLast(tagArray);
-    tagArray.data('highValue', tags.length.toString());
-    dialog.dialog('open');
 }
 
 /**
@@ -585,21 +534,6 @@ function newLeafDialog(id, name) {
     dialog.dialog('open');
 }
 
-function addUser(event) {
-    let dialog = $('#addUser');
-    dialog.dialog('option', 'title', 'Add User');
-    dialog.dialog('open');
-}
-
-function editUser(id, name) {
-    let dialog = $('#editUser');
-    dialog.dialog('option', 'title', `Edit User ${name}`);
-    $('#edit-userid').val(id);
-    $('#edit-username').val(sessionStorage.getItem('userId'));
-    dialog.dialog('open');
-}
-
-// Slide top panes in or out of view
 /**
  * Toggles the top forms in and out of view
  * 
@@ -625,53 +559,7 @@ function togglePane(button, id) {
 }
 
 /**
- * Searches for certificates that contain a string in the tags that matches the input filter. Hides any lines that don't.
- */
-function searchTags() {
-    let filter = $('#tagChooserValue').val();
-    let keyIds = [];
-    let r = new RegExp(filter, $('#tagCaseLabelCBox').is(':checked')? 'i' : '');
-    $('.cert-line').each((i, line) => {
-        let tags = $(line).find('.cert-line-tags-value');
-        if (filter.length > 0 && r.exec(tags.text()) == null) {
-            $(line).hide();
-            let details = $(line).find('.cert-details');
-            let arrow = $(line).find('.cert-line-arrow');
-            certHide(details, arrow);
-        }
-        else {
-            $(line).show();
-            let keyId = $(line).find('.cert-line-id').data('keyid');
-            if (keyId != null) {
-                keyIds.push(keyId);
-            }
-        }
-    });
-    $('.key-line').each((i, line) => {
-        if (keyIds.includes(parseInt($(line).attr('id').slice(1)))) {
-            $(line).show();
-        }
-        else {
-            $(line).hide();
-            let details = $(line).find('.key-details');
-            let arrow = $(line).find('key-line-arrow');
-            keyHide(details, arrow);
-        }
-    });
-}
-
-/**
- * Work in progress function to try and improve the tag dialog behavior.
- * 
- * @returns {boolean} always false
- */
-function tagChooserSubmit() {
-    console.log('tag submit');
-    return false;
-}
-
-/**
- * Displays a modeless dialog with an informational message which fades out after 3 seconds
+ * Displays either a modeless dialog with an informational message which fades out after 3 seconds or a modal error dialog that requires the user to dismis.
  * 
  * @param {string} msg message to display
  */
@@ -735,48 +623,6 @@ function onGenerateCert(event) {
             showMessage(data.responseJSON);
         }
     });
-}
-
-function onAddUser(event) {
-    event.preventDefault();
-    let frm = $('#addUserForm');
-    $.ajax({
-        type: frm.attr('method'),
-        url: frm.attr('action'),
-        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` },
-        data: frm.serialize(),
-        success: addUserResponse,
-        error: function(data) {
-            showMessage(data.responseJSON);
-        }
-    });
-}
-
-function addUserResponse(result) {
-    $('#addUserForm')[0].reset();
-    $('#addUser').dialog('close');
-    showMessage(result);
-}
-
-function onEditUser(event) {
-    event.preventDefault();
-    let frm = $('#editUserForm');
-    $.ajax({
-        type: frm.attr('method'),
-        url: frm.attr('action'),
-        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` },
-        data: frm.serialize(),
-        success: editUserResponse,
-        error: function(data) {
-            showMessage(data.responseJSON);
-        }
-    });
-}
-
-function editUserResponse(result) {
-    $('#editUserForm')[0].reset();
-    $('#editUser').dialog('close');
-    showMessage(result);
 }
 
 /**
@@ -902,128 +748,6 @@ function AddSAN(list, input) {
  */
 function removeSAN(spanId) {
     $(`#${spanId}`).remove();
-}
-
-/**
- * Called when the certificate's tags are successfully updated.
- * 
- * @param {{ message: string }} result the result message
- */
-function updateTagsDisplay(result) {
-    $('tagsCancelButton').trigger('click');
-    showMessage(result);
-    $('#tagsEdit').dialog('close');
-}
-
-/**
- * Called to remove a tag from the certificates tags.
- * 
- * @param {number} tagIndex index of the tag to remove
- */
-function tagDelete(tagIndex) {
-    $(`#tag${tagIndex}`).remove();
-}
-
-/**
- * Adds the new tag input to the list of tags.
- * 
- * @param {string} tagArrayId HTML id of the tag array
- */
-function tagAdd(tagArrayId) {
-    let tagArray = $(`#${tagArrayId}`);
-    let tagLast = tagArray.find('#tagLast');
-    let highValue = parseInt(tagArray.data('highValue'));
-    let id = highValue.toString().padStart(3, '0');
-    let tagInput = tagLast.find('#tagValueLast');
-    let tagButton = tagLast.find('.tag-form-button');
-    tagLast.prop('id', 'tag' + id);
-    tagInput.prop('name', 'tags');
-    tagInput.prop('id', 'tagValue' + id);
-    tagButton.val('✘');
-    tagButton.attr('onclick', `tagDelete('${id}')`);
-    tagsAddLast(tagArray);
-    tagArray.data('highValue', `${(++highValue)}`);
-}
-
-function openUserPane(event) {
-    let header = `
-        <li class="user-line">
-            <div class="user-line-inner">
-                <span class="user-name-title user-name">User Name</span>
-                <span class="user-role-title user-role">User Role</span>
-                <span class="user-buttons"></span>
-            </div>
-        </li>    `;
-    $('.top-section').hide();
-    $('.certs-view').hide();
-    $('.keys-view').hide();
-    $('.users-view').show();
-    if (sessionStorage.getItem('role') !== '0') {
-        $('#add-user-btn').hide();
-    }
-    $.ajax({
-        type: 'GET',
-        url: '/api/getUsers',
-        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` },
-        success: (data) => {
-            let userList = $('#userList');
-            userList.empty();
-            if (data.length == 0) {
-                userList.append('<li class="empty">None</li>');
-            }
-            else {
-                userList.append(header)
-                data.forEach((user) => {
-                    userList.append(buildUserEntry(user));
-                });
-            }
-        },
-        error: (xhr, _msg, err) => {
-            showMessage(err);
-        }
-    });
-}
-
-function deleteUser(id, name) {
-    if (confirm(`This will delete user ${name}. \n\nDo you wish to continue?`)) {
-        $.ajax({
-            type: 'DELETE',
-            url: `/api/removeUser?id=${id}`,
-            headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` },
-            success: (data) => {
-                showMessage(data);
-            },
-            error: (xhr, _msg, _err) => {
-                showMessage(xhr.responseJSON);
-            }
-        });
-    }
-}
-
-function buildUserEntry(user) {
-    let userLine = `
-        <li class="user-line" id=u${user.id}>
-            <div class="user-line-inner">
-                <span class="user-name">${user.username}</span>
-                <span class="user-role">${user.role == 0? 'ADMIN' : 'USER'}</span>
-                <span class="user-buttons">
-                    <button class="button4" type="button" onclick="editUser(${user.id}, '${user.username}')">
-                        <span class="button1Text">Edit</span>
-                    </button>
-                    <button class="button4 ${user.username != sessionStorage.getItem('userId') ? '' : 'hidden'}" type="button" onclick="deleteUser(${user.id}, '${user.username}')">
-                        <span class="button1Text">Delete</span>
-                    </button>
-                </span>
-            </div>
-        </li>`;
-    return userLine;
-}
-
-function exitUserPane(event) {
-    $('.users-view').hide();
-    $('.top-section').show();
-    $('.certs-view').show();
-    $('.keys-view').show();
 }
 
 /**
@@ -1220,7 +944,7 @@ $(async function() {
         dataType: 'json',
         success: createCACertResponse,
         error: (xhr, _msg, err) => {
-            showMessage(JSON.parse(xhr.responseText));
+            showMessage(xhr.responseJSON);
         } 
     });
 
@@ -1228,7 +952,7 @@ $(async function() {
         dataType: 'json',
         success: createIntermediateCertResponse,
         error: (xhr, _msg, err) => {
-            showMessage(JSON.parse(xhr.responseText));
+            showMessage(xhr.responseJSON);
         } 
     });
 
@@ -1236,15 +960,7 @@ $(async function() {
         dataType: 'json',
         success: createLeafCertResponse,
         error: (xhr, _msg, err) => {
-            showMessage(JSON.parse(xhr.responseText));
-        } 
-    });
-
-    $('#tagsEditForm').ajaxForm({
-        datType: 'json',
-        success: updateTagsDisplay,
-        error: (xhr, _msg, err) => {
-            showMessage(xhr.responseText);
+            showMessage(xhr.responseJSON);
         } 
     });
 
@@ -1262,20 +978,7 @@ $(async function() {
         width: 400,
         modal: true,
     });
-    
-    $('#tagsEdit').dialog({
-        autoOpen: false,
-        modal: true,
-        width: 450,
-    });
 
-    $('#addUser').dialog({
-        autoOpen: false,
-        modal: true,
-    });
-
-    $('#editUser').dialog({
-        autoOpen: false,
-        modal: true,
-    });
+    initTags();
+    initUsers();
 });

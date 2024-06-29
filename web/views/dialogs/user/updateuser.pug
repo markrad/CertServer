@@ -1,17 +1,17 @@
 div#editUser.hidden(title='Update User')
-    form#editUserForm(action="/api/UpdateUser", method="post", encType="application/x-www-form-urlencoded" onsubmit="onEditUser(event)")
+    form#editUserForm(action="/api/UpdateUser", method="post", encType="application/x-www-form-urlencoded")
         #error 
         if error
             p.text-danger Error!!!
         fieldset
-            input#edit-userid(type='hidden' name='userid' value='')
-            input#edit-username(type='hidden' name='username' value='')
             label.modal-label(for='userpassword') Your Password:
             input(type='password' name='userpassword' value='' class='text ui-widget-content ui-corner-all' required autofocus)
             label.modal-label(for='Password') New Password:
             input(type='password' name='newpassword' value='' class='text ui-widget-content ui-corner-all' required)
             label.modal-label(for='Password') Confirm Password:
             input(type='password' name='confirmpassword' value='' class='text ui-widget-content ui-corner-all' required)
+            input#edit-userid(type='hidden' name='userid' value='')
+            input#edit-username(type='hidden' name='username' value='')
         div.new-form-buttons
             input.button4#editUserReset(type="reset", value="Reset", title="Reset")
             input.button4#editUserButton.form-submit-button(type="submit", title="submit", value="Update User")

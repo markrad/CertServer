@@ -56,7 +56,7 @@ class LineCache {
     async getLineHeaders(type) {
         return new Promise(async (resolve, reject) => {
             try {
-                let res = await this._getFromServer(`/certList?type=${type}`);
+                let res = await this.getFromServer(`/certList?type=${type}`);
                 res.files.forEach((file) => type === 'key' ? this._keys.set(file.id, file) : this._certs.set(file.id, file));
                 resolve(res.files);
             }
@@ -238,17 +238,17 @@ class LineCache {
                 case 1:
                 case 2:
                 case 3:
-                    entry = await this._getFromServer(`/api/certname?id=${res.id}`);
+                    entry = await this.getFromServer(`/api/certname?id=${res.id}`);
                     entry['tags'] = [];
                     this._certs.set(res.id, entry);
                     break;
                 case 4:
-                    entry = await this._getFromServer(`/api/keyname?id=${res.id}`);
+                    entry = await this.getFromServer(`/api/keyname?id=${res.id}`);
                     entry['tags'] = [];
                     this._keys.set(res.id, entry);
                     break;
                 case 5:
-                    entry = await this._getFromServer(`/api/getuser?id=${res.id}`);
+                    entry = await this.getFromServer(`/api/getuser?id=${res.id}`);
                 default:
                     // Ignore unhandled types
                     break;
@@ -263,17 +263,17 @@ class LineCache {
                 case 1:
                 case 2:
                 case 3:
-                    entry = await this._getFromServer(`/api/certname?id=${res.id}`);
+                    entry = await this.getFromServer(`/api/certname?id=${res.id}`);
                     entry['tags'] = [];
                     this._certs.set(res.id, entry);
                     break;
                 case 4:
-                    entry = await this._getFromServer(`/api/keyname?id=${res.id}`);
+                    entry = await this.getFromServer(`/api/keyname?id=${res.id}`);
                     entry['tags'] = [];
                     this._keys.set(res.id, entry);
                     break;
                 case 5:
-                    entry = await this._getFromServer(`/api/getuser?id=${res.id}`);
+                    entry = await this.getFromServer(`/api/getuser?id=${res.id}`);
                 default:
                     // Ignore unhandled types
                     break;
@@ -308,7 +308,7 @@ class LineCache {
      * @param {string} url URL to POST to
      * @returns {Promise<any>} server response
      */
-    async _getFromServer(url) {
+    async getFromServer(url) {
         return this._ajaxCall('GET', url, null);
     }
 
@@ -324,6 +324,27 @@ class LineCache {
     }
 
     /**
+     * Sends a PUT request to the server with the specified URL and data.
+     * 
+     * @param {string} url - The URL to send the request to.
+     * @param {any} data - The data to send in the request body.
+     * @returns {Promise} A Promise that resolves with the response from the server.
+     */
+    async putToServer(url, data) {
+        return this._ajaxCall('PUT', url, data);
+    }
+
+    /**
+     * Deletes a resource from the server.
+     *
+     * @param {string} url - The URL of the resource to delete.
+     * @returns {Promise} A promise that resolves when the resource is successfully deleted.
+     */
+    async deleteFromServer(url) {
+        return this._ajaxCall('DELETE', url, null);
+    }
+
+    /**
      * Sends an ajax request to the server.
      * 
      * @param {string} verb HTTP verb to use
@@ -336,11 +357,6 @@ class LineCache {
             $.ajax({
                 url: url,
                 method: verb,
-                processData: false,
-                contentType: false,
-                headers: {
-                    "Authorization": "Bearer " + sessionStorage.getItem('token')
-                },
                 data: data,
                 error: (xhr, _msg, err) => {
                     if (xhr.status == 401) {

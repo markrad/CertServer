@@ -364,7 +364,7 @@ class AuthRouter {
             logger.warn(`Failed to authenticate: ${err.message}`);
             // let e: (CertError | CertMultiError) = CertMultiError.getCertError(err);
             // return response.status(e.status).json(e.getResponse());
-            return response.redirect('/signin');
+            response.redirect('/signin');
         }
     }
     /**
@@ -406,7 +406,7 @@ class AuthRouter {
             else {
                 e = CertMultiError_1.CertMultiError.getCertError(err);
             }
-            return response.status(e.status).json(e.getResponse());
+            response.status(e.status).json(e.getResponse());
         }
     }
     /**

@@ -1,5 +1,5 @@
 div#addUser.hidden(title='Add User')
-    form#addUserForm(action="/api/addUser", method="post", encType="application/x-www-form-urlencoded" onsubmit="onAddUser(event)")
+    form#addUserForm(action="/api/addUser", method="post", encType="application/x-www-form-urlencoded")
         #error 
         if error
             p.text-danger Error!!!

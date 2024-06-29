@@ -1,5 +1,5 @@
 import http from 'http';
-import { NextFunction, Router } from 'express';
+import { Request, Response, NextFunction, Router } from 'express';
 import { JsonWebTokenError, JwtPayload, decode, sign, verify } from 'jsonwebtoken';
 import * as log4js from 'log4js';
 
@@ -22,8 +22,8 @@ export class AuthRouter {
     private _authRouter = Router();
     private _authRouterAPI = Router();
     private _passwordSecret: string = DbStores.getPasswordSecret();
-    private _authPtr: (request: any, response: any, next: NextFunction) => void = this._noAuth;
-    private _checkAuthPtr: (request: any, response: any, next: NextFunction) => void = this._noAuth;
+    private _authPtr: (request: Request, response: Response, next: NextFunction) => void = this._noAuth;
+    private _checkAuthPtr: (request: Request, response: Response, next: NextFunction) => void = this._noAuth;
     private _authRequired: boolean = false;
 
     /**
@@ -291,7 +291,7 @@ export class AuthRouter {
      * Returns the authentication middleware function.
      * @returns The authentication middleware function.
      */
-    public get auth(): (request: any, response: any, next: NextFunction) => void {
+    public get auth(): (request: Request, response: Response, next: NextFunction) => void {
         return this._authPtr.bind(this);
     }
 
@@ -299,7 +299,7 @@ export class AuthRouter {
      * Returns the middleware function for checking authentication.
      * @returns A middleware function that checks authentication.
      */
-    public get checkAuth(): (request: any, response: any, next: NextFunction) => void {
+    public get checkAuth(): (request: Request, response: Response, next: NextFunction) => void {
         return this._checkAuthPtr.bind(this);
     }
 
@@ -309,7 +309,7 @@ export class AuthRouter {
      * @param _response - The response object.
      * @param next - The next function to call in the middleware chain.
      */
-    private _noAuth(_request: any, _response: any, next: NextFunction): void {
+    private _noAuth(_request: Request, _response: Response, next: NextFunction): void {
         next();
     }
 
@@ -323,7 +323,7 @@ export class AuthRouter {
      * @param response - The HTTP response object.
      * @param next - The next function to be called in the middleware chain.
      */
-    private _checkAuth(request: any, response: any, next: NextFunction): void {
+    private _checkAuth(request: Request, response: Response, next: NextFunction): void {
         try {
             if (this._authRequired) {
                 if (request.session.userId == '' || !request.session.token) {
@@ -342,7 +342,7 @@ export class AuthRouter {
             logger.warn(`Failed to authenticate: ${err.message}`);
             // let e: (CertError | CertMultiError) = CertMultiError.getCertError(err);
             // return response.status(e.status).json(e.getResponse());
-            return response.redirect('/signin');
+            response.redirect('/signin');
         }
     }
 
@@ -355,7 +355,7 @@ export class AuthRouter {
      * @param response - The HTTP response object.
      * @param next - The next function to be called in the middleware chain.
      */
-    private _auth(request: any, response: any, next: NextFunction): void {
+    private _auth(request: Request, response: Response, next: NextFunction): void {
         try {
             if (this._passwordSecret) {
                 let token: string = null;
@@ -385,7 +385,7 @@ export class AuthRouter {
             else {
                 e = CertMultiError.getCertError(err);
             }
-            return response.status(e.status).json(e.getResponse());
+            response.status(e.status).json(e.getResponse());
         }
     }
 
