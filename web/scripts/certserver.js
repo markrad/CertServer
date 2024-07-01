@@ -509,32 +509,6 @@ async function uploadPem(x) {
 }
 
 /**
- * Open a new intermediate certificate dialog box.
- * 
- * @param {string} id id of the certificate that will sign this new intermediate 
- * @param {*} name name of the certificate that will sign this new intermediate
- */
-function newIntermediateDialog(id, name) {
-    let dialog = $('#newIntermediate');
-    dialog.dialog('option', 'title', `${name} -> intermediate`);
-    $('#intermediateSigner').val(id); 
-    dialog.dialog('open');
-}
-
-/**
- * Open a new leaf certificate dialog box.
- * 
- * @param {string} id id of the certificate that will sign this new leaf 
- * @param {*} name name of the certificate that will sign this new leaf
- */
-function newLeafDialog(id, name) {
-    let dialog = $('#newLeaf');
-    dialog.dialog('option', 'title', `${name} -> leaf`);
-    $('#leafSigner').val(id); 
-    dialog.dialog('open');
-}
-
-/**
  * Toggles the top forms in and out of view
  * 
  * @param {JQuery<HTMLElement} button the button that was clicked indicating the form to show unless it is already showing then it will be hidden
@@ -610,145 +584,6 @@ function showMessage(result) {
         }, 3000);
     }
 }
-function onGenerateCert(event) {
-    event.preventDefault();
-    let frm = $('#generateCertForm');
-    $.ajax({
-        type: frm.attr('method'),
-        url: frm.attr('action'),
-        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` },
-        data: frm.serialize(),
-        success: createCACertResponse,
-        error: function(data) {
-            showMessage(data.responseJSON);
-        }
-    });
-}
-
-/**
- * Called when a new CA is successfully created.
- * 
- * @param {{ message: string }} result result when creating a new CA
- */
-function createCACertResponse(result) {
-    $('#generateCAReset').trigger('click');
-    showMessage(result);
-}
-function onCreateIntermediateCert(event) {
-    event.preventDefault();
-    let frm = $('#newIntermediateForm');
-    $.ajax({
-        type: frm.attr('method'),
-        url: frm.attr('action'),
-        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` },
-        data: frm.serialize(),
-        success: createIntermediateCertResponse,
-        error: function(data) {
-            showMessage(data.responseJSON);
-        }
-    });
-}
-/**
- * Called when a new intermediate is successfully created.
- * 
- * @param {{ message: string }} result result when creating a new intermediate
- */
-function createIntermediateCertResponse(result) {
-    $('#generateIntermediateReset').trigger('click');
-    showMessage(result);
-    $('#newIntermediate').dialog('close');
-}
-
-/**
- * Called when the reset button is clicked on the new intermediate form.
- */
-function resetIntermediateForm() {
-    let signer = $('#intermediateSigner').val();
-    $('#newIntermediateForm')[0].reset();
-    $('#IntermediateSANList').empty();
-    $('#intermediateSigner').val(signer); 
-}
-function onCreateLeafCert(event) {
-    event.preventDefault();
-    let frm = $('#newLeafForm');
-    $.ajax({
-        type: frm.attr('method'),
-        url: frm.attr('action'),
-        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` },
-        data: frm.serialize(),
-        success: createLeafCertResponse,
-        error: function(data) {
-            showMessage(data.responseJSON);
-        }
-    });
-}
-/**
- * Called when a new leaf is successfully created.
- * 
- * @param {{ message: string }} result result when creating a new leaf
- */
-function createLeafCertResponse(result) {
-    $('#generateLeafReset').trigger('click');
-    showMessage(result);
-    $('#newLeaf').dialog('close');
-}
-
-/**
- * Called when the reset button is clicked on the new leaf form.
- */
-function resetLeafForm() {
-    let signer = $('#leafSigner').val();
-    $('#newLeafForm')[0].reset();
-    $('#LeafSANList').empty();
-    $('#leafSigner').val(signer);
-}
-
-/**
- * Add a new subject alternative name input box to the new intermediate certificate dialog
- */
-function AddIntermediateSAN() {
-    let list = $('#IntermediateSANList');
-    let input = $('#IntermediateSANInput');
-    AddSAN(list, input);
-}
-
-/**
- * Add a new subject alternative name input box to the new leaf certificate dialog
- */
-function AddLeafSAN() {
-    let list = $('#LeafSANList');
-    let input = $('#LeafSANInput');
-    AddSAN(list, input);
-}
-
-/**
- * When the tick is clicked to accept a new SAN, this is called to add it to the current list of SANs.
- * 
- * @param {JQuery<HTMLElement>} list the current list of SANs
- * @param {JQuery<HTMLElement>} input the new SAN to add
- */
-function AddSAN(list, input) {
-    let type = input.find('.san-type');
-    let value = input.find('.san-value');
-    let spanId = 'SAN' + list.children().length;
-    let newSpan = $(`<div id=${spanId}></div>`);
-    let newButton = $(`<input type='button' value='✘' onClick="removeSAN('${spanId}')"></input>`);
-    let newEntry = $(`<input type='text' name='SANArray' value='${type.val()}: ${value.val()}' class='san-list' readonly></input>`);
-    newSpan.append(newButton);
-    newSpan.append(newEntry);
-    list.append(newSpan);
-    type.val('DNS');
-    value.val('');
-}
-
-/**
- * Removes a SAN from the current list of SANs
- * 
- * @param {JQuery<HTMLElement>} spanId the SAN to remove from the existing SANs list
- */
-function removeSAN(spanId) {
-    $(`#${spanId}`).remove();
-}
 
 /**
  * This function is automatically called by jQuery when the webpage is loaded. It initializes stuff.
@@ -760,6 +595,9 @@ $(async function() {
         return;
     }
 
+    /**
+     * Calculates the refresh time for the token and initiates token refresh when necessary.
+     */
     let calcRefresh = () => {
         let expiresAt = sessionStorage.getItem('expiresAt');
         if (expiresAt == null) {
@@ -940,45 +778,7 @@ $(async function() {
         entry[1]($(`#${entry[0]}List`), files);
     });
 
-    $('#generateCertForm').ajaxForm({
-        dataType: 'json',
-        success: createCACertResponse,
-        error: (xhr, _msg, err) => {
-            showMessage(xhr.responseJSON);
-        } 
-    });
-
-    $('#newIntermediateForm').ajaxForm({
-        dataType: 'json',
-        success: createIntermediateCertResponse,
-        error: (xhr, _msg, err) => {
-            showMessage(xhr.responseJSON);
-        } 
-    });
-
-    $('#newLeafForm').ajaxForm({
-        dataType: 'json',
-        success: createLeafCertResponse,
-        error: (xhr, _msg, err) => {
-            showMessage(xhr.responseJSON);
-        } 
-    });
-
-    // Initialize dialogs
-    $('#newIntermediate').dialog({
-        autoOpen: false,
-        //- height: 600,
-        width: 350,
-        modal: true,
-    });
-
-    $('#newLeaf').dialog({
-        autoOpen: false,
-        //- height: 640,
-        width: 400,
-        modal: true,
-    });
-
+    initCerts();
     initTags();
     initUsers();
 });

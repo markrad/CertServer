@@ -1,5 +1,5 @@
 div#newLeaf(title='** Title **')
-  form#newLeafForm(action="/createLeafCert", method="post", encType="application/x-www-form-urlencoded" onsubmit="onCreateLeafCert(event)")
+  form#newLeafForm(action="/createLeafCert", method="post", encType="application/x-www-form-urlencoded")
     fieldset
       label.modal-label(for="Password") Password (if key is encrypted):
       input(type='password' name='password' id='leafPassword' value='' class='text ui-widget-content ui-corner-all')
