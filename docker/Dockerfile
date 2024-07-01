@@ -3,7 +3,7 @@ FROM node:20.10.0-alpine3.19
 RUN apk update
 RUN apk add curl jq git
 RUN npm install -g npm@10.2.5
-RUN git -c advice.detachedHead=false clone -b v1.12.5 https://github.com/markrad/certserver.git
+RUN git -c advice.detachedHead=false clone -b v1.12.6 https://github.com/markrad/certserver.git
 RUN mkdir /config
 RUN printf "certServer:\n"  > /config/config.yml
 
