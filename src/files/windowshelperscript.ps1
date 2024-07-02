@@ -1,12 +1,12 @@
 Set-Item "env:REQUEST_PATH" -Value "/api/test"
 Write-Host Exported CERTSERVER_HOST =((Get-Item -Path "Env:/CERTSERVER_HOST").Value)
 
-function Autenticate {
+function Authenticate {
     $userId = Read-Host -Prompt "Enter your username"
     $password = Read-Host -Prompt "Enter your password" -MaskInput
 
     $resp = Invoke-RestMethod -Method Post -Uri (Get-URIPrefix "login") -Body @{
-        userId = $userId
+        userId   = $userId
         password = $password
     }
     if ($resp.success -ne $true) {
@@ -18,13 +18,13 @@ function Autenticate {
         Write-Host -ForegroundColor Green Authentication successful
     }
 }
-if ((Get-Item "Env:/AUTH_REQUIRED").Value -eq "1") {
+if ((Get-Item "Env:/AUTH_REQUIRED").Value -eq "true") {
     Write-Host Authentication Required
     # Autenticate
 }
 function Get-Auth {
-    if ((Get-Item "Env:/AUTH_REQUIRED").Value -eq "1") {
-        @{ 'Authorization' = Get-Item "Env:CERTSERVER_TOKEN" }
+    if ((Get-Item "Env:/AUTH_REQUIRED").Value -eq "true") {
+        @{ 'Authorization' = 'Bearer ' + ((Get-Item "Env:CERTSERVER_TOKEN").Value) }
     }
     else {
         @{ }
@@ -142,7 +142,7 @@ function Get-ChainAndKey {
             Write-Host -ForegroundColor Yellow Certificate $CertificateId does not exist
         }
         else {
-            Write-Host -ForegroundColor Red Error occured getting device: $resp.ReturnCode $resp.Error
+            Write-Host -ForegroundColor Red Error occured getting device: $resp.ReturnCode $resp.Error.messages[0].message
         }
     }
     elseif ($null -eq $resp.Result.keyId) {
@@ -382,7 +382,7 @@ class Internal {
                     @{
                         Success    = $false
                         ReturnCode = $httprc
-                        Error      = $resp
+                        Error      = $resp.messages.message
                         Result     = $null
                     }
                 )
@@ -413,9 +413,9 @@ class Internal {
         try {
             $ValidTo = (Get-Date).AddDays($ValidDays)
             $body = @{
-                signer = $SignerId
+                signer     = $SignerId
                 commonName = $CertificateCommonName
-                validTo = $ValidTo.toString('MM/dd/yyyy')
+                validTo    = $ValidTo.toString('MM/dd/yyyy')
             }
             $jsonBody = ConvertTo-Json $body
             $httprc = -1
@@ -609,15 +609,15 @@ class Internal {
         try {
             $headers = @{
                 'Authorization' = $SASToken
-                'Content-Type' = 'application/json'
+                'Content-Type'  = 'application/json'
             }
             $body = @{
-                'deviceid' = $DeviceId
-                'status' = 'enabled'
+                'deviceid'       = $DeviceId
+                'status'         = 'enabled'
                 'authentication' = @{
                     'type' = 'certificateAuthority'
                 }
-                'capabilities' = @{
+                'capabilities'   = @{
                     'iotEdge' = $false
                 }
             }
@@ -659,7 +659,7 @@ class Internal {
     static [ReturnCode] RemoveDevice([string]$SASToken, [string]$Url, [string]$DeviceId, [string]$eTag) {
         $headers = @{
             'Authorization' = $SASToken
-            'If-Match' = $eTag
+            'If-Match'      = $eTag
         }
         try {
             $httprc = -1
@@ -912,3 +912,4 @@ function New-Device {
         Write-Host -ForegroundColor Red Unexpected error occured: $_
     }
 }
+
