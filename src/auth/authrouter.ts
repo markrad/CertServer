@@ -200,15 +200,17 @@ export class AuthRouter {
                 if (!this._authRequired) {
                     throw new CertError(401, 'Authentication is not enabled');
                 }
-                if (request.body.username != request.session.userId && request.session.role != UserRole.ADMIN) {
+                const { userpassword, userid, username, newpassword, confirmpassword } = request.body;
+                if (username != request.session.userId && request.session.role != UserRole.ADMIN) {
                     throw new CertError(401, 'You must be an admin to update a user');
                 }
-                const { userpassword, userid, username, newpassword, confirmpassword } = request.body;
                 if (newpassword != confirmpassword) {
                     throw new CertError(400, 'Passwords do not match');
                 }
-                UserStore.authenticate(username, userpassword);
-                let result = UserStore.updatePassword(Number(userid), newpassword);
+                if (userid == request.session.userId) {
+                    UserStore.authenticate(username, userpassword);
+                }
+                let result = UserStore.updatePassword(userid, newpassword);
                 logger.debug(`User ${result.name} updated successfully`);
                 WSManager.broadcast(result);
                 return response.status(200).json(result.getResponse());

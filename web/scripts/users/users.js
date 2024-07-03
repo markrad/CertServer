@@ -112,8 +112,24 @@ function onUserAdded(response) {
  */
 function editUser(id, name) {
     let dialog = $('#editUser');
-    dialog.dialog('option', 'title', `Edit User ${name}`);
-    $('#edit-userid').val(id);
+    let yourPasswordLabel = $('#your-password-label');
+    let yourPassword = $('#your-password');
+    let newPassword = $('#new-password');
+    let title = '';
+    if (name == sessionStorage.getItem('userId')) {
+        title = 'Change password';
+        yourPasswordLabel.removeClass('hidden');
+        yourPassword.removeClass('hidden').prop('required', true).prop('autofocus', true);
+        newPassword.prop('autofocus', false);
+    }
+    else {
+        title = `Edit User ${name}`;
+        yourPasswordLabel.addClass('hidden');
+        yourPassword.addClass('hidden').prop('required', false).prop('autofocus', false);
+        newPassword.prop('autofocus', true);
+    }
+    dialog.dialog('option', 'title', title);
+    $('#edit-userid').val(name);
     $('#edit-username').val(sessionStorage.getItem('userId'));
     dialog.dialog('open');
 }
