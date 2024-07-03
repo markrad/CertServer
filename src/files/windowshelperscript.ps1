@@ -175,8 +175,8 @@ function Get-CertAndKey {
     else {
         Write-Host Getting certificate $CertificateId
         Get-CertPem $CertificateId
-        Write-Host Getting key $key
-        Get-KeyPem $key
+        Write-Host Getting key $resp.Result.keyId
+        Get-KeyPem $resp.Result.keyId
     }
 }
 function Get-Chain {
@@ -912,4 +912,3 @@ function New-Device {
         Write-Host -ForegroundColor Red Unexpected error occured: $_
     }
 }
-
