@@ -540,6 +540,7 @@ function togglePane(button, id) {
 function showMessage(result) {
     let timerHandle = null;
     let msg = $('#messageDialogMessage');
+    msg.text('');
     let msgLine = '';
     let first = true;
     for (let m of result.messages) {
@@ -568,7 +569,6 @@ function showMessage(result) {
         },
         buttons: {
             "Ok": function() {
-                $('#messageDialogMessage').text('');
                 $(this).dialog('close');
                 if (timerHandle) {
                     clearTimeout(timerHandle);
@@ -580,7 +580,6 @@ function showMessage(result) {
     if (result.success) {
         timerHandle = setTimeout(() => {
             $('#messageDialog').dialog('close');
-            $('#messageDialogMessage').text('');
         }, 3000);
     }
 }
