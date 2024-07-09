@@ -1,10 +1,8 @@
 function authenticate() {
     if [ $# -ne 2 ]; then
         echo "Please enter your username and password"
-        echo "Username:"
-        read -r USERNAME
-        echo "Password:"
-        read -r -s PASSWORD
+        read -p "Username: " -r USERNAME
+        read -p "Password: " -r -s PASSWORD
     else
         USERNAME=$1
         PASSWORD=$2
@@ -21,7 +19,7 @@ function authenticate() {
         echo $token
         return 4
     fi
-    token=$(echo $token | tr -d '{' | tr -d '}' | cut -d ':' -f3 | tr -d '"')
+    token=$(echo $token | tr -d '{}' | cut -d ',' -f2 | cut -d ':' -f2 | tr -d '"')
     export CERTSERVER_TOKEN="Authorization: Bearer $token"
     echo "Authenticated - header exported as $CERTSERVER_TOKEN"
 }
@@ -36,7 +34,7 @@ if [ $? -ne 0 ]; then
     echo *** ERROR *** Command curl is required!
     return 4
 fi
-if [ $AUTH_REQUIRED == "1" ]; then
+if [ $AUTH_REQUIRED == "true" ]; then
     echo "Authentication is required"
     echo "Use authenticate <username> <password> to authenticate"
     # authenticate
@@ -185,7 +183,7 @@ function getcertserver() {
     echo $CERTSERVER_HOST;
 }
 function getcert() { 
-    wget --content-disposition --header="$CERTSERVER_TOKEN" $CERTSERVER_HOST/api/getCertificatePem?id=$@ 2>&1; 
+    wget --content-disposition "--header=$CERTSERVER_TOKEN" $CERTSERVER_HOST/api/getCertificatePem?id=$@ 2>&1; 
 }
 function getkey() { 
     wget --content-disposition --header="$CERTSERVER_TOKEN" $CERTSERVER_HOST/api/getKeyPem?id=$@ 2>&1; 
