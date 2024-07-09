@@ -515,20 +515,25 @@ async function uploadPem(x) {
  * @param {string} id html id of the form to display or hide
  */
 function togglePane(button, id) {
+    let bees = button.parent().find('.button1-arrow');
+    bees.each((i, bee) => {
+        $(bee).text('>');
+    });
     let arrow = button.find('.button1-arrow');
     let p = $(id);
     if (p.is(':visible')) {
-        arrow.text('>');
         p.slideUp(500);
     }
     else {
         $('.top-slide').each(function(_i, form) {
             if (`#${form.id}` != id) {
-                arrow.text('˅')
                 $(form).slideUp(500);
             }
         });
+        arrow.text('˅')
         p.slideDown(500);
+        let firstInput = p.find('input').first();
+        firstInput.focus();
     }
 }
 
