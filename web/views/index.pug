@@ -10,18 +10,19 @@ block layout-content
   include dialogs/user/updateuser.pug
   // Main view          
   div.View
-    div 
-     h1.Banner 
-      | Local Certificate Manager
-      span#auth.hidden #{authRequired}
-      span.sub #{version}
-      span#logged-in-user 
-        | User: 
-        span#user-name #{userName} Role:
-        span#user-role #{userRole}
-        button(type='button' class='button4' onclick='openUserPane(event)') 
-          span.button1Text #{userEditLabel}
-        a(href='/signout' class='button4') Sign Out
+    div.header
+      h1.Banner 
+        | Local Certificate Manager
+        span#auth.hidden #{authRequired}
+        span.sub #{version}
+        span#logged-in-user 
+          span User: 
+          span#user-name #{userName} 
+          span Role:
+          span#user-role #{userRole}
+          button(type='button' class='button4' onclick='openUserPane(event)') 
+            span.button1Text #{userEditLabel}
+          a(href='/signout' class='button4') Sign Out
     .top-section
       button(type='button' class='button1' onclick='togglePane($(this), \'#uploadCertForm\')') 
         span.button1Text Upload pem Files

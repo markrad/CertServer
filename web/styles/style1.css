@@ -484,14 +484,15 @@ button.button2-red:hover {
     font-family: 'Courier New', Courier, monospace;
     font-size: medium;
     width: 50%;
-    display: inline-block;
-    /* float: right; */
+    /* display: inline-block; */
+    float: right;
     text-align: right;
 }
 
 #user-role {
     font-style: italic;
     margin-left: 10px;
+    margin-right: 15px;
 }
 
 span.user-name-title {
