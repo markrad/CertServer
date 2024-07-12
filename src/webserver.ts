@@ -855,24 +855,21 @@ export class WebServer {
         return new Promise<OperationResult>(async (resolve, _reject) => {
             let result: OperationResult = new OperationResult('multiple');
             try {
-                // TODO: Put this in CertificateUtil
-                let msg: pem.ObjectPEM[] = pem.decode(pemString);
+                let msg: pem.ObjectPEM[] = CertificateUtil.pemDecode(pemString);
 
                 if (msg.length == 0) {
                     throw new CertError(400, 'Could not decode the file as a pem certificate');
                 }
 
                 for (let m of msg) {
-                    logger.debug(`Processing ${m.type}`);
+                    logger.debug(`Processing ${m}`);
                     let oneRes: OperationResult;
                     try {
                         if (m.type.includes('CERTIFICATE')) {
-                            // TODO: Put this in CertificateUtil
-                            oneRes = await this._tryAddCertificate({ pemString: pem.encode(m, { maxline: 64 }) });
+                            oneRes = await this._tryAddCertificate({ pemString: CertificateUtil.pemEncode(m) });
                         }
                         else if (m.type.includes('KEY')) {
-                            // TODO: Put this in CertificateUtil
-                            oneRes = await this._tryAddKey({ pemString: pem.encode(m, { maxline: 64 }) });
+                            oneRes = await this._tryAddKey({ pemString: CertificateUtil.pemEncode(m) });
                         }
                         else {
                             throw new CertError(409, `Unsupported type ${m.type}`);
@@ -880,7 +877,6 @@ export class WebServer {
                         result.merge(oneRes);
                     }
                     catch (err) {
-                        // logger.error(err.message);
                         result.pushMessage(err.message, ResultType.Failed);
                     }
                 }

@@ -807,22 +807,19 @@ class WebServer {
             return new Promise((resolve, _reject) => __awaiter(this, void 0, void 0, function* () {
                 let result = new OperationResult_1.OperationResult('multiple');
                 try {
-                    // TODO: Put this in CertificateUtil
-                    let msg = node_forge_1.pem.decode(pemString);
+                    let msg = certificateUtil_1.CertificateUtil.pemDecode(pemString);
                     if (msg.length == 0) {
                         throw new CertError_1.CertError(400, 'Could not decode the file as a pem certificate');
                     }
                     for (let m of msg) {
-                        logger.debug(`Processing ${m.type}`);
+                        logger.debug(`Processing ${m}`);
                         let oneRes;
                         try {
                             if (m.type.includes('CERTIFICATE')) {
-                                // TODO: Put this in CertificateUtil
-                                oneRes = yield this._tryAddCertificate({ pemString: node_forge_1.pem.encode(m, { maxline: 64 }) });
+                                oneRes = yield this._tryAddCertificate({ pemString: certificateUtil_1.CertificateUtil.pemEncode(m) });
                             }
                             else if (m.type.includes('KEY')) {
-                                // TODO: Put this in CertificateUtil
-                                oneRes = yield this._tryAddKey({ pemString: node_forge_1.pem.encode(m, { maxline: 64 }) });
+                                oneRes = yield this._tryAddKey({ pemString: certificateUtil_1.CertificateUtil.pemEncode(m) });
                             }
                             else {
                                 throw new CertError_1.CertError(409, `Unsupported type ${m.type}`);
@@ -830,7 +827,6 @@ class WebServer {
                             result.merge(oneRes);
                         }
                         catch (err) {
-                            // logger.error(err.message);
                             result.pushMessage(err.message, OperationResult_1.ResultType.Failed);
                         }
                     }
