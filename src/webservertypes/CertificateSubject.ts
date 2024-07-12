@@ -1,7 +1,7 @@
 /**
  * Represents a certificate subject
  */
-export type CertificateSubject = {
+export type CertificateSubject = { [key: string]: string } &{ 
     /** Country - must be two characters */
     C?: string;
     /** State or province */

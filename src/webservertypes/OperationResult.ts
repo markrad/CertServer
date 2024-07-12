@@ -116,11 +116,22 @@ export class OperationResult {
      * Pushes a message to the operation result.
      * 
      * @param message - The message to be pushed.
-     * @param type - The type of the message.
+     * @param type - The type of the message if the first arg is not a `ResultMessage` object.
      * @returns The updated OperationResult instance.
      */
-    public pushMessage(message: string, type: ResultType): OperationResult {
-        this._messages.push({ type: type, message: message });
+    public pushMessage(message: ResultMessage): OperationResult;
+    public pushMessage(message: ResultMessage[]): OperationResult;
+    public pushMessage(message: string, type: ResultType): OperationResult;
+    public pushMessage(message: ResultMessage | ResultMessage[] | string, type?: ResultType): OperationResult {
+        if (typeof message === 'string') {
+            this._messages.push({ type: type, message: message });
+        }
+        else if (Array.isArray(message)) {
+            this._messages = this._messages.concat(message);
+        }
+        else {
+            this._messages.push(message);
+        }
         return this;
     }
 

@@ -91,15 +91,16 @@ class OperationResult {
         }
         return this;
     }
-    /**
-     * Pushes a message to the operation result.
-     *
-     * @param message - The message to be pushed.
-     * @param type - The type of the message.
-     * @returns The updated OperationResult instance.
-     */
     pushMessage(message, type) {
-        this._messages.push({ type: type, message: message });
+        if (typeof message === 'string') {
+            this._messages.push({ type: type, message: message });
+        }
+        else if (Array.isArray(message)) {
+            this._messages = this._messages.concat(message);
+        }
+        else {
+            this._messages.push(message);
+        }
         return this;
     }
     /**

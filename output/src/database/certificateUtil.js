@@ -622,7 +622,6 @@ class CertificateUtil {
      */
     static _validateCertificateInput(type, bodyIn) {
         var _a, _b;
-        // FUTURE Needs a mechanism to force parts of the RDA sequence to be omitted
         try {
             if (typeof bodyIn !== 'object') {
                 throw new CertError_1.CertError(400, 'Bad POST data format - use Content-type: application/json');
@@ -647,8 +646,6 @@ class CertificateUtil {
                 }
             };
             let opResults = new OperationResult_1.OperationResult('Generate Certificate');
-            if (!result.subject.CN)
-                opResults.pushMessage('Common name is required', OperationResult_1.ResultType.Failed);
             if (!result.validTo)
                 opResults.pushMessage('Valid to is required', OperationResult_1.ResultType.Failed);
             if (type != CertTypes_1.CertTypes.root && !body.signer)
@@ -657,11 +654,7 @@ class CertificateUtil {
                 opResults.pushMessage('Valid to is invalid', OperationResult_1.ResultType.Failed);
             if (body.validFrom && isNaN(result.validFrom.valueOf()))
                 opResults.pushMessage('Valid from is invalid', OperationResult_1.ResultType.Failed);
-            if (result.subject.C != null && result.subject.C.length != 2)
-                opResults.pushMessage('Country code must be omitted or have two characters', OperationResult_1.ResultType.Failed);
-            let rc = CertificateUtil._isValidRNASequence([result.subject.C, result.subject.ST, result.subject.L, result.subject.O, result.subject.OU, result.subject.CN]);
-            if (rc)
-                opResults.pushMessage(rc.message, rc.type);
+            opResults.pushMessage(CertificateUtil._isValidRDNSequence(result.subject));
             if (opResults.hasErrors) {
                 opResults.setStatusCode(400);
                 return { certificateInput: null, messages: opResults };
@@ -690,13 +683,18 @@ class CertificateUtil {
      * @param rnas Array of RNA values for validation
      * @returns {{valid: boolean, message?: string}} valid: true if all are valid otherwise valid: false, message: error message
      */
-    static _isValidRNASequence(rnas) {
+    static _isValidRDNSequence(rnas) {
+        let messages = [];
+        if (rnas.C != null && rnas.C.length != 2)
+            messages.push({ message: 'Country code must be omitted or have two characters', type: OperationResult_1.ResultType.Failed });
+        if (!rnas.CN)
+            messages.push({ message: 'Common name is required', type: OperationResult_1.ResultType.Failed });
         for (let r in rnas) {
             if (!/^[a-z A-Z 0-9'\=\(\)\+\,\-\.\/\:\?]*$/.test(rnas[r])) {
-                return { message: 'Subject contains an invalid character', type: OperationResult_1.ResultType.Failed };
+                messages.push({ message: `RDN sequence key ${r} contains an invalid character`, type: OperationResult_1.ResultType.Failed });
             }
         }
-        return null;
+        return messages;
     }
     /**
      * Generates a certificate serial number

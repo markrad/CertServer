@@ -633,7 +633,6 @@ export class CertificateUtil implements CertificateRow, LokiObj {
      * @throws {CertError} If there is an error in the certificate input.
      */
     private static _validateCertificateInput(type: CertTypes, bodyIn: any): { certificateInput: CertificateInput, messages: OperationResult } {
-        // FUTURE Needs a mechanism to force parts of the RDA sequence to be omitted
         try {
             if (typeof bodyIn !== 'object') {
                 throw new CertError(400, 'Bad POST data format - use Content-type: application/json');
@@ -658,14 +657,11 @@ export class CertificateUtil implements CertificateRow, LokiObj {
                 }
             };
             let opResults: OperationResult = new OperationResult('Generate Certificate');
-            if (!result.subject.CN) opResults.pushMessage('Common name is required' , ResultType.Failed);
             if (!result.validTo) opResults.pushMessage('Valid to is required', ResultType.Failed);
             if (type != CertTypes.root && !body.signer) opResults.pushMessage('Signing certificate is required', ResultType.Failed);
             if (isNaN(result.validTo.valueOf())) opResults.pushMessage('Valid to is invalid', ResultType.Failed);
             if (body.validFrom && isNaN(result.validFrom.valueOf())) opResults.pushMessage('Valid from is invalid', ResultType.Failed);
-            if (result.subject.C != null && result.subject.C.length != 2) opResults.pushMessage('Country code must be omitted or have two characters', ResultType.Failed);
-            let rc: ResultMessage = CertificateUtil._isValidRNASequence([result.subject.C, result.subject.ST, result.subject.L, result.subject.O, result.subject.OU, result.subject.CN]);
-            if (rc) opResults.pushMessage(rc.message, rc.type);
+            opResults.pushMessage(CertificateUtil._isValidRDNSequence(result.subject));
             if (opResults.hasErrors) {
                 opResults.setStatusCode(400);
                 return { certificateInput: null, messages: opResults };
@@ -693,13 +689,18 @@ export class CertificateUtil implements CertificateRow, LokiObj {
      * @param rnas Array of RNA values for validation
      * @returns {{valid: boolean, message?: string}} valid: true if all are valid otherwise valid: false, message: error message
      */
-    private static _isValidRNASequence(rnas: string[]): ResultMessage {
+    private static _isValidRDNSequence(rnas: CertificateSubject): ResultMessage[] {
+        let messages: ResultMessage[] = [];
+        
+        if (rnas.C != null && rnas.C.length != 2) messages.push({ message: 'Country code must be omitted or have two characters', type: ResultType.Failed });
+        if (!rnas.CN) messages.push({ message: 'Common name is required', type: ResultType.Failed });
+
         for (let r in rnas) {
             if (!/^[a-z A-Z 0-9'\=\(\)\+\,\-\.\/\:\?]*$/.test(rnas[r])) {
-                return { message: 'Subject contains an invalid character', type: ResultType.Failed };
+                messages.push({ message: `RDN sequence key ${r} contains an invalid character`, type: ResultType.Failed });
             }
         }
-        return null;
+        return messages;
     }
 
     /**
