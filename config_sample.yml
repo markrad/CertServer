@@ -7,8 +7,9 @@ certServer:
   port: 4141                    # Webserver port number
   certificate: ''               # If both this and the key are provided the server will start in https
   key: ''                       # See above
-  encryptKeys: false            # Secret key to hash the password
-  useAuthentication: false      # Secret key to encrypt private keys
+  encryptKeys: false            # Encrypt keys in the file system
+  useAuthentication: false      # Require authentication to access the server
+  allowBasicAuth: false         # Allow basic authentication - should only be used for testing purposes
   subject:                      # Certificate subject defaults
     C: US
     ST: Washington

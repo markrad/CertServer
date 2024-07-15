@@ -34,6 +34,10 @@
                     "type": "boolean",
                     "description": "Encrypt keys at rest"
                 },
+                "allowBasicAuth": {
+                    "type": "boolean",
+                    "description": "Allow basic authentication"
+                },
                 "subject": {
                     "description": "The default subject information for created certificates.",
                     "properties": {
