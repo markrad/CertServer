@@ -88,6 +88,8 @@ export class WebServer {
     private _certificate: string = null;
     private _key: string = null;
     private _useAuthentication: boolean = false;
+    private _allowBasicAuth: boolean = false;
+    private _allowDigestAuth: boolean = false;
     private _encryptKeys: boolean = false;
     private _config: Config;
     private _version = 'v' + require('../../package.json').version;
@@ -121,6 +123,8 @@ export class WebServer {
             }
 
             this._useAuthentication = config.certServer.useAuthentication;
+            this._allowBasicAuth = config.certServer.allowBasicAuth ?? false;
+            this._allowDigestAuth = config.certServer.allowDigestAuth ?? false;
         }
 
         if (config.certServer.encryptKeys) {
@@ -168,6 +172,8 @@ export class WebServer {
         logger.info(`Data path: ${this._dataPath}`);
         logger.info(`TLS enabled: ${this._certificate != null}`);
         logger.info(`Authentication enabled: ${this._useAuthentication != null}`);
+        logger.info(`Basic Auth enabled: ${this._useAuthentication != null}`);
+        logger.info(`Digest Auth enabled: ${this._useAuthentication != null}`);
         logger.info(`Key encryption enabled: ${this._encryptKeys != null}`);
         let getCollections: () => void = function() {
             if (null == (certificates = db.getCollection<CertificateRow>('certificates'))) {
@@ -212,7 +218,7 @@ export class WebServer {
             await this._dbInit();
 
             DbStores.setAuthenticationState(this._useAuthentication);
-            this._authRouter = new AuthRouter(this._useAuthentication);
+            this._authRouter = new AuthRouter(this._useAuthentication, this._allowBasicAuth, this._allowDigestAuth);
         }
         catch (err) {
             logger.fatal('Failed to initialize the database: ' + err.message);
@@ -408,7 +414,7 @@ export class WebServer {
                 response.status(e.status).json(e.getResponse());
             }
         });
-        this._app.get('/api/keyList', this._authRouter.auth, (request, _response, next) => {
+        this._app.get('/api/keyList', (request, _response, next) => {
             request.url = '/api/certList';
             request.query = { type: 'key' };
             next();

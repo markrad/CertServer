@@ -15,6 +15,10 @@ export type Config = {
         encryptKeys?: boolean;
         /** When true, authentication will be used - default false */
         useAuthentication?: boolean;
+        /** When true, basic auth will be accepted */
+        allowBasicAuth?: boolean;
+        /** When true, digest auth will be accepted */
+        allowDigestAuth?: boolean;
         /** The secret used to encrypt keys at rest - default none <this will be deprecated> */
         keySecret?: string;
         subject: {

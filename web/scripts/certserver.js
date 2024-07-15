@@ -607,7 +607,7 @@ $(async function() {
         if (expiresAt == null) {
             return;
         }
-        let expiresIn = Number(expiresAt) - (Date.now() / 1000);
+        let expiresIn = Number(expiresAt) - Math.floor((Date.now() / 1000));
         let diff = expiresIn - 60;
         console.log(`${new Date()} Refresh in ${diff} seconds`);
         setTimeout(() => {
