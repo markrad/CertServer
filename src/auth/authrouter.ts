@@ -92,7 +92,6 @@ export class AuthRouter {
                 let { token, expiresAt } = await this.generateToken({ userId: request.session.userId, role: request.session.role }, this._passwordSecret, tokenLife);
                 request.session.token = token;
                 request.session.tokenExpiration = expiresAt;
-                logger.debug('Token refresh successful');
                 return response.status(200).json({ success: true, token: token, expiresAt: expiresAt });
             }
             catch (err) {
@@ -445,6 +444,8 @@ export class AuthRouter {
                     reject(err);
                 }
                 else {
+                    let expiresAt = (decode(token) as JwtPayload).exp;
+                    logger.debug(`Token refresh successful - will expire at ${expiresAt} in ${expiresAt - Math.floor(Date.now() / 1000)} seconds`);
                     resolve({ token: token, expiresAt: (decode(token) as JwtPayload).exp });
                 }
             });
