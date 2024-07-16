@@ -4,14 +4,14 @@ div#addUser.hidden(title='Add User')
         if error
             p.text-danger Error!!!
         fieldset
-            label.modal-label(for='Username') Username:
-            input(type='text' name='username' value='' class='text ui-widget-content ui-corner-all' required autofocus)
-            label.modal-label(for='Password') Password:
-            input(type='password' name='password' value='' class='text ui-widget-content ui-corner-all' required)
-            label.modal-label(for='Password') Confirm Password:
-            input(type='password' name='confirmpassword' value='' class='text ui-widget-content ui-corner-all' required)
-            label.modal-label(for='Role') Role:
-            select#roleSelect(name='role')
+            label.modal-label(for='add-userid') Username:
+            input#add-userid(type='text' name='username' value='' class='text ui-widget-content ui-corner-all' required autofocus)
+            label.modal-label(for='add-password') Password:
+            input#add-password(type='password' name='password' value='' class='text ui-widget-content ui-corner-all' required)
+            label.modal-label(for='add-confirmpassword') Confirm Password:
+            input#add-confirmpassword(type='password' name='confirmpassword' value='' class='text ui-widget-content ui-corner-all' required)
+            label.modal-label(for='roleSelect') Role:
+            select#roleSelect(name='role' title='Role')
                 option(value='1') User
                 option(value='0') Admin
         div.new-form-buttons

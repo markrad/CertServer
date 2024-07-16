@@ -4,12 +4,12 @@ div#editUser.hidden(title='Update User')
         if error
             p.text-danger Error!!!
         fieldset
-            label.modal-label#your-password-label(for='userpassword') Your Password:
+            label.modal-label#your-password-label(for='your-password') Your Password:
             input#your-password(type='password' name='userpassword' value='' class='text ui-widget-content ui-corner-all' required autofocus)
-            label.modal-label(for='Password') New Password:
+            label.modal-label(for='new-password') New Password:
             input#new-password(type='password' name='newpassword' value='' class='text ui-widget-content ui-corner-all' required)
-            label.modal-label(for='Password') Confirm Password:
-            input(type='password' name='confirmpassword' value='' class='text ui-widget-content ui-corner-all' required)
+            label.modal-label(for='confirm-password') Confirm Password:
+            input#confirm-password(type='password' name='confirmpassword' value='' class='text ui-widget-content ui-corner-all' required)
             input#edit-userid(type='hidden' name='userid' value='')
             input#edit-username(type='hidden' name='username' value='')
         div.new-form-buttons

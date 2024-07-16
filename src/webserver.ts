@@ -230,7 +230,8 @@ export class WebServer {
         this._app.use(Express.json({ type: '*/json' }));
         this._app.use(Express.text({ type: 'text/plain' }));
         this._app.use(Express.text({ type: 'application/x-www-form-urlencoded' }));
-        this._app.use(Express.text({ type: 'application/json' }));this._app.use('/scripts', Express.static(path.join(__dirname, '../../web/scripts')));
+        this._app.use(Express.text({ type: 'application/json' }));
+        this._app.use('/scripts', Express.static(path.join(__dirname, '../../web/scripts')));
         this._app.use('/styles', Express.static(path.join(__dirname, '../../web/styles')));
         this._app.use('/icons', Express.static(path.join(__dirname, '../../web/icons')));
         this._app.use('/files', Express.static(path.join(__dirname, '../../web/files')));

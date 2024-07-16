@@ -1,31 +1,31 @@
 div#newIntermediate(title='** Title **')
   form#newIntermediateForm(action="/createIntermediateCert", method="post", encType="application/x-www-form-urlencoded")
     fieldset
-      label.modal-label(for="Password") Password (if key is encrypted):
+      label.modal-label(for="intPassword") Password (if key is encrypted):
       input(type='password' name='password' id='intPassword' value='' class='text ui-widget-content ui-corner-all')
-      label.modal-label(for='Country') Country: 
-      input(type='text' name='country' id='intermediateC' value=C class='text ui-widget-content ui-corner-all')
-      label.modal-label(for='State' styles { float: left; }) State:
+      label.modal-label(for='intermediateC') Country: 
+      input(type='text' name='intermediateC' id='intermediateC' value=C class='text ui-widget-content ui-corner-all')
+      label.modal-label(for='intermediateST' styles { float: left; }) State:
       input(type='text' name='state' id='intermediateST' value=ST class='text ui-widget-content ui-corner-all')
-      label.modal-label(for='Location') Location:
+      label.modal-label(for='intermediateL') Location:
       input(type='text' name='location' id='intermediateL' value=L class='text ui-widget-content ui-corner-all')
-      label.modal-label(for='Organization') Organization:
-      input(type='text' name='organization' id='intermediateO' value=O class='text ui-widget-content ui-corner-all')
-      label.modal-label(for='Unit') Unit:
-      input(type='text' name='unit' id='intermediateOU' value=OU class='text ui-widget-content ui-corner-all')
-      label.modal-label(for='Common Name') Common Name:
+      label.modal-label(for='intermediateO') Organization:
+      input(type='text' name='intermediateO' id='intermediateO' value=O class='text ui-widget-content ui-corner-all')
+      label.modal-label(for='intermediateOU') Unit:
+      input(type='text' name='intermediateOU' id='intermediateOU' value=OU class='text ui-widget-content ui-corner-all')
+      label.modal-label(for='intermediateCN') Common Name:
       input(type='text' name='commonName' id='intermediateCN' value='' class='text ui-widget-content ui-corner-all')
-      label.modal-label(for='SANs') SANs
+      label.modal-label SANs
       div#IntermediateSANList
       div#IntermediateSANInput
-        select.san-type(title='SAN Type')
+        select.san-type(title='SAN Type' name='SANType')
           option DNS 
           option IP
-        input.san-value(type='text')
+        input.san-value(type='text' name='SANValue')
         input.san-enter(name='SanEnter' type='button' value='✔' onClick='AddIntermediateSAN()')
-      label.modal-label(for='Valid From') Valid from:
+      label.modal-label(for='IntermediateValidFrom') Valid from:
       input#IntermediateValidFrom(type='text' name='validFrom')
-      label.modal-label(for='Valid To') Valid to:
+      label.modal-label(for='IntermediateValidTo') Valid to:
       input#IntermediateValidTo(type='text' name='validTo')
       input#intermediateSigner(type='text' name='signer' value='' class='hidden')
       div.new-form-buttons
