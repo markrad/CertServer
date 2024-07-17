@@ -322,6 +322,24 @@ export class KeyUtil implements PrivateKeyRow, LokiObj {
         return parseInt(Path.parse(name).name.split('_').slice(-1)[0].split('.')[0]);
     }
 
+    /**
+     * Decodes a PEM string and returns an array of PEM objects.
+     * @param pemString The PEM string to decode.
+     * @returns An array of PEM objects.
+     */
+    public static pemDecode(pemString: string): pem.ObjectPEM[] {
+        return pem.decode(pemString);
+    }
+
+    /**
+     * Encodes a PEM object into a string.
+     * @param pemObject The PEM object to encode.
+     * @returns The encoded PEM object as a string.
+     */
+    public static pemEncode(pemObject: pem.ObjectPEM): string {
+        return pem.encode(pemObject, { maxline: 64 });
+    }
+
     public update(): OperationResultItem {
         KeyStores.keyDb.update(this.row);
         return new OperationResultItem(this.type, this.$loki);
