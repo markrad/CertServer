@@ -46,13 +46,14 @@ export class AuthRouter {
                 UserStore.addUser(defaultUser, defaultPassword, UserRole.ADMIN);
             }
         }
-        this._authRouter.get('/signin', (_request, response) => {
+        this._authRouter.get('/signin', (request, response) => {
             if (!this._authRequired) {
                 return response.redirect('/');
             }
             response.render('signin', {
                 title: 'Sign In',
                 version: 'v' + require('../../../package.json').version,
+                errorMessage: request.query.error,
                 authRequired: `${authRequired ? '1' : '0'}`,
             });
         });
@@ -385,7 +386,7 @@ export class AuthRouter {
                     token = request.session.token;
                 }
                 else {
-                    throw new CertError(403, 'No authorization provided');
+                    throw new CertError(401, 'No authorization provided');
                 }
                 let decoded = verify(token, this._passwordSecret);
                 logger.debug(decoded);

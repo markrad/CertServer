@@ -524,3 +524,12 @@ span.user-role-title {
 .user-line-inner {
     display: flex;
 }
+
+#signinError {
+    color: red;
+    font-size: normal;
+    font-weight: normal;
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    border-left: 2px solid red;
+    padding: 5px;
+}

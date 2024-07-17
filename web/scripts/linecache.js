@@ -360,7 +360,8 @@ class LineCache {
                 data: data,
                 error: (xhr, _msg, err) => {
                     if (xhr.status == 401) {
-                        window.location.href = '/signin';
+                        let query = `?error=${encodeURIComponent(xhr.responseJSON.messages[0].message)}`;
+                        window.location.href = `/signin${query}`;
                     }
                     reject(xhr.responseJSON);
                 },

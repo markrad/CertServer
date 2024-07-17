@@ -340,6 +340,22 @@ class KeyUtil {
     static getIdFromFileName(name) {
         return parseInt(path_1.default.parse(name).name.split('_').slice(-1)[0].split('.')[0]);
     }
+    /**
+     * Decodes a PEM string and returns an array of PEM objects.
+     * @param pemString The PEM string to decode.
+     * @returns An array of PEM objects.
+     */
+    static pemDecode(pemString) {
+        return node_forge_1.pem.decode(pemString);
+    }
+    /**
+     * Encodes a PEM object into a string.
+     * @param pemObject The PEM object to encode.
+     * @returns The encoded PEM object as a string.
+     */
+    static pemEncode(pemObject) {
+        return node_forge_1.pem.encode(pemObject, { maxline: 64 });
+    }
     update() {
         keyStores_1.KeyStores.keyDb.update(this.row);
         return new OperationResultItem_1.OperationResultItem(this.type, this.$loki);
