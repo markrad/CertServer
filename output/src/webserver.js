@@ -42,7 +42,7 @@ const http_1 = __importDefault(require("http"));
 const https_1 = __importDefault(require("https"));
 const fs_1 = __importDefault(require("fs"));
 const promises_1 = require("fs/promises");
-const node_forge_1 = require("node-forge");
+// import { /* pki, */ pem, /* util, random, md */ } from 'node-forge'; 
 const lokijs_1 = __importStar(require("lokijs"));
 const express_1 = __importDefault(require("express"));
 const express_fileupload_1 = __importDefault(require("express-fileupload"));
@@ -229,27 +229,27 @@ class WebServer {
                     request.session.token = null;
                 }
                 const redirects = {
-                    '/api/uploadCert': '/api/uploadPem',
+                    '/api/uploadcert': '/api/uploadPem',
                     '/api/helpers': '/api/helper',
                     '/api/script': '/api/helper',
-                    '/createCACert': '/api/createCACert',
-                    '/createIntermediateCert': '/api/createIntermediateCert',
-                    '/createLeafCert': '/api/createLeafCert',
-                    '/deleteCert': '/api/deleteCert',
-                    '/certList': '/api/certList',
-                    '/certDetails': '/api/certDetails',
-                    '/deleteKey': '/api/deleteKey',
-                    '/keyList': '/certList',
-                    '/keyDetails': '/api/keyDetails',
-                    '//api/getCertPem': '/api/getCertificatePem',
-                    '/api/uploadKey': '/api/uploadPem',
+                    '/createcacert': '/api/createCACert',
+                    '/createintermediatecert': '/api/createIntermediateCert',
+                    '/createleafcert': '/api/createLeafCert',
+                    '/deletecert': '/api/deleteCert',
+                    '/certlist': '/api/certList',
+                    '/certdetails': '/api/certDetails',
+                    '/deletekey': '/api/deleteKey',
+                    '/keylist': '/certList',
+                    '/keydetails': '/api/keyDetails',
+                    '/api/getcertpem': '/api/getCertificatePem',
+                    '/api/uploadkey': '/api/uploadPem',
                     '/login': '/api/login',
                     'authrequired': '/api/authrequired',
                 };
                 try {
-                    if (request.path in redirects) {
-                        logger.debug(`Redirecting ${request.path} to ${redirects[request.path]}`);
-                        request.url = redirects[request.path];
+                    if (request.path.toLowerCase() in redirects) {
+                        logger.debug(`Redirecting ${request.path} to ${redirects[request.path.toLowerCase()]}`);
+                        request.url = redirects[request.path.toLowerCase()];
                     }
                     logger.debug(`${request.method} ${request.url}`);
                     next();
@@ -275,6 +275,22 @@ class WebServer {
                     userEditLabel: this._useAuthentication ? _request.session.role == UserRole_1.UserRole.ADMIN ? 'Edit Users' : 'Change Password' : '',
                 });
             });
+            this._app.get('/api/getconfig', (_request, response) => __awaiter(this, void 0, void 0, function* () {
+                response.status(200).json({
+                    useAthentication: this._useAuthentication,
+                    allowBasicAuth: this._allowBasicAuth,
+                    allowDigestAuth: this._allowDigestAuth,
+                    encryptKeys: this._encryptKeys,
+                    version: this._version,
+                    defaultSubject: {
+                        C: this._config.certServer.subject.C,
+                        ST: this._config.certServer.subject.ST,
+                        L: this._config.certServer.subject.L,
+                        O: this._config.certServer.subject.O,
+                        OU: this._config.certServer.subject.OU,
+                    }
+                });
+            }));
             this._app.get('/api/helper', (request, response) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     response.setHeader('content-type', 'application/text');
@@ -865,8 +881,7 @@ class WebServer {
                         }
                         input.pemString = yield (0, promises_1.readFile)(input.filename, { encoding: 'utf8' });
                     }
-                    // TODO: Put this in CertificateUtil
-                    let msg = node_forge_1.pem.decode(input.pemString)[0];
+                    let msg = keyUtil_1.KeyUtil.pemDecode(input.pemString)[0];
                     logger.debug(`Received ${msg.type}`);
                     if (msg.type != 'CERTIFICATE') {
                         throw new CertError_1.CertError(400, 'Unsupported type ' + msg.type);

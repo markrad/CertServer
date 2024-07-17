@@ -5,7 +5,7 @@ import https from 'https';
 import fs from 'fs';
 import { readFile } from 'fs/promises'
 
-import { /* pki, */ pem, /* util, random, md */ } from 'node-forge'; 
+// import { /* pki, */ pem, /* util, random, md */ } from 'node-forge'; 
 import loki, { Collection, LokiFsAdapter } from 'lokijs'
 import Express, { NextFunction, /*Request, /* response */ } from 'express';
 import FileUpload from 'express-fileupload';
@@ -251,27 +251,27 @@ export class WebServer {
                 request.session.token = null;
             }
             const redirects: { [key: string]: string } = {
-                '/api/uploadCert':          '/api/uploadPem',
+                '/api/uploadcert':          '/api/uploadPem',
                 '/api/helpers':             '/api/helper',
                 '/api/script':              '/api/helper',
-                '/createCACert':            '/api/createCACert',
-                '/createIntermediateCert':  '/api/createIntermediateCert',
-                '/createLeafCert':          '/api/createLeafCert',
-                '/deleteCert':              '/api/deleteCert',
-                '/certList':                '/api/certList',
-                '/certDetails':             '/api/certDetails',
-                '/deleteKey':               '/api/deleteKey',
-                '/keyList':                 '/certList',
-                '/keyDetails':              '/api/keyDetails',
-                '//api/getCertPem':         '/api/getCertificatePem',
-                '/api/uploadKey':           '/api/uploadPem',
+                '/createcacert':            '/api/createCACert',
+                '/createintermediatecert':  '/api/createIntermediateCert',
+                '/createleafcert':          '/api/createLeafCert',
+                '/deletecert':              '/api/deleteCert',
+                '/certlist':                '/api/certList',
+                '/certdetails':             '/api/certDetails',
+                '/deletekey':               '/api/deleteKey',
+                '/keylist':                 '/certList',
+                '/keydetails':              '/api/keyDetails',
+                '/api/getcertpem':          '/api/getCertificatePem',
+                '/api/uploadkey':           '/api/uploadPem',
                 '/login':                   '/api/login',
                 'authrequired':             '/api/authrequired',
             };
             try {
-                if (request.path in redirects) {
-                    logger.debug(`Redirecting ${request.path} to ${redirects[request.path]}`)
-                    request.url = redirects[request.path];
+                if (request.path.toLowerCase() in redirects) {
+                    logger.debug(`Redirecting ${request.path} to ${redirects[request.path.toLowerCase()]}`)
+                    request.url = redirects[request.path.toLowerCase()];
                 }
                 logger.debug(`${request.method} ${request.url}`);
                 next();
@@ -295,6 +295,22 @@ export class WebServer {
                 userName: this._useAuthentication? _request.session.userId : 'None',
                 userRole: this._useAuthentication? _request.session.role == UserRole.ADMIN? 'admin' : 'user' : '',
                 userEditLabel: this._useAuthentication? _request.session.role == UserRole.ADMIN? 'Edit Users' : 'Change Password' : '',
+            });
+        });
+        this._app.get('/api/getconfig', async (_request, response) => {
+            response.status(200).json({
+                useAthentication: this._useAuthentication,
+                allowBasicAuth: this._allowBasicAuth,
+                allowDigestAuth: this._allowDigestAuth,
+                encryptKeys: this._encryptKeys,
+                version: this._version,
+                defaultSubject: {
+                    C: this._config.certServer.subject.C,
+                    ST: this._config.certServer.subject.ST,
+                    L: this._config.certServer.subject.L,
+                    O: this._config.certServer.subject.O,
+                    OU: this._config.certServer.subject.OU,
+                }
             });
         });
         this._app.get('/api/helper', async (request, response) => {
@@ -862,7 +878,7 @@ export class WebServer {
         return new Promise<OperationResult>(async (resolve, _reject) => {
             let result: OperationResult = new OperationResult('multiple');
             try {
-                let msg: pem.ObjectPEM[] = CertificateUtil.pemDecode(pemString);
+                let msg = CertificateUtil.pemDecode(pemString);
 
                 if (msg.length == 0) {
                     throw new CertError(400, 'Could not decode the file as a pem certificate');
@@ -915,8 +931,7 @@ export class WebServer {
                     input.pemString = await readFile(input.filename, { encoding: 'utf8' });
                 }
 
-                // TODO: Put this in CertificateUtil
-                let msg = pem.decode(input.pemString)[0];
+                let msg = KeyUtil.pemDecode(input.pemString)[0];
                 logger.debug(`Received ${msg.type}`);
 
                 if (msg.type != 'CERTIFICATE') {
