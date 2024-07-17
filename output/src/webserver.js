@@ -91,13 +91,12 @@ class WebServer {
      * @param config Configuration information such as port, etc.
      */
     constructor(config) {
-        var _a, _b;
+        var _a;
         this._app = (0, express_1.default)();
         this._certificate = null;
         this._key = null;
         this._useAuthentication = false;
         this._allowBasicAuth = false;
-        this._allowDigestAuth = false;
         this._encryptKeys = false;
         this._version = 'v' + require('../../package.json').version;
         this._authRouter = null;
@@ -118,7 +117,6 @@ class WebServer {
             }
             this._useAuthentication = config.certServer.useAuthentication;
             this._allowBasicAuth = (_a = config.certServer.allowBasicAuth) !== null && _a !== void 0 ? _a : false;
-            this._allowDigestAuth = (_b = config.certServer.allowDigestAuth) !== null && _b !== void 0 ? _b : false;
         }
         if (config.certServer.encryptKeys) {
             if (!config.certServer.certificate) {
@@ -155,8 +153,7 @@ class WebServer {
             logger.info(`Data path: ${this._dataPath}`);
             logger.info(`TLS enabled: ${this._certificate != null}`);
             logger.info(`Authentication enabled: ${this._useAuthentication != null}`);
-            logger.info(`Basic Auth enabled: ${this._useAuthentication != null}`);
-            logger.info(`Digest Auth enabled: ${this._useAuthentication != null}`);
+            logger.info(`Basic Auth enabled: ${this._allowBasicAuth != null}`);
             logger.info(`Key encryption enabled: ${this._encryptKeys != null}`);
             let getCollections = function () {
                 if (null == (certificates = db.getCollection('certificates'))) {
@@ -196,7 +193,7 @@ class WebServer {
                 userStore_1.UserStore.init(userStore);
                 yield this._dbInit();
                 dbStores_1.DbStores.setAuthenticationState(this._useAuthentication);
-                this._authRouter = new authrouter_1.AuthRouter(this._useAuthentication, this._allowBasicAuth, this._allowDigestAuth);
+                this._authRouter = new authrouter_1.AuthRouter(this._useAuthentication, this._allowBasicAuth);
             }
             catch (err) {
                 logger.fatal('Failed to initialize the database: ' + err.message);
@@ -279,7 +276,6 @@ class WebServer {
                 response.status(200).json({
                     useAthentication: this._useAuthentication,
                     allowBasicAuth: this._allowBasicAuth,
-                    allowDigestAuth: this._allowDigestAuth,
                     encryptKeys: this._encryptKeys,
                     version: this._version,
                     defaultSubject: {

@@ -1,7 +1,6 @@
 import http from 'http';
 import { Request, Response, NextFunction, Router } from 'express';
 import { JsonWebTokenError, JwtPayload, decode, sign, verify } from 'jsonwebtoken';
-import * as crypto from 'crypto';
 import * as log4js from 'log4js';
 
 import { UserStore } from '../database/userStore';
@@ -27,16 +26,14 @@ export class AuthRouter {
     private _checkAuthPtr: (request: Request, response: Response, next: NextFunction) => void = this._noAuth;
     private _authRequired: boolean = false;
     private _allowBasicAuth: boolean = false;
-    private _allowDigestAuth: boolean = false;
 
     /**
      * @constructor
      * @param authRequired - Will be true if authentication is required, false otherwise.
      */
-    constructor(authRequired: boolean, allowBasicAuth: boolean, allowDigestAuth: boolean) {
+    constructor(authRequired: boolean, allowBasicAuth: boolean) {
         this._authRequired = authRequired;
         this._allowBasicAuth = allowBasicAuth;
-        this._allowDigestAuth = allowDigestAuth;
         if (this._authRequired) {
             this._authPtr = this._auth;
             this._checkAuthPtr = this._checkAuth;
@@ -367,14 +364,6 @@ export class AuthRouter {
                             logger.debug(`Bearer auth successful for ${auth[0]} role ${role}`);
                             next();
                             return;
-                        case 'Digest':
-                            if (!this._allowDigestAuth) {
-                                throw new CertError(403, 'Digest auth not allowed');
-                            }
-                            logger.warn('Digest auth not implemented');
-                            break;
-                            // throw new CertError(403, 'Digest auth not implemented');
-                            // return;
                         case 'Bearer':
                             token = authType[1];
                             break;
@@ -405,9 +394,6 @@ export class AuthRouter {
             else {
                 e = CertMultiError.getCertError(err);
             }
-            // if (e.status == 401) {
-            //     response.appendHeader('WWW-Authenticate', `Digest realm="CertServer", qop="auth,auth-int", nonce="${crypto.randomBytes(16).toString('base64')}", opaque="${crypto.randomBytes(16).toString('base64')}"`);
-            // }
             response.status(e.status).json(e.getResponse());
         }
     }

@@ -10,7 +10,6 @@ certServer:
   encryptKeys: false            # Encrypt keys in the file system
   useAuthentication: false      # Require authentication to access the server
   allowBasicAuth: false         # Allow basic authentication - should only be used for testing purposes
-  allowDigestAuth: false        # Allow digest authentication - should only be used for testing purposes
   subject:                      # Certificate subject defaults
     C: US
     ST: Washington

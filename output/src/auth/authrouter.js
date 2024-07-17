@@ -54,7 +54,7 @@ class AuthRouter {
      * @constructor
      * @param authRequired - Will be true if authentication is required, false otherwise.
      */
-    constructor(authRequired, allowBasicAuth, allowDigestAuth) {
+    constructor(authRequired, allowBasicAuth) {
         this._authRouter = (0, express_1.Router)();
         this._authRouterAPI = (0, express_1.Router)();
         this._passwordSecret = dbStores_1.DbStores.getPasswordSecret();
@@ -62,10 +62,8 @@ class AuthRouter {
         this._checkAuthPtr = this._noAuth;
         this._authRequired = false;
         this._allowBasicAuth = false;
-        this._allowDigestAuth = false;
         this._authRequired = authRequired;
         this._allowBasicAuth = allowBasicAuth;
-        this._allowDigestAuth = allowDigestAuth;
         if (this._authRequired) {
             this._authPtr = this._auth;
             this._checkAuthPtr = this._checkAuth;
@@ -388,14 +386,6 @@ class AuthRouter {
                             logger.debug(`Bearer auth successful for ${auth[0]} role ${role}`);
                             next();
                             return;
-                        case 'Digest':
-                            if (!this._allowDigestAuth) {
-                                throw new CertError_1.CertError(403, 'Digest auth not allowed');
-                            }
-                            logger.warn('Digest auth not implemented');
-                            break;
-                        // throw new CertError(403, 'Digest auth not implemented');
-                        // return;
                         case 'Bearer':
                             token = authType[1];
                             break;
@@ -426,9 +416,6 @@ class AuthRouter {
             else {
                 e = CertMultiError_1.CertMultiError.getCertError(err);
             }
-            // if (e.status == 401) {
-            //     response.appendHeader('WWW-Authenticate', `Digest realm="CertServer", qop="auth,auth-int", nonce="${crypto.randomBytes(16).toString('base64')}", opaque="${crypto.randomBytes(16).toString('base64')}"`);
-            // }
             response.status(e.status).json(e.getResponse());
         }
     }

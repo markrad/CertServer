@@ -89,7 +89,6 @@ export class WebServer {
     private _key: string = null;
     private _useAuthentication: boolean = false;
     private _allowBasicAuth: boolean = false;
-    private _allowDigestAuth: boolean = false;
     private _encryptKeys: boolean = false;
     private _config: Config;
     private _version = 'v' + require('../../package.json').version;
@@ -124,7 +123,6 @@ export class WebServer {
 
             this._useAuthentication = config.certServer.useAuthentication;
             this._allowBasicAuth = config.certServer.allowBasicAuth ?? false;
-            this._allowDigestAuth = config.certServer.allowDigestAuth ?? false;
         }
 
         if (config.certServer.encryptKeys) {
@@ -172,8 +170,7 @@ export class WebServer {
         logger.info(`Data path: ${this._dataPath}`);
         logger.info(`TLS enabled: ${this._certificate != null}`);
         logger.info(`Authentication enabled: ${this._useAuthentication != null}`);
-        logger.info(`Basic Auth enabled: ${this._useAuthentication != null}`);
-        logger.info(`Digest Auth enabled: ${this._useAuthentication != null}`);
+        logger.info(`Basic Auth enabled: ${this._allowBasicAuth != null}`);
         logger.info(`Key encryption enabled: ${this._encryptKeys != null}`);
         let getCollections: () => void = function() {
             if (null == (certificates = db.getCollection<CertificateRow>('certificates'))) {
@@ -218,7 +215,7 @@ export class WebServer {
             await this._dbInit();
 
             DbStores.setAuthenticationState(this._useAuthentication);
-            this._authRouter = new AuthRouter(this._useAuthentication, this._allowBasicAuth, this._allowDigestAuth);
+            this._authRouter = new AuthRouter(this._useAuthentication, this._allowBasicAuth);
         }
         catch (err) {
             logger.fatal('Failed to initialize the database: ' + err.message);
@@ -301,7 +298,6 @@ export class WebServer {
             response.status(200).json({
                 useAthentication: this._useAuthentication,
                 allowBasicAuth: this._allowBasicAuth,
-                allowDigestAuth: this._allowDigestAuth,
                 encryptKeys: this._encryptKeys,
                 version: this._version,
                 defaultSubject: {
