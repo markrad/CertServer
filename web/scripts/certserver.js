@@ -654,7 +654,13 @@ $(async function() {
     datePicker = $('#LeafValidTo');
     datePicker.datepicker( { defaultDate: +365 } );
 
-    lineCache = new LineCache($('#auth').text() == '1');
+    let authRequired = $('#auth').text() == '1';
+    lineCache = new LineCache(authRequired);
+
+    if (!authRequired) {
+        $('#logged-in-user').hide();
+    }
+
 
     lineCache.setAddHandler(addHandler);
     lineCache.setUpdateHandler(updateHandler);
