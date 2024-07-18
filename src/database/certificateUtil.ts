@@ -1,4 +1,4 @@
-import { pki, pem, util, random, md, /*jsbn*/ } from "node-forge";
+import { pki, pem, util, random, md } from "node-forge";
 import { CertTypes } from "../webservertypes/CertTypes";
 import { CertificateRow } from "./CertificateRow";
 import { CertificateSubject } from "../webservertypes/CertificateSubject";
@@ -6,9 +6,8 @@ import { CertificateStores } from "./certificateStores";
 import { CertError } from "../webservertypes/CertError";
 
 import Path from "path";
-import { unlink, writeFile } from "fs/promises";
+import { readFile, unlink, writeFile } from "fs/promises";
 import * as log4js from "log4js";
-import { readFile, /*writeFile, unlink, rename*/ } from 'fs/promises'
 import crypto from 'crypto';
 import { OperationResultItem } from "../webservertypes/OperationResultItem";
 import { OperationResult, ResultMessage, ResultType } from "../webservertypes/OperationResult";
@@ -24,10 +23,13 @@ import { ExtensionKeyUsage } from "../extensions/ExtensionKeyUsage";
 import { ExtensionSubjectKeyIdentifier } from "../extensions/ExtensionSubjectKeyIdentifier";
 import { ExtensionAuthorityKeyIdentifier } from "../extensions/ExtensionAuthorityKeyIdentifier";
 import { ExtensionExtKeyUsage } from "../extensions/ExtensionExtKeyUsage";
-import { ExtensionSubjectAltName /*, ExtensionSubjectAltNameOptions */} from "../extensions/ExtensionSubjectAltName";
+import { ExtensionSubjectAltName } from "../extensions/ExtensionSubjectAltName";
 
 const logger = log4js.getLogger();
 
+/**
+ * Represents a utility class for working with certificates.
+ */
 export class CertificateUtil implements CertificateRow, LokiObj {
     private _row: CertificateRow & LokiObj;
     private _pem: string = null;
@@ -152,10 +154,20 @@ export class CertificateUtil implements CertificateRow, LokiObj {
         } 
     }
 
+    /**
+     * Creates an operational result item.
+     * @returns {OperationResultItem} The operational result item.
+     */
     public getOperationalResultItem(): OperationResultItem {
         return new OperationResultItem(this.type, this.$loki);
     }
 
+    /**
+     * Inserts the certificate into the database if it is not already present. Any associated keys are also updated and any certificates signed by this one are marked as such.
+     * 
+     * @returns A Promise that resolves to an OperationResult indicating the result of the insertion.
+     * @throws {CertError} If the certificate already exists in the database.
+     */
     public async insert(): Promise<OperationResult> {
         return new Promise<OperationResult>(async (resolve, reject) => {
             try {

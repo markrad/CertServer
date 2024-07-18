@@ -43,7 +43,6 @@ const CertError_1 = require("../webservertypes/CertError");
 const path_1 = __importDefault(require("path"));
 const promises_1 = require("fs/promises");
 const log4js = __importStar(require("log4js"));
-const promises_2 = require("fs/promises");
 const crypto_1 = __importDefault(require("crypto"));
 const OperationResultItem_1 = require("../webservertypes/OperationResultItem");
 const OperationResult_1 = require("../webservertypes/OperationResult");
@@ -56,6 +55,9 @@ const ExtensionAuthorityKeyIdentifier_1 = require("../extensions/ExtensionAuthor
 const ExtensionExtKeyUsage_1 = require("../extensions/ExtensionExtKeyUsage");
 const ExtensionSubjectAltName_1 = require("../extensions/ExtensionSubjectAltName");
 const logger = log4js.getLogger();
+/**
+ * Represents a utility class for working with certificates.
+ */
 class CertificateUtil {
     /**
      * Get a CertificateUtil from a PEM string
@@ -177,9 +179,19 @@ class CertificateUtil {
             version: this.row.meta.version
         };
     }
+    /**
+     * Creates an operational result item.
+     * @returns {OperationResultItem} The operational result item.
+     */
     getOperationalResultItem() {
         return new OperationResultItem_1.OperationResultItem(this.type, this.$loki);
     }
+    /**
+     * Inserts the certificate into the database if it is not already present. Any associated keys are also updated and any certificates signed by this one are marked as such.
+     *
+     * @returns A Promise that resolves to an OperationResult indicating the result of the insertion.
+     * @throws {CertError} If the certificate already exists in the database.
+     */
     insert() {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
@@ -340,14 +352,14 @@ class CertificateUtil {
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     let file;
-                    file = yield (0, promises_2.readFile)(this.absoluteFilename, { encoding: 'utf8' });
+                    file = yield (0, promises_1.readFile)(this.absoluteFilename, { encoding: 'utf8' });
                     let s = this.signedById;
                     while (s != null) {
                         let c = certificateStores_1.CertificateStores.findOne({ $loki: s });
                         if (c == null) {
                             throw new CertError_1.CertError(500, `Expected certificate row with id ${s}`);
                         }
-                        file += yield (0, promises_2.readFile)(c.absoluteFilename, { encoding: 'utf8' });
+                        file += yield (0, promises_1.readFile)(c.absoluteFilename, { encoding: 'utf8' });
                         s = c.signedById == c.$loki ? null : c.signedById;
                     }
                     resolve(file);
@@ -412,7 +424,7 @@ class CertificateUtil {
      */
     getpkiCert() {
         return __awaiter(this, void 0, void 0, function* () {
-            return node_forge_1.pki.certificateFromPem(this._pem ? this._pem : yield (0, promises_2.readFile)(this.absoluteFilename, { encoding: 'utf8' }));
+            return node_forge_1.pki.certificateFromPem(this._pem ? this._pem : yield (0, promises_1.readFile)(this.absoluteFilename, { encoding: 'utf8' }));
         });
     }
     /**
