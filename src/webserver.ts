@@ -926,7 +926,7 @@ export class WebServer {
                     input.pemString = await readFile(input.filename, { encoding: 'utf8' });
                 }
 
-                let msg = KeyUtil.pemDecode(input.pemString)[0];
+                let msg = CertificateUtil.pemDecode(input.pemString)[0];
                 logger.debug(`Received ${msg.type}`);
 
                 if (msg.type != 'CERTIFICATE') {

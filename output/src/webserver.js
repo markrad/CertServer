@@ -876,7 +876,7 @@ class WebServer {
                         }
                         input.pemString = yield (0, promises_1.readFile)(input.filename, { encoding: 'utf8' });
                     }
-                    let msg = keyUtil_1.KeyUtil.pemDecode(input.pemString)[0];
+                    let msg = certificateUtil_1.CertificateUtil.pemDecode(input.pemString)[0];
                     logger.debug(`Received ${msg.type}`);
                     if (msg.type != 'CERTIFICATE') {
                         throw new CertError_1.CertError(400, 'Unsupported type ' + msg.type);
