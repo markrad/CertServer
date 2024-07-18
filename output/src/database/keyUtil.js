@@ -98,7 +98,7 @@ class KeyUtil {
             pairCN: null,
             name: null,
             type: CertTypes_1.CertTypes.key,
-            encrypted: encryptedType != keyEncryption_1.KeyEncryption.NONE,
+            encrypted: undefined,
             encryptedType: encryptedType,
             $loki: undefined,
             meta: {
@@ -130,10 +130,8 @@ class KeyUtil {
     get pairCN() { return this.row.pairCN; }
     get name() { return this.row.name; }
     get type() { return this.row.type; }
-    get encrypted() { return this.row.encrypted; }
+    get encrypted() { return this.row.encryptedType != keyEncryption_1.KeyEncryption.NONE; }
     get encryptedType() { return this.row.encryptedType; }
-    // TODO: Remove this after the database has been upgraded
-    set encryptedType(value) { this._row.encryptedType = value; }
     /** LokiObj fields */
     get $loki() { return this.row.$loki; }
     get meta() {
@@ -182,7 +180,7 @@ class KeyUtil {
                     yield this.deleteFile();
                     yield this.writeFile();
                     this._row.encryptedType = encryptedType;
-                    this._row.encrypted = true;
+                    this._row.encrypted = undefined;
                     resolve(this.update());
                 }
                 catch (err) {
@@ -210,7 +208,7 @@ class KeyUtil {
                     yield this.deleteFile();
                     yield this.writeFile();
                     this._row.encryptedType = keyEncryption_1.KeyEncryption.NONE;
-                    this._row.encrypted = false;
+                    this._row.encrypted = undefined;
                     resolve(this.update());
                 }
                 catch (err) {
@@ -379,7 +377,6 @@ class KeyUtil {
     getpkiKey(password) {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
-                // TODO: Should already have a flag that says it is encrypted
                 try {
                     let p = yield (0, promises_1.readFile)(this.absoluteFilename, { encoding: 'utf8' });
                     switch (this.encryptedType) {

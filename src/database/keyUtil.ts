@@ -71,7 +71,7 @@ export class KeyUtil implements PrivateKeyRow, LokiObj {
             pairCN: null,
             name: null,
             type: CertTypes.key,
-            encrypted: encryptedType != KeyEncryption.NONE,
+            encrypted: undefined,
             encryptedType: encryptedType,
             $loki: undefined,
             meta: {
@@ -102,11 +102,8 @@ export class KeyUtil implements PrivateKeyRow, LokiObj {
     public get pairCN(): string { return this.row.pairCN; }
     public get name(): string { return this.row.name; }
     public get type(): CertTypes { return this.row.type; }
-    public get encrypted(): boolean { return this.row.encrypted; }
+    public get encrypted(): boolean { return this.row.encryptedType != KeyEncryption.NONE; }
     public get encryptedType(): KeyEncryption { return this.row.encryptedType; }
-
-    // TODO: Remove this after the database has been upgraded
-    public set encryptedType(value: KeyEncryption) { this._row.encryptedType = value; } 
 
     /** LokiObj fields */
     public get $loki(): number { return this.row.$loki }
@@ -158,7 +155,7 @@ export class KeyUtil implements PrivateKeyRow, LokiObj {
                 await this.deleteFile();
                 await this.writeFile();
                 this._row.encryptedType = encryptedType;
-                this._row.encrypted = true;
+                this._row.encrypted = undefined;
                 resolve(this.update());
             }
             catch (err) {
@@ -185,7 +182,7 @@ export class KeyUtil implements PrivateKeyRow, LokiObj {
                 await this.deleteFile();
                 await this.writeFile();
                 this._row.encryptedType = KeyEncryption.NONE;
-                this._row.encrypted = false;
+                this._row.encrypted = undefined;
                 resolve(this.update());
             }
             catch (err) {
@@ -366,7 +363,6 @@ export class KeyUtil implements PrivateKeyRow, LokiObj {
 
     public async getpkiKey(password?: string): Promise<pki.rsa.PrivateKey> {
         return new Promise<pki.rsa.PrivateKey>(async (resolve, reject) => {
-            // TODO: Should already have a flag that says it is encrypted
             try {
                 let p = await readFile(this.absoluteFilename, { encoding: 'utf8' });
                 switch (this.encryptedType) {
