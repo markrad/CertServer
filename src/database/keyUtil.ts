@@ -71,7 +71,6 @@ export class KeyUtil implements PrivateKeyRow, LokiObj {
             pairCN: null,
             name: null,
             type: CertTypes.key,
-            encrypted: undefined,
             encryptedType: encryptedType,
             $loki: undefined,
             meta: {
@@ -155,7 +154,6 @@ export class KeyUtil implements PrivateKeyRow, LokiObj {
                 await this.deleteFile();
                 await this.writeFile();
                 this._row.encryptedType = encryptedType;
-                this._row.encrypted = undefined;
                 resolve(this.update());
             }
             catch (err) {
@@ -182,7 +180,6 @@ export class KeyUtil implements PrivateKeyRow, LokiObj {
                 await this.deleteFile();
                 await this.writeFile();
                 this._row.encryptedType = KeyEncryption.NONE;
-                this._row.encrypted = undefined;
                 resolve(this.update());
             }
             catch (err) {

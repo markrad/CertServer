@@ -21,8 +21,6 @@ export interface PrivateKeyRow {
     pairId: number;
     /** Common name of certificate pair or null if there is no pair */
     pairCN: string;
-    /** Set to true if encrypted */
-    encrypted: boolean;
     /** The type of key encryption */
     encryptedType: KeyEncryption;
 }

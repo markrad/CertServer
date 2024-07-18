@@ -1163,7 +1163,7 @@ export class WebServer {
     private async _databaseFixUp(): Promise<void> {
 
         // First check that the database is a version that can be operated upon by the code.
-        if (this._currentVersion < 6) {
+        if (this._currentVersion < 7) {
             console.error(`Database version ${this._currentVersion} is not supported by the release - try installing the previous minor version`);
             process.exit(4);
         }
@@ -1171,16 +1171,16 @@ export class WebServer {
         // Check that the database is an older version that needs to be modified
         logger.info('Database is a supported version for this release');
 
-        // Add the encryption type in preperation for system encryption
-        if (this._currentVersion == 6) {
-            logger.info(`Updating database to version ${++this._currentVersion}`);
+        // // Add the encryption type in preperation for system encryption
+        // if (this._currentVersion == 6) {
+        //     logger.info(`Updating database to version ${++this._currentVersion}`);
 
-            KeyStores.keyDb.findAndUpdate({}, (k: PrivateKeyRow) => {
-                k.encrypted = undefined;
-            });
+        //     KeyStores.keyDb.findAndUpdate({}, (k: PrivateKeyRow) => {
+        //         k.encrypted = undefined;
+        //     });
 
-            DbStores.updateVersion(this._currentVersion);
-        }
+        //     DbStores.updateVersion(this._currentVersion);
+        // }
     }
 
     /**

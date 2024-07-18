@@ -98,7 +98,6 @@ class KeyUtil {
             pairCN: null,
             name: null,
             type: CertTypes_1.CertTypes.key,
-            encrypted: undefined,
             encryptedType: encryptedType,
             $loki: undefined,
             meta: {
@@ -180,7 +179,6 @@ class KeyUtil {
                     yield this.deleteFile();
                     yield this.writeFile();
                     this._row.encryptedType = encryptedType;
-                    this._row.encrypted = undefined;
                     resolve(this.update());
                 }
                 catch (err) {
@@ -208,7 +206,6 @@ class KeyUtil {
                     yield this.deleteFile();
                     yield this.writeFile();
                     this._row.encryptedType = keyEncryption_1.KeyEncryption.NONE;
-                    this._row.encrypted = undefined;
                     resolve(this.update());
                 }
                 catch (err) {
