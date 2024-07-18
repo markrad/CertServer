@@ -629,7 +629,6 @@ export class CertificateUtil implements CertificateRow, LokiObj {
                     }
                 }
                 catch (err) {
-                    // TODO Handle other errors than verify error
                     if (!err.actualIssuer || !err.expectedIssuer) {
                         logger.debug(`Possible error: ${err.message}`);
                     }

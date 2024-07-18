@@ -607,7 +607,6 @@ class WebServer {
                 }
             }));
             this._app.get('/api/ChainDownload', this._authRouter.auth, (request, response) => __awaiter(this, void 0, void 0, function* () {
-                // BUG - Breaks if there chain is not complete
                 try {
                     let c = this._resolveCertificateQuery(request.query);
                     let fileData = yield c.getCertificateChain();
@@ -1114,6 +1113,7 @@ class WebServer {
                 for (let k of keys) {
                     yield k.decrypt(this._config.certServer.keySecret);
                 }
+                // BUG: This will lose the secrets from now on
                 dbStores_1.DbStores.dbDb.findAndRemove();
                 dbStores_1.DbStores.initialize(this._currentVersion, false, false);
                 logger.info(`Updated ${keys.length} keys`);

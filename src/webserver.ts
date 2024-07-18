@@ -638,7 +638,6 @@ export class WebServer {
             }
         });
         this._app.get('/api/ChainDownload', this._authRouter.auth, async (request, response) => {
-            // BUG - Breaks if there chain is not complete
             try {
                 let c = this._resolveCertificateQuery(request.query as QueryType);
                 let fileData = await c.getCertificateChain();
@@ -1185,6 +1184,7 @@ export class WebServer {
             for (let k of keys) {
                 await k.decrypt(this._config.certServer.keySecret);
             }
+            // BUG: This will lose the secrets from now on
             DbStores.dbDb.findAndRemove();
             DbStores.initialize(this._currentVersion, false, false);
             logger.info(`Updated ${keys.length} keys`);
