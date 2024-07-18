@@ -93,8 +93,8 @@ export class WebServer {
     private _config: Config;
     private _version = 'v' + require('../../package.json').version;
     private _authRouter: AuthRouter = null;
-    private static readonly _lowestDBVersion: number = 5;           // The lowest version of the database that is supported
-    public static readonly _defaultDBVersion: number = 6;           // The version of the database that will be created if it doesn't exist
+    private static readonly _lowestDBVersion: number = 7;           // The lowest version of the database that is supported
+    public static readonly _defaultDBVersion: number = 7;           // The version of the database that will be created if it doesn't exist
     private _currentVersion: number = 0;
     get port() { return this._port; }
     get dataPath() { return this._dataPath; }

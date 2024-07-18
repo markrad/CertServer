@@ -1143,6 +1143,6 @@ class WebServer {
 }
 exports.WebServer = WebServer;
 WebServer.instance = null;
-WebServer._lowestDBVersion = 5; // The lowest version of the database that is supported
-WebServer._defaultDBVersion = 6; // The version of the database that will be created if it doesn't exist
+WebServer._lowestDBVersion = 7; // The lowest version of the database that is supported
+WebServer._defaultDBVersion = 7; // The version of the database that will be created if it doesn't exist
 //# sourceMappingURL=webserver.js.map
