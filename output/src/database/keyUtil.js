@@ -129,7 +129,7 @@ class KeyUtil {
     get pairCN() { return this.row.pairCN; }
     get name() { return this.row.name; }
     get type() { return this.row.type; }
-    get encrypted() { return this.row.encryptedType != keyEncryption_1.KeyEncryption.NONE; }
+    get encrypted() { return this.row.encryptedType == keyEncryption_1.KeyEncryption.USER; }
     get encryptedType() { return this.row.encryptedType; }
     /** LokiObj fields */
     get $loki() { return this.row.$loki; }

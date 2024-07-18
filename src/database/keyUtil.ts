@@ -101,7 +101,7 @@ export class KeyUtil implements PrivateKeyRow, LokiObj {
     public get pairCN(): string { return this.row.pairCN; }
     public get name(): string { return this.row.name; }
     public get type(): CertTypes { return this.row.type; }
-    public get encrypted(): boolean { return this.row.encryptedType != KeyEncryption.NONE; }
+    public get encrypted(): boolean { return this.row.encryptedType == KeyEncryption.USER; }
     public get encryptedType(): KeyEncryption { return this.row.encryptedType; }
 
     /** LokiObj fields */
