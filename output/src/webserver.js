@@ -1094,41 +1094,19 @@ class WebServer {
     _databaseFixUp() {
         return __awaiter(this, void 0, void 0, function* () {
             // First check that the database is a version that can be operated upon by the code.
-            if (this._currentVersion < 5) {
+            if (this._currentVersion < 6) {
                 console.error(`Database version ${this._currentVersion} is not supported by the release - try installing the previous minor version`);
                 process.exit(4);
             }
             // Check that the database is an older version that needs to be modified
             logger.info('Database is a supported version for this release');
             // Add the encryption type in preperation for system encryption
-            if (this._currentVersion == 5) {
+            if (this._currentVersion == 6) {
                 logger.info(`Updating database to version ${++this._currentVersion}`);
-                // let keys = KeyStores.find();
-                // for (let k of keys) {
-                //     k.encryptedType = k.encrypted? KeyEncryption.USER : KeyEncryption.NONE;
-                //     k.update();
-                // }
-                // Decrpyt all keys
-                let keys = keyStores_1.KeyStores.find({ encryptedType: { $eq: keyEncryption_1.KeyEncryption.SYSTEM } });
-                for (let k of keys) {
-                    yield k.decrypt(this._config.certServer.keySecret);
-                }
-                // BUG: This will lose the secrets from now on
-                dbStores_1.DbStores.dbDb.findAndRemove();
-                dbStores_1.DbStores.initialize(this._currentVersion, false, false);
-                logger.info(`Updated ${keys.length} keys`);
-                logger.info(`Database updated to version ${this._currentVersion}`);
-                logger.info('All keys have been decrypted');
-                logger.info('Please restart the server to complete the upgrade');
-                let ew = new eventWaiter_1.EventWaiter();
-                this._db.saveDatabase((err) => {
-                    if (err) {
-                        logger.error(`Failed to save database: ${err.message}`);
-                    }
-                    ew.EventSet();
+                keyStores_1.KeyStores.keyDb.findAndUpdate({}, (k) => {
+                    k.encrypted = undefined;
                 });
-                yield ew.EventWait();
-                process.exit(0);
+                dbStores_1.DbStores.updateVersion(this._currentVersion);
             }
         });
     }

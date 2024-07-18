@@ -1163,7 +1163,7 @@ export class WebServer {
     private async _databaseFixUp(): Promise<void> {
 
         // First check that the database is a version that can be operated upon by the code.
-        if (this._currentVersion < 5) {
+        if (this._currentVersion < 6) {
             console.error(`Database version ${this._currentVersion} is not supported by the release - try installing the previous minor version`);
             process.exit(4);
         }
@@ -1172,34 +1172,14 @@ export class WebServer {
         logger.info('Database is a supported version for this release');
 
         // Add the encryption type in preperation for system encryption
-        if (this._currentVersion == 5) {
+        if (this._currentVersion == 6) {
             logger.info(`Updating database to version ${++this._currentVersion}`);
-            // let keys = KeyStores.find();
-            // for (let k of keys) {
-            //     k.encryptedType = k.encrypted? KeyEncryption.USER : KeyEncryption.NONE;
-            //     k.update();
-            // }
-            // Decrpyt all keys
-            let keys = KeyStores.find({ encryptedType: { $eq: KeyEncryption.SYSTEM }});
-            for (let k of keys) {
-                await k.decrypt(this._config.certServer.keySecret);
-            }
-            // BUG: This will lose the secrets from now on
-            DbStores.dbDb.findAndRemove();
-            DbStores.initialize(this._currentVersion, false, false);
-            logger.info(`Updated ${keys.length} keys`);
-            logger.info(`Database updated to version ${this._currentVersion}`);
-            logger.info('All keys have been decrypted');
-            logger.info('Please restart the server to complete the upgrade');
-            let ew: EventWaiter = new EventWaiter();
-            this._db.saveDatabase((err) => {
-                if (err) {
-                    logger.error(`Failed to save database: ${err.message}`);
-                }
-                ew.EventSet();
+
+            KeyStores.keyDb.findAndUpdate({}, (k: PrivateKeyRow) => {
+                k.encrypted = undefined;
             });
-            await ew.EventWait();
-            process.exit(0);
+
+            DbStores.updateVersion(this._currentVersion);
         }
     }
 
