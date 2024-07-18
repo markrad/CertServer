@@ -316,9 +316,9 @@ class AuthRouter {
      * @param _response - The response object.
      * @param next - The next function to call in the middleware chain.
      */
-    _noAuth(_request, response, next) {
+    _noAuth(request, response, next) {
         try {
-            if (!this._authRequired) {
+            if (!this._authRequired && request.headers.authorization) {
                 throw new CertError_1.CertError(400, 'Authentication is not enabled');
             }
             next();
