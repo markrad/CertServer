@@ -42,6 +42,10 @@ export class KeyUtil implements PrivateKeyRow, LokiObj {
                 throw(new CertError(400, 'Password is required for key'));
             }
             k = pki.decryptRsaPrivateKey(pemString, password);
+            if (k == null) {
+                logger.warn(`Invalid password for encrypted key`);
+                throw(new CertError(400, 'Invalid password for key'));
+            }
             encrypted = password != KeyStores.keySecret? KeyEncryption.USER : KeyEncryption.SYSTEM;
         }
         else {

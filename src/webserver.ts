@@ -812,10 +812,11 @@ export class WebServer {
                     let key: KeyUtil = KeyStores.findOne({ $loki: KeyUtil.getIdFromFileName(file) });
                     if (!key) {
                         try {
-                            adding.push(this._tryAddKey({ filename: path.join(this._privatekeysPath, file) }));
+                            // Pass the system key encryption password by default. If it was user encrypted the add will fail.
+                            adding.push(this._tryAddKey({ filename: path.join(this._privatekeysPath, file), password: DbStores.getKeySecret() }));
                         }
                         catch (err) {
-                            logger.debug('WTF');
+                            logger.warn(err.message);
                         }
                     }
                 });

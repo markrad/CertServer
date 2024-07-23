@@ -71,6 +71,10 @@ class KeyUtil {
                     throw (new CertError_1.CertError(400, 'Password is required for key'));
                 }
                 k = node_forge_1.pki.decryptRsaPrivateKey(pemString, password);
+                if (k == null) {
+                    logger.warn(`Invalid password for encrypted key`);
+                    throw (new CertError_1.CertError(400, 'Invalid password for key'));
+                }
                 encrypted = password != keyStores_1.KeyStores.keySecret ? keyEncryption_1.KeyEncryption.USER : keyEncryption_1.KeyEncryption.SYSTEM;
             }
             else {
