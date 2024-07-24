@@ -46,6 +46,8 @@
 	// Use 'postCreateCommand' to run commands after the container is created.
 	"postCreateCommand": "./.devcontainer/init.sh",
 
+	// "postStartCommand": "tsc -p /workspaces/CertServer/tsconfig.json --watch",
+
 	// Configure tool-specific properties.
 	"customizations": {
 		"vscode": {
