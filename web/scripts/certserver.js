@@ -66,7 +66,7 @@ function buildKeyDetail(detail) {
     const detailHTML = ({ id, name, certPair, encrypted }) => `
         <div class="key-container">
         <div class="cert-info-buttons"> 
-            <button type="button" class="button2 keyBtnDownload" onClick="keyDownload('${id}')">Download</button>
+            <a href="/api/getKeyPem?id=${id}" download="${name}.pem" class="button2 keyBtnDownload">Download</a>
             <button type="button" class="button2 button2-red keyBtnDelete" onClick="keyDelete('${name}', '${id}')">Delete</button>
         </div>
         <div class="key-info-type">
@@ -133,22 +133,6 @@ async function keyClick(id) {
     else {
         keyShow(details, arrow);
     };
-}
-
-/**
- * Download a key from the server
- * 
- * @param {string} id Key id
- * @deprecated Can be better done with an href that behaves like a button
- */
-function keyDownload(id) {
-    // FUTURE Deprecate this
-    let filename = $(`#k${id} .cert-line-info`).text() + '.pem';
-    let fileLocation = '/api/getKeyPem?id=' + id;
-    const anchor = $('<a>', { href: fileLocation, download: filename })[0];
-    $('body').append(anchor);
-    anchor.click();
-    $(anchor).remove();
 }
 
 /**
