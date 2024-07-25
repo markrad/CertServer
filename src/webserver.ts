@@ -1172,16 +1172,21 @@ export class WebServer {
         // Check that the database is an older version that needs to be modified
         logger.info('Database is a supported version for this release');
 
-        // // Add the encryption type in preperation for system encryption
-        // if (this._currentVersion == 6) {
-        //     logger.info(`Updating database to version ${++this._currentVersion}`);
+        if (this._currentVersion == 7) {
+            // Remove unused cert type
+            logger.info(`Updating database to version ${++this._currentVersion}`);
 
-        //     KeyStores.keyDb.findAndUpdate({}, (k: PrivateKeyRow) => {
-        //         k.encrypted = undefined;
-        //     });
+            CertificateStores.certificateDb.findAndUpdate({}, (c: CertificateRow) => {
+                c.type = c.type - 1;
+            });
 
-        //     DbStores.updateVersion(this._currentVersion);
-        // }
+            KeyStores.keyDb.findAndUpdate({}, (k: PrivateKeyRow) => {
+                k.type = k.type - 1;
+            });
+
+            DbStores.updateVersion(this._currentVersion);
+            logger.info(`Database updated to version ${this._currentVersion}`);
+        }
     }
 
     /**
