@@ -19,6 +19,7 @@ import { OperationResultItem } from '../webservertypes/OperationResultItem';
 import { getSASToken, ConnectionInfo } from '../utility/generatesastoken'
 import { Config } from '../webservertypes/Config';
 import { dump } from 'js-yaml';
+import { CertTypes } from '../webservertypes/CertTypes';
 
 
 const testPath = path.join(__dirname, '../testdata');
@@ -314,7 +315,7 @@ async function createCACertificate(): Promise<boolean> {
     ew.EventReset();
     msg = JSON.parse(wsQueue.shift() as string);
     checkPacket(msg, 'someName/someName_key', 2, 0, 0);
-    checkItems(msg.added, [OperationResultItem.makeResult({ type: 1, id: nextCertId }), OperationResultItem.makeResult({ type: 4, id: nextKeyId })]);
+    checkItems(msg.added, [OperationResultItem.makeResult({ type: CertTypes.root, id: nextCertId }), OperationResultItem.makeResult({ type: CertTypes.key, id: nextKeyId })]);
     if (encryptKeys) {
         let key = await readFile(path.join(testPath, 'privatekeys/someName_key_1.pem'), { encoding: 'utf8' });
         assert(key.startsWith('-----BEGIN ENCRYPTED PRIVATE KEY-----'), 'Key is not encrypted');
@@ -331,7 +332,7 @@ async function createIntermediateCertificate(): Promise<boolean> {
     ew.EventReset();
     msg = JSON.parse(wsQueue.shift() as string);
     checkPacket(msg, 'intName/intName_key', 2, 0, 0);
-    checkItems(msg.added, [OperationResultItem.makeResult({ type: 2, id: nextCertId }), OperationResultItem.makeResult({ type: 4, id: nextKeyId })]);
+    checkItems(msg.added, [OperationResultItem.makeResult({ type: CertTypes.intermediate, id: nextCertId }), OperationResultItem.makeResult({ type: CertTypes.key, id: nextKeyId })]);
     return true;
 }
 
@@ -344,7 +345,7 @@ async function createLeafCertificate(): Promise<boolean> {
     ew.EventReset();
     msg = JSON.parse(wsQueue.shift() as string);
     checkPacket(msg, 'leafName/leafName_key', 2, 0, 0);
-    checkItems(msg.added, [OperationResultItem.makeResult({ type: 3, id: nextCertId }), OperationResultItem.makeResult({ type: 4, id: nextKeyId })]);
+    checkItems(msg.added, [OperationResultItem.makeResult({ type: CertTypes.leaf, id: nextCertId }), OperationResultItem.makeResult({ type: CertTypes.key, id: nextKeyId })]);
     return true;
 }
 
@@ -355,7 +356,7 @@ async function addTagsToIntermediate(): Promise<boolean> {
     ew.EventReset();
     msg = JSON.parse(wsQueue.shift() as string);
     checkPacket(msg, 'intName', 0, 1, 0);
-    checkItems(msg.updated, [OperationResultItem.makeResult({ type: 2, id: nextCertId - 1 })]);
+    checkItems(msg.updated, [OperationResultItem.makeResult({ type: CertTypes.intermediate, id: nextCertId - 1 })]);
     return true;
 }
 
@@ -514,8 +515,8 @@ async function deleteRootCertificate(): Promise<boolean> {
     ew.EventReset();
     msg = JSON.parse(wsQueue.shift() as string);
     checkPacket(msg, '', 0, 2, 1);
-    checkItems(msg.updated, [OperationResultItem.makeResult({ type: 4, id: nextKeyId - 2 }), OperationResultItem.makeResult({ type: 2, id: nextCertId - 1 })]);
-    checkItems(msg.deleted, [OperationResultItem.makeResult({ type: 1, id: nextCertId - 2 })]);
+    checkItems(msg.updated, [OperationResultItem.makeResult({ type: CertTypes.key, id: nextKeyId - 2 }), OperationResultItem.makeResult({ type: CertTypes.intermediate, id: nextCertId - 1 })]);
+    checkItems(msg.deleted, [OperationResultItem.makeResult({ type: CertTypes.root, id: nextCertId - 2 })]);
     res = await httpRequest('get', url + '/certDetails?id=2');
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
     assert.equal(res.body.signerId, null, 'Signed certificate still references nonexistent parent');
@@ -531,8 +532,8 @@ async function uploadRootCertificate(): Promise<boolean> {
     ew.EventReset();
     msg = JSON.parse(wsQueue.shift() as string);
     checkPacket(msg, 'multiple', 1, 2, 0);
-    checkItems(msg.added, [OperationResultItem.makeResult({ type: 1, id: nextCertId })]);
-    checkItems(msg.updated, [OperationResultItem.makeResult({ type: 4, id: nextKeyId - 2 }), OperationResultItem.makeResult({ type: 2, id: nextCertId - 2 })]);
+    checkItems(msg.added, [OperationResultItem.makeResult({ type: CertTypes.root, id: nextCertId })]);
+    checkItems(msg.updated, [OperationResultItem.makeResult({ type: CertTypes.key, id: nextKeyId - 2 }), OperationResultItem.makeResult({ type: CertTypes.intermediate, id: nextCertId - 2 })]);
     res = await httpRequest('get', url + '/certDetails?id=2');
     assert.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
     assert.equal(res.body.signerId, 4, 'Signed certificate does not reference uploaded parent');
@@ -547,8 +548,8 @@ async function deleteIntermediateKey(): Promise<boolean> {
     ew.EventReset();
     msg = JSON.parse(wsQueue.shift() as string);
     checkPacket(msg, '', 0, 1, 1);
-    checkItems(msg.updated, [OperationResultItem.makeResult({ type: 2, id: nextCertId - 2 })]);
-    checkItems(msg.deleted, [OperationResultItem.makeResult({ type: 4, id: nextKeyId - 1 })]);
+    checkItems(msg.updated, [OperationResultItem.makeResult({ type: CertTypes.intermediate, id: nextCertId - 2 })]);
+    checkItems(msg.deleted, [OperationResultItem.makeResult({ type: CertTypes.key, id: nextKeyId - 1 })]);
     return true;
 }
 
@@ -561,8 +562,8 @@ async function uploadIntermediateKey(): Promise<boolean> {
     ew.EventReset();
     msg = JSON.parse(wsQueue.shift() as string);
     checkPacket(msg, 'multiple', 1, 1, 0);
-    checkItems(msg.added, [OperationResultItem.makeResult({ type: 4, id: nextKeyId })]);
-    checkItems(msg.updated, [OperationResultItem.makeResult({ type: 2, id: nextCertId - 2 })]);
+    checkItems(msg.added, [OperationResultItem.makeResult({ type: CertTypes.key, id: nextKeyId })]);
+    checkItems(msg.updated, [OperationResultItem.makeResult({ type: CertTypes.intermediate, id: nextCertId - 2 })]);
     return true;
 }
 

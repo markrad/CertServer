@@ -29,6 +29,7 @@ const eventWaiter_1 = require("../utility/eventWaiter");
 const OperationResultItem_1 = require("../webservertypes/OperationResultItem");
 const generatesastoken_1 = require("../utility/generatesastoken");
 const js_yaml_1 = require("js-yaml");
+const CertTypes_1 = require("../webservertypes/CertTypes");
 const testPath = path_1.default.join(__dirname, '../testdata');
 const testConfig = path_1.default.join(testPath, 'testconfig.yml');
 let useTls = false;
@@ -291,7 +292,7 @@ function createCACertificate() {
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
         checkPacket(msg, 'someName/someName_key', 2, 0, 0);
-        checkItems(msg.added, [OperationResultItem_1.OperationResultItem.makeResult({ type: 1, id: nextCertId }), OperationResultItem_1.OperationResultItem.makeResult({ type: 4, id: nextKeyId })]);
+        checkItems(msg.added, [OperationResultItem_1.OperationResultItem.makeResult({ type: CertTypes_1.CertTypes.root, id: nextCertId }), OperationResultItem_1.OperationResultItem.makeResult({ type: CertTypes_1.CertTypes.key, id: nextKeyId })]);
         if (encryptKeys) {
             let key = yield (0, promises_1.readFile)(path_1.default.join(testPath, 'privatekeys/someName_key_1.pem'), { encoding: 'utf8' });
             (0, node_assert_1.default)(key.startsWith('-----BEGIN ENCRYPTED PRIVATE KEY-----'), 'Key is not encrypted');
@@ -309,7 +310,7 @@ function createIntermediateCertificate() {
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
         checkPacket(msg, 'intName/intName_key', 2, 0, 0);
-        checkItems(msg.added, [OperationResultItem_1.OperationResultItem.makeResult({ type: 2, id: nextCertId }), OperationResultItem_1.OperationResultItem.makeResult({ type: 4, id: nextKeyId })]);
+        checkItems(msg.added, [OperationResultItem_1.OperationResultItem.makeResult({ type: CertTypes_1.CertTypes.intermediate, id: nextCertId }), OperationResultItem_1.OperationResultItem.makeResult({ type: CertTypes_1.CertTypes.key, id: nextKeyId })]);
         return true;
     });
 }
@@ -323,7 +324,7 @@ function createLeafCertificate() {
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
         checkPacket(msg, 'leafName/leafName_key', 2, 0, 0);
-        checkItems(msg.added, [OperationResultItem_1.OperationResultItem.makeResult({ type: 3, id: nextCertId }), OperationResultItem_1.OperationResultItem.makeResult({ type: 4, id: nextKeyId })]);
+        checkItems(msg.added, [OperationResultItem_1.OperationResultItem.makeResult({ type: CertTypes_1.CertTypes.leaf, id: nextCertId }), OperationResultItem_1.OperationResultItem.makeResult({ type: CertTypes_1.CertTypes.key, id: nextKeyId })]);
         return true;
     });
 }
@@ -335,7 +336,7 @@ function addTagsToIntermediate() {
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
         checkPacket(msg, 'intName', 0, 1, 0);
-        checkItems(msg.updated, [OperationResultItem_1.OperationResultItem.makeResult({ type: 2, id: nextCertId - 1 })]);
+        checkItems(msg.updated, [OperationResultItem_1.OperationResultItem.makeResult({ type: CertTypes_1.CertTypes.intermediate, id: nextCertId - 1 })]);
         return true;
     });
 }
@@ -507,8 +508,8 @@ function deleteRootCertificate() {
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
         checkPacket(msg, '', 0, 2, 1);
-        checkItems(msg.updated, [OperationResultItem_1.OperationResultItem.makeResult({ type: 4, id: nextKeyId - 2 }), OperationResultItem_1.OperationResultItem.makeResult({ type: 2, id: nextCertId - 1 })]);
-        checkItems(msg.deleted, [OperationResultItem_1.OperationResultItem.makeResult({ type: 1, id: nextCertId - 2 })]);
+        checkItems(msg.updated, [OperationResultItem_1.OperationResultItem.makeResult({ type: CertTypes_1.CertTypes.key, id: nextKeyId - 2 }), OperationResultItem_1.OperationResultItem.makeResult({ type: CertTypes_1.CertTypes.intermediate, id: nextCertId - 1 })]);
+        checkItems(msg.deleted, [OperationResultItem_1.OperationResultItem.makeResult({ type: CertTypes_1.CertTypes.root, id: nextCertId - 2 })]);
         res = yield httpRequest('get', url + '/certDetails?id=2');
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         node_assert_1.default.equal(res.body.signerId, null, 'Signed certificate still references nonexistent parent');
@@ -525,8 +526,8 @@ function uploadRootCertificate() {
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
         checkPacket(msg, 'multiple', 1, 2, 0);
-        checkItems(msg.added, [OperationResultItem_1.OperationResultItem.makeResult({ type: 1, id: nextCertId })]);
-        checkItems(msg.updated, [OperationResultItem_1.OperationResultItem.makeResult({ type: 4, id: nextKeyId - 2 }), OperationResultItem_1.OperationResultItem.makeResult({ type: 2, id: nextCertId - 2 })]);
+        checkItems(msg.added, [OperationResultItem_1.OperationResultItem.makeResult({ type: CertTypes_1.CertTypes.root, id: nextCertId })]);
+        checkItems(msg.updated, [OperationResultItem_1.OperationResultItem.makeResult({ type: CertTypes_1.CertTypes.key, id: nextKeyId - 2 }), OperationResultItem_1.OperationResultItem.makeResult({ type: CertTypes_1.CertTypes.intermediate, id: nextCertId - 2 })]);
         res = yield httpRequest('get', url + '/certDetails?id=2');
         node_assert_1.default.equal(res.statusCode, 200, `Bad status code from server - ${res.statusCode}`);
         node_assert_1.default.equal(res.body.signerId, 4, 'Signed certificate does not reference uploaded parent');
@@ -542,8 +543,8 @@ function deleteIntermediateKey() {
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
         checkPacket(msg, '', 0, 1, 1);
-        checkItems(msg.updated, [OperationResultItem_1.OperationResultItem.makeResult({ type: 2, id: nextCertId - 2 })]);
-        checkItems(msg.deleted, [OperationResultItem_1.OperationResultItem.makeResult({ type: 4, id: nextKeyId - 1 })]);
+        checkItems(msg.updated, [OperationResultItem_1.OperationResultItem.makeResult({ type: CertTypes_1.CertTypes.intermediate, id: nextCertId - 2 })]);
+        checkItems(msg.deleted, [OperationResultItem_1.OperationResultItem.makeResult({ type: CertTypes_1.CertTypes.key, id: nextKeyId - 1 })]);
         return true;
     });
 }
@@ -557,8 +558,8 @@ function uploadIntermediateKey() {
         ew.EventReset();
         msg = JSON.parse(wsQueue.shift());
         checkPacket(msg, 'multiple', 1, 1, 0);
-        checkItems(msg.added, [OperationResultItem_1.OperationResultItem.makeResult({ type: 4, id: nextKeyId })]);
-        checkItems(msg.updated, [OperationResultItem_1.OperationResultItem.makeResult({ type: 2, id: nextCertId - 2 })]);
+        checkItems(msg.added, [OperationResultItem_1.OperationResultItem.makeResult({ type: CertTypes_1.CertTypes.key, id: nextKeyId })]);
+        checkItems(msg.updated, [OperationResultItem_1.OperationResultItem.makeResult({ type: CertTypes_1.CertTypes.intermediate, id: nextCertId - 2 })]);
         return true;
     });
 }
