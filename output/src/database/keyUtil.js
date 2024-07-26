@@ -160,6 +160,7 @@ class KeyUtil {
         return {
             id: this.$loki,
             name: this.name,
+            certPairId: this.pairId,
             certPair: (this.pairId == null) ? 'Not present' : this.name.substring(0, this.name.length - 4),
             encrypted: this.encrypted,
         };

@@ -63,7 +63,7 @@ function buildKeyEntry(file) {
  * @returns {string} HTML string for a key detail block on the webpage
  */
 function buildKeyDetail(detail) {
-    const detailHTML = ({ id, name, certPair, encrypted }) => `
+    const detailHTML = ({ id, name, certPairId, certPair, encrypted }) => `
         <div class="key-container">
         <div class="cert-info-buttons"> 
             <a href="/api/getKeyPem?id=${id}" download="${name}.pem" class="button2 keyBtnDownload">Download</a>
@@ -76,13 +76,14 @@ function buildKeyDetail(detail) {
         <div class="key-info-pair">
             <span class="key-info-pair-label">Pair:&nbsp;</span>
             <span class="key-info-pair-value">${certPair}</span>
+            <span class="key-info-pair-id hidden">${certPairId}</span>
         </div>
         <div class="key-info-encrypted">
             <span class="key-info-encrypted-label">Encrypted:&nbsp;</span>
             <span class="key-info-encrypted-value">${encrypted}</span>
         </div>
     `;
-    return detailHTML({ id: detail.id, name: detail.name, certPair: detail.certPair, encrypted: detail.encrypted? 'yes' : 'no' });
+    return detailHTML({ id: detail.id, name: detail.name, certPairId: detail.certPairId, certPair: detail.certPair, encrypted: detail.encrypted? 'yes' : 'no' });
 }
 
 /**
@@ -92,6 +93,7 @@ function buildKeyDetail(detail) {
  * @param {JQuery<HTMLElement>} arrow jquery object for the arrow on the key line
  */
 function keyHide(details, arrow) {
+    removeRelativeHighlights();
     details.slideUp(400, () => {
         details.html('');
         arrow.text('>');
@@ -105,6 +107,7 @@ function keyHide(details, arrow) {
  * @param {JQuery<HTMLElement>} arrow jquery object for the arrow on the key line
  */
 async function keyShow(details, arrow) {
+    removeRelativeHighlights();
     arrow.text('˅');
     try {
         let id = details.data('id');
@@ -112,6 +115,10 @@ async function keyShow(details, arrow) {
         let content = buildKeyDetail(result);
         details.html(content);
         details.slideDown(500);
+        if (result.certPairId != null) {
+            let certPair = $(`#c${result.certPairId}`);
+            certPair.find('.cert-line-info').addClass('cert-value-key');
+        }
     }
     catch (err) {
         showMessage(err);
