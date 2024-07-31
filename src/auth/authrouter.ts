@@ -331,11 +331,8 @@ export class AuthRouter {
             next();
         }
         catch (err) {
-            // TODO - Pass error message to sign in page
             logger.warn(`Failed to authenticate: ${err.message}`);
-            // let e: (CertError | CertMultiError) = CertMultiError.getCertError(err);
-            // return response.status(e.status).json(e.getResponse());
-            response.redirect('/signin');
+            response.redirect(`/signin?error=${err.message}`);
         }
     }
 
