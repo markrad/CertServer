@@ -21,7 +21,7 @@
         {
             "type": "bind",
             "source": "/home/markrad/.ssh",
-            "target": "/home/node/.ssh"
+            "target": "/home/bun/.ssh"
         }
     ],
     "containerEnv": {
