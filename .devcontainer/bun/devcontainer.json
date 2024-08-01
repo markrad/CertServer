@@ -17,6 +17,13 @@
     "runArgs": [
         "-p=4141:4141"
     ],
+    "mounts": [
+        {
+            "type": "bind",
+            "source": "/home/markrad/.ssh",
+            "target": "/home/node/.ssh"
+        }
+    ],
     "containerEnv": {
         "LOG_SERVER_STDOUT": "1",
         "RUN_API_TESTS": "1",
