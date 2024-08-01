@@ -42,6 +42,7 @@ const CertMultiError_1 = require("../webservertypes/CertMultiError");
 const UserRole_1 = require("../database/UserRole");
 const dbStores_1 = require("../database/dbStores");
 const wsmanager_1 = require("../wsmanger/wsmanager");
+const webserver_1 = require("../webserver");
 const logger = log4js.getLogger('CertServer');
 const tokenLife = '5m';
 const defaultUser = 'admin';
@@ -78,7 +79,7 @@ class AuthRouter {
             }
             response.render('signin', {
                 title: 'Sign In',
-                version: 'v' + require('../../../package.json').version,
+                version: webserver_1.WebServer.version,
                 errorMessage: request.query.error,
                 authRequired: `${authRequired ? '1' : '0'}`,
             });

@@ -140,10 +140,19 @@ export class WebServer {
             }
 
             this._useAuthentication = true;
-            this._allowBasicAuth = true;
         }
         else {
             this._useAuthentication = false;
+        }
+
+        if (config.certServer.allowBasicAuth) {
+            if (!config.certServer.useAuthentication) {
+                throw new Error('Basic authentication requires authentication to be enabled');
+            }
+
+            this._allowBasicAuth = true;
+        }
+        else {
             this._allowBasicAuth = false;
         }
 
@@ -174,9 +183,6 @@ export class WebServer {
             mkdirSync(this._privatekeysPath);
         if (!existsSync(this._dbPath)) 
             mkdirSync(this._dbPath);
-
-        this._app.set('views', `${WebServer.getWebPath}/views`);
-        this._app.set('view engine', 'pug');
     }
 
     /**
@@ -247,6 +253,8 @@ export class WebServer {
             process.exit(4);
         }
 
+        this._app.set('views', `${WebServer.getWebPath}/views`);
+        this._app.set('view engine', 'pug');
         this._app.use(Express.urlencoded({ extended: true }));
         this._app.use(serveFavicon(`${WebServer.getWebPath}/icons/doc_lock.ico`, { maxAge: 2592000000 }));
         this._app.use(Express.json({ type: '*/json' }));
