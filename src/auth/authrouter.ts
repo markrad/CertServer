@@ -9,6 +9,7 @@ import { CertMultiError } from '../webservertypes/CertMultiError';
 import { UserRole } from '../database/UserRole';
 import { DbStores } from '../database/dbStores';
 import { WSManager } from '../wsmanger/wsmanager';
+import { WebServer } from '../webserver';
 
 const logger = log4js.getLogger('CertServer');
 const tokenLife: string | number = '5m';
@@ -49,7 +50,7 @@ export class AuthRouter {
             }
             response.render('signin', {
                 title: 'Sign In',
-                version: 'v' + require('../../../package.json').version,
+                version: WebServer.version,
                 errorMessage: request.query.error,
                 authRequired: `${authRequired ? '1' : '0'}`,
             });

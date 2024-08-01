@@ -5,6 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Launch bun CertServer",
+            "program": "${workspaceFolder}/src/index.ts",
+            "request": "launch",
+            "type": "bun",
+            "args": [ "./config.yml" ],
+        },
+        {
             "type": "node",
             "request": "launch",
             "name": "Launch CertServer",

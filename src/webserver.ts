@@ -63,6 +63,7 @@ import { UserRole } from './database/UserRole';
 const logger = log4js.getLogger('CertServer');
 logger.level = "debug";
 
+const ifBun: string = process.versions.bun? '' : '../';
 /**
  * @classdesc Web server to help maintain test certificates and keys in the file system and a database.
  */
@@ -78,6 +79,24 @@ export class WebServer {
     static getWebServer(): WebServer {
         return WebServer.instance;
     }
+
+    static get isBun(): boolean {
+        return process.versions.bun != undefined;
+    }
+
+    static get getPackagePath(): string {
+        let dir = `${__dirname}/${ifBun}../package.json`;
+        return path.resolve(dir);
+    }
+
+    static get getWebPath(): string {
+        let dir = `${__dirname}/${ifBun}../web`;
+        return path.resolve(dir);
+    }
+
+    private static _version = 'v' + require(WebServer.getPackagePath).version;
+    public static get version() { return this._version; }
+
     private _port: number;
     private _dataPath: string;
     private _certificatesPath: string;
@@ -91,7 +110,6 @@ export class WebServer {
     private _allowBasicAuth: boolean = false;
     private _encryptKeys: boolean = false;
     private _config: Config;
-    private _version = 'v' + require('../../package.json').version;
     private _authRouter: AuthRouter = null;
     private static readonly _lowestDBVersion: number = 7;           // The lowest version of the database that is supported
     public static readonly _defaultDBVersion: number = 7;           // The version of the database that will be created if it doesn't exist
@@ -121,8 +139,12 @@ export class WebServer {
                 throw new Error('Authentication requires TLS encryption to be enabled');
             }
 
-            this._useAuthentication = config.certServer.useAuthentication;
-            this._allowBasicAuth = config.certServer.allowBasicAuth ?? false;
+            this._useAuthentication = true;
+            this._allowBasicAuth = true;
+        }
+        else {
+            this._useAuthentication = false;
+            this._allowBasicAuth = false;
         }
 
         if (config.certServer.encryptKeys) {
@@ -130,7 +152,10 @@ export class WebServer {
                 throw new Error('Key encryption requires TLS encryption to be enabled');
             }
 
-            this._encryptKeys = config.certServer.encryptKeys;
+            this._encryptKeys = true;
+        }
+        else {
+            this._encryptKeys = false;
         }
 
         if (config.certServer.subject.C && config.certServer.subject.C.length != 2) {
@@ -150,7 +175,7 @@ export class WebServer {
         if (!existsSync(this._dbPath)) 
             mkdirSync(this._dbPath);
 
-        this._app.set('views', path.join(__dirname, '../../web/views'));
+        this._app.set('views', `${WebServer.getWebPath}/views`);
         this._app.set('view engine', 'pug');
     }
 
@@ -166,12 +191,12 @@ export class WebServer {
             port: number,
         }
         const csHost: (c: cshostType) => string = ({ protocol, hostname, port }) => `${protocol}://${hostname}:${port}`;
-        logger.info(`CertServer starting - ${this._version}`);
+        logger.info(`CertServer starting - ${WebServer.version}`);
         logger.info(`Data path: ${this._dataPath}`);
         logger.info(`TLS enabled: ${this._certificate != null}`);
-        logger.info(`Authentication enabled: ${this._useAuthentication != null}`);
-        logger.info(`Basic Auth enabled: ${this._allowBasicAuth != null}`);
-        logger.info(`Key encryption enabled: ${this._encryptKeys != null}`);
+        logger.info(`Authentication enabled: ${this._useAuthentication}`);
+        logger.info(`Basic Auth enabled: ${this._allowBasicAuth}`);
+        logger.info(`Key encryption enabled: ${this._encryptKeys}`);
         let getCollections: () => void = function() {
             if (null == (certificates = db.getCollection<CertificateRow>('certificates'))) {
                 certificates = db.addCollection<CertificateRow>('certificates', { });
@@ -223,16 +248,16 @@ export class WebServer {
         }
 
         this._app.use(Express.urlencoded({ extended: true }));
-        this._app.use(serveFavicon(path.join(__dirname, "../../web/icons/doc_lock.ico"), { maxAge: 2592000000 }));
+        this._app.use(serveFavicon(`${WebServer.getWebPath}/icons/doc_lock.ico`, { maxAge: 2592000000 }));
         this._app.use(Express.json({ type: '*/json' }));
         this._app.use(Express.text({ type: 'text/plain' }));
         this._app.use(Express.text({ type: 'application/x-www-form-urlencoded' }));
         this._app.use(Express.text({ type: 'application/json' }));
-        this._app.use('/scripts', Express.static(path.join(__dirname, '../../web/scripts')));
-        this._app.use('/styles', Express.static(path.join(__dirname, '../../web/styles')));
-        this._app.use('/icons', Express.static(path.join(__dirname, '../../web/icons')));
-        this._app.use('/files', Express.static(path.join(__dirname, '../../web/files')));
-        this._app.use('/images', Express.static(path.join(__dirname, '../../web/images')));
+        this._app.use('/scripts', Express.static(`${WebServer.getWebPath}/scripts`));
+        this._app.use('/styles', Express.static(`${WebServer.getWebPath}/styles`));
+        this._app.use('/icons', Express.static(`${WebServer.getWebPath}/icons`));
+        this._app.use('/files', Express.static(`${ WebServer.getWebPath }/files`));
+        this._app.use('/images', Express.static(`${WebServer.getWebPath}/images`));
         this._app.use(FileUpload());
         this._app.use(session({
             secret: 'mysecret',
@@ -287,7 +312,7 @@ export class WebServer {
                 L: this._config.certServer.subject.L,
                 O: this._config.certServer.subject.O,
                 OU: this._config.certServer.subject.OU,
-                version: this._version,
+                version: WebServer.version,
                 authRequired: `${this._useAuthentication? '1' : '0'}`,
                 userName: this._useAuthentication? _request.session.userId : 'None',
                 userRole: this._useAuthentication? _request.session.role == UserRole.ADMIN? 'admin' : 'user' : '',
@@ -299,7 +324,7 @@ export class WebServer {
                 useAthentication: this._useAuthentication,
                 allowBasicAuth: this._allowBasicAuth,
                 encryptKeys: this._encryptKeys,
-                version: this._version,
+                version: WebServer.version,
                 defaultSubject: {
                     C: this._config.certServer.subject.C,
                     ST: this._config.certServer.subject.ST,
@@ -1162,6 +1187,8 @@ export class WebServer {
      * This function is used to update the database when breaking changes are made. 
      */
     private async _databaseFixUp(): Promise<void> {
+
+        DbStores.setKeyEncryptionState(this._encryptKeys);      // Broken database encryption state. Not sure how this happened but this will fix it.
 
         // First check that the database is a version that can be operated upon by the code.
         if (this._currentVersion < 7) {

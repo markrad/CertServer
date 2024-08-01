@@ -1,0 +1,35 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/marcosgomesneto/bun-devcontainers/tree/main/src/basic-bun
+{
+    "name": "Bun",
+    "dockerFile": "Dockerfile",
+    // Configure tool-specific properties.
+    "customizations": {
+        // Configure properties specific to VS Code.
+        "vscode": {
+            // Add the IDs of extensions you want installed when the container is created.
+            "extensions": [
+                "oven.bun-vscode",
+                "maixiaojie.git-emoji"
+            ]
+        }
+    },
+    "runArgs": [
+        "-p=4141:4141"
+    ],
+    "containerEnv": {
+        "LOG_SERVER_STDOUT": "1",
+        "RUN_API_TESTS": "1",
+        "RUN_BASH_HELPER_TESTS": "1",
+        "RUN_POWERSHELL_HELPER_TESTS": "0",
+        "RUN_IOTHUB_TESTS": "0",
+        "USE_TLS": "1",
+        "TLS_CERT": "src/tests/rr-frigate_lan.pem",
+        "TLS_KEY": "src/tests/rr-frigate.lan_key.pem",
+        "USE_AUTH": "1",
+        "AUTH_USERID": "test",
+        "AUTH_PASSWORD": "test",
+        "ENCRYPT_KEYS": "1",
+        "NODE_EXTRA_CA_CERTS": "src/tests/CertServer-Test.pem"
+    }
+}
