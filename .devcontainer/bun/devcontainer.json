@@ -10,7 +10,8 @@
             // Add the IDs of extensions you want installed when the container is created.
             "extensions": [
                 "oven.bun-vscode",
-                "maixiaojie.git-emoji"
+                "maixiaojie.git-emoji",
+				"github.vscode-github-actions"
             ]
         }
     },
